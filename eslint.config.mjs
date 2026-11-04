@@ -118,8 +118,8 @@ const eslintConfig = defineConfig([
       "check-file/filename-blocklist": [
         "error",
         {
-          // 슬라이스 내부 비표준 세그먼트 폴더 차단 (7대 표준 세그먼트만 허용)
-          "src/{widgets,features,entities}/*/!(ui|queries|server|store|schema|types|lib)/**":
+          // 슬라이스 내부 비표준 세그먼트 폴더 차단 (7대 표준 세그먼트만 허용, 슬라이스 루트 index.{ts,tsx}는 허용)
+          "src/{widgets,features,entities}/*/!(ui|queries|server|store|schema|types|lib|index.ts|index.tsx)/**":
             "src/**/{ui,queries,server,store,schema,types,lib}/**",
 
           // store 폴더 내 파일은 반드시 .store.ts 접미사를 가져야 함 (테스트 및 index 제외)
