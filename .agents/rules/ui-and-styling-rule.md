@@ -25,8 +25,8 @@ UI 요소를 작성할 때는 새로운 기본 HTML 태그(`<button>`, `<input>`
 
 `@/shared/ui`는 트리쉐이킹 최적화 및 클라이언트 번들 오염 방지를 위해 **배럴 파일(`index.ts`)을 생성하지 않습니다.**
 
-- ⭕ `import { Button } from "@/shared/ui/button";`
-- ❌ `import { Button } from "@/shared/ui";`
+- [Good] `import { Button } from "@/shared/ui/button";`
+- [Bad] `import { Button } from "@/shared/ui";`
 
 ---
 
@@ -67,7 +67,7 @@ export function CustomCard({ className, isActive, children }: CustomCardProps) {
 
 인라인 SVG를 임의로 작성하지 않고, 이미 설치된 **`lucide-react`** 아이콘 라이브러리를 사용합니다:
 
-- ⭕ `import { Check, AlertCircle, ChevronDown } from "lucide-react";`
+- [Good] `import { Check, AlertCircle, ChevronDown } from "lucide-react";`
 
 ---
 

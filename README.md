@@ -5,7 +5,7 @@
 
 ---
 
-## 📌 Executive Summary
+## 1. Executive Summary
 
 사내 백오피스 및 B2B SaaS 환경에서 폼(Form) 관리 비용과 비정형 데이터 입력 공수는 가장 빈번한 생산성 병목 중 하나입니다. 또한 대형 언어 모델(LLM)을 업무 시스템에 도입할 때 발생하는 **환각(Hallucination), 비정형 출력 포맷 깨짐, 불필요한 토큰 비용 낭비**는 프로덕션 안착을 가로막는 주요 장애물입니다.
 
@@ -18,7 +18,7 @@
 
 ---
 
-## 🏛️ System Architecture
+## 2. System Architecture
 
 ```mermaid
 flowchart TD
@@ -53,7 +53,7 @@ flowchart TD
 
 ---
 
-## 🛡️ Engineering Harness & Governance
+## 3. Engineering Harness & Governance
 
 본 저장소는 개발 생산성과 아키텍처 정합성을 기계적으로 통제하기 위한 **엔지니어링 하네스(Harness)** 가드레일을 준수합니다.
 
@@ -68,7 +68,7 @@ flowchart TD
 
 ---
 
-## 📂 Architecture Layers (Feature-Sliced Design)
+## 4. Architecture Layers (Feature-Sliced Design)
 
 단방향 결합도와 관심사 분리를 보장하기 위해 **FSD(Feature-Sliced Design)** 레이어 원칙을 기반으로 모듈화됩니다:
 
@@ -86,7 +86,7 @@ src/
 
 ---
 
-## ⚖️ Key Technical Decisions & Trade-offs
+## 5. Key Technical Decisions & Trade-offs
 
 ### 1. 단일 Next.js 레포지토리 (vs 모노레포)
 
@@ -115,7 +115,7 @@ src/
 
 ---
 
-## 🚀 Getting Started
+## 6. Getting Started
 
 ### 1. Requirements
 

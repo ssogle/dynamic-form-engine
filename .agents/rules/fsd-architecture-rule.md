@@ -50,8 +50,8 @@
 `eslint-plugin-check-file`에 의해 정적 검사됩니다:
 
 - **모든 디렉터리명과 파일명은 반드시 `kebab-case`**를 사용합니다.
-  - ❌ `DynamicRenderer.tsx`, `fieldRegistry.ts`, `FormEngine/`
-  - ⭕ `dynamic-renderer.tsx`, `field-registry.ts`, `form-engine/`
+  - [Bad] `DynamicRenderer.tsx`, `fieldRegistry.ts`, `FormEngine/`
+  - [Good] `dynamic-renderer.tsx`, `field-registry.ts`, `form-engine/`
 - 단, 파일 내부의 React 컴포넌트 심볼은 `PascalCase`, 함수/변수는 `camelCase`로 선언합니다.
 
 ---
@@ -84,9 +84,9 @@ src/widgets/form-builder-workspace/
 ### Public API (`index.ts`) 원칙
 
 - 외부 레이어에서는 반드시 슬라이스의 `index.ts`를 통해서만 모듈을 가져옵니다.
-  - ⭕ `import { FormBuilderWorkspace } from "@/widgets/form-builder-workspace";`
-  - ⭕ `import { DynamicRenderer } from "@/features/form-engine";`
-  - ❌ `import { DynamicRenderer } from "@/features/form-engine/ui/dynamic-renderer";` (Deep import 지양)
+  - [Good] `import { FormBuilderWorkspace } from "@/widgets/form-builder-workspace";`
+  - [Good] `import { DynamicRenderer } from "@/features/form-engine";`
+  - [Bad] `import { DynamicRenderer } from "@/features/form-engine/ui/dynamic-renderer";` (Deep import 지양)
 
 ---
 
