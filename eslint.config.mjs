@@ -107,6 +107,23 @@ const eslintConfig = defineConfig([
           "src/**/!(app)/**": "KEBAB_CASE",
         },
       ],
+
+      // 5. 함수형 프로그래밍 가드레일 (클래스 및 this 키워드 원천 차단)
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "ClassDeclaration",
+          message:
+            "본 프로젝트에서는 클래스(class) 작성이 금지됩니다. 순수 함수와 객체 팩토리를 사용하세요.",
+        },
+        {
+          selector: "ThisExpression",
+          message:
+            "함수형 코드베이스에서는 'this' 키워드 사용이 금지됩니다. 인자를 통한 순수 함수로 작성하세요.",
+        },
+      ],
+      "prefer-const": "error",
+      "no-var": "error",
     },
   },
 ]);

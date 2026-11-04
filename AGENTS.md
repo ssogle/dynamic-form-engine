@@ -62,6 +62,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | 분야                  | 규칙 문서 경로                                                                             | 핵심 가이드 내용                                           |
 | :-------------------- | :----------------------------------------------------------------------------------------- | :--------------------------------------------------------- |
 | **아키텍처 & 네이밍** | [.agents/rules/fsd-architecture-rule.md](.agents/rules/fsd-architecture-rule.md)           | FSD 레이어 계층, kebab-case 파일/폴더 네이밍, Public API   |
+| **코딩 패러다임**     | [.agents/rules/coding-paradigm-rule.md](.agents/rules/coding-paradigm-rule.md)             | 함수형 지향, class/this 금지, { data, error } Result 패턴  |
 | **테스트 전략 (TDD)** | [.agents/rules/testing-strategy-rule.md](.agents/rules/testing-strategy-rule.md)           | ROI 중심 테스트, 테스트 대상(도메인/인터랙션) vs 제외 대상 |
 | **UI & 스타일링**     | [.agents/rules/ui-and-styling-rule.md](.agents/rules/ui-and-styling-rule.md)               | shadcn/ui 재사용, Tailwind v4 시맨틱 토큰, 배럴 파일 금지  |
 | **커밋 컨벤션**       | [.agents/rules/git-commit-automation-rule.md](.agents/rules/git-commit-automation-rule.md) | Conventional Commits 규격 (feat, fix, refactor 등)         |
