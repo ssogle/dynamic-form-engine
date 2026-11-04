@@ -111,6 +111,7 @@ const eslintConfig = defineConfig([
           "*.mutation.{ts,tsx}": "**/queries/",
           "*.keys.{ts,tsx}": "**/queries/",
           "*.types.{ts,tsx}": "**/types/",
+          "*.dto.{ts,tsx}": "**/types/",
         },
       ],
 
@@ -135,8 +136,8 @@ const eslintConfig = defineConfig([
           "src/**/queries/**/!(*.query|*.mutation|*.keys|*.query.test|*.mutation.test|*.keys.test|index).{ts,tsx}":
             "*.query.ts, *.mutation.ts, 또는 *.keys.ts",
 
-          // types 폴더 내 파일은 반드시 .types.ts 접미사를 가져야 함 (index 제외)
-          "src/**/types/**/!(*.types|index).{ts,tsx}": "*.types.ts",
+          // types 폴더 내 파일은 반드시 .types.ts 또는 .dto.ts 접미사를 가져야 함 (index 제외)
+          "src/**/types/**/!(*.types|*.dto|index).{ts,tsx}": "*.types.ts 또는 *.dto.ts",
         },
       ],
 

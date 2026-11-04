@@ -47,13 +47,25 @@ export const createFormValidator = (schema: Schema): FormValidator => ({
 
 ---
 
-## 3. 비동기 통신 및 Result 패턴 (`{ data, error }`)
+## 3. 비동기 통신 및 정규화된 에러 핸들링
 
-- **클라이언트 비동기 통신**:
-  - 무분별한 `try-catch` 폭탄 돌리기를 지양하고, `@/shared/lib/http`의 `httpClient`를 사용하여 항상 `const { data, error } = await httpClient.get(...)` 형태로 처리합니다.
-  - 조기 리턴(Guard Clause)을 통해 `if (error)` 분기를 상단에서 처리하여 코드의 깊은 들여쓰기를 방지합니다.
-- **서버 에러 핸들링**:
-  - Route Handler 작성 시 `withErrorHandler` 고차 함수를 감싸서 예외를 중앙 집중식 표준 JSON 응답으로 변환합니다.
+본 프로젝트는 서버와 클라이언트의 런타임 특성에 맞춰 비동기 에러를 체계적으로 정규화하여 다룹니다.
+
+### 1) 클라이언트 비동기 통신 (`httpClient` & TanStack Query)
+
+- **통합 에러 객체 throw**:
+  - `httpClient`는 4xx/5xx HTTP 실패 및 네트워크 단절 시, 항상 단일 공통 규격인 `HttpErrorData`(`status`, `code`, `message`, `details`)를 일관되게 `throw`합니다.
+- **TanStack Query와의 직통 연동**:
+  - 쿼리 함수(`queries/*.query.ts`)는 수동 분기(`if (error) throw`) 없이 `() => httpClient.get<T>(url)` 단 한 줄로 선언합니다.
+  - 던져진 `HttpErrorData`는 TanStack Query의 표준 상태 머신(`isError: true`, `error: HttpErrorData`)으로 자동 집결되어, UI 컴포넌트에서는 `if (isError)` 단일 조건문으로 모든 에러를 안전하게 처리합니다.
+- **비(非) TanStack Query 환경**:
+  - 리액트 바깥에서 직접 `httpClient`를 호출할 때는 `try-catch`를 사용하며, `isHttpError(e)` 타입 가드를 통해 에러 코드별 정밀 분기를 수행합니다.
+
+### 2) 서버 에러 핸들링 (BFF Route Handler)
+
+- **전역 예외 필터 (`withErrorHandler`)**:
+  - Route Handler 작성 시 `withErrorHandler` 고차 함수를 감싸서 서버 내부의 모든 예외(`throw badRequest`, 예상치 못한 런타임 예외 등)를 가로챕니다.
+  - 서버 프로세스 중단 없이 항상 표준 JSON 에러 포맷(`{ success: false, error: {...} }`)과 적절한 HTTP 상태 코드로 안전하게 변환하여 응답합니다.
 
 ---
 

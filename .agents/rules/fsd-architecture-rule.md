@@ -75,7 +75,7 @@ ESLint(`eslint-plugin-check-file`)에 의해 기계적으로 강제되며, 세�
 | `server`  | Server 전용     | 백엔드 데이터 영속성   | `*.server.ts`                                | `form-db.server.ts`                 |
 | `store`   | Client 전용     | 클라이언트 전역 상태   | `*.store.ts`                                 | `form-editor.store.ts`              |
 | `schema`  | 공통            | 런타임 데이터 검증     | `*.schema.ts`                                | `form.schema.ts`                    |
-| `types`   | 컴파일 타임     | 정적 타입 정의         | `*.types.ts` 또는 `index.ts`                 | `form.types.ts`                     |
+| `types`   | 컴파일 타임     | 정적 타입 정의         | `*.types.ts` / `*.dto.ts` / `index.ts`       | `form.types.ts`, `health.dto.ts`    |
 | `lib`     | 공통            | 순수 함수/도구         | `*.util.ts` 또는 `[name].ts`                 | `calculate-score.util.ts`           |
 
 - 단위 테스트 파일은 해당 접미사 뒤에 `.test.ts`를 부착합니다 (예: `form-editor.store.test.ts`, `form.schema.test.ts`).
