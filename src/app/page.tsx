@@ -1,5 +1,6 @@
 "use client";
 
+import { HealthIndicator } from "@/features/check-server-health";
 import { useCounterStore } from "@/shared/store/counter.store";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
@@ -20,6 +21,11 @@ export default function Home() {
           <p className="text-muted-foreground text-lg">
             자연어로 폼을 정의하고 비정형 문서를 파싱하여 자동 입력하세요.
           </p>
+        </div>
+
+        {/* TanStack Query + BFF 통신 헬스체크 연동 카드 */}
+        <div className="w-full max-w-sm">
+          <HealthIndicator />
         </div>
 
         {/* Zustand 전역 상태 연동 테스트 카드 */}
