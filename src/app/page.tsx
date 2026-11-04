@@ -1,6 +1,6 @@
 "use client";
 
-import { useCounterStore } from "@/shared/model/counter-store";
+import { useCounterStore } from "@/shared/store/counter.store";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 

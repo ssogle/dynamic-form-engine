@@ -79,7 +79,7 @@ src/
 ├── widgets/      # 결합 블록: 독립적으로 완결된 대형 복합 UI 패널
 ├── features/     # 기능 단위: 사용자 인터랙션 및 유스케이스 로직 (폼 빌더, 런타임 검수기)
 ├── entities/     # 도메인 모델: 폼 스키마 규격 정의, 비즈니스 핵심 엔티티 및 스키마 변환기
-└── shared/       # 공통 인프라: 재사용 UI 키트(shadcn/ui), 유틸리티, API 클라이언트 인스턴스
+└── shared/       # 공통 인프라: 재사용 UI 키트(shadcn/ui), SDK 클라이언트 및 유틸리티(HTTP, Supabase, Gemini)
 ```
 
 - **Public API 거버넌스**: `entities`, `features`, `widgets` 레이어는 슬라이스 루트의 `index.ts`를 통해서만 외부 참조를 허용하며, 내부 세부 파일로의 직통 참조는 ESLint 단계에서 엄격히 차단됩니다.

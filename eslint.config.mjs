@@ -100,7 +100,47 @@ const eslintConfig = defineConfig([
         },
       ],
 
-      // 4. 디렉터리 폴더명 컨벤션 (kebab-case 강제)
+      // 4. 세그먼트별 파일 확장자 접미사(suffix) 격리 강제
+      "check-file/folder-match-with-fex": [
+        "error",
+        {
+          "*.store.{ts,tsx}": "**/store/",
+          "*.schema.{ts,tsx}": "**/schema/",
+          "*.server.{ts,tsx}": "**/server/",
+          "*.query.{ts,tsx}": "**/queries/",
+          "*.mutation.{ts,tsx}": "**/queries/",
+          "*.keys.{ts,tsx}": "**/queries/",
+          "*.types.{ts,tsx}": "**/types/",
+        },
+      ],
+
+      // 5. 비표준 세그먼트 폴더 및 세그먼트 내부 파일 접미사 누락 차단
+      "check-file/filename-blocklist": [
+        "error",
+        {
+          // 슬라이스 내부 비표준 세그먼트 폴더 차단 (7대 표준 세그먼트만 허용)
+          "src/{widgets,features,entities}/*/!(ui|queries|server|store|schema|types|lib)/**":
+            "src/**/{ui,queries,server,store,schema,types,lib}/**",
+
+          // store 폴더 내 파일은 반드시 .store.ts 접미사를 가져야 함 (테스트 및 index 제외)
+          "src/**/store/**/!(*.store|*.store.test|index).{ts,tsx}": "*.store.ts",
+
+          // schema 폴더 내 파일은 반드시 .schema.ts 접미사를 가져야 함
+          "src/**/schema/**/!(*.schema|*.schema.test|index).{ts,tsx}": "*.schema.ts",
+
+          // server 폴더 내 파일은 반드시 .server.ts 접미사를 가져야 함
+          "src/**/server/**/!(*.server|*.server.test|index).{ts,tsx}": "*.server.ts",
+
+          // queries 폴더 내 파일은 반드시 .query.ts, .mutation.ts, 또는 .keys.ts 접미사를 가져야 함
+          "src/**/queries/**/!(*.query|*.mutation|*.keys|*.query.test|*.mutation.test|*.keys.test|index).{ts,tsx}":
+            "*.query.ts, *.mutation.ts, 또는 *.keys.ts",
+
+          // types 폴더 내 파일은 반드시 .types.ts 접미사를 가져야 함 (index 제외)
+          "src/**/types/**/!(*.types|index).{ts,tsx}": "*.types.ts",
+        },
+      ],
+
+      // 6. 디렉터리 폴더명 컨벤션 (kebab-case 강제)
       "check-file/folder-naming-convention": [
         "error",
         {
@@ -108,7 +148,7 @@ const eslintConfig = defineConfig([
         },
       ],
 
-      // 5. 함수형 프로그래밍 가드레일 (클래스 및 this 키워드 원천 차단)
+      // 7. 함수형 프로그래밍 가드레일 (클래스 및 this 키워드 원천 차단)
       "no-restricted-syntax": [
         "error",
         {
