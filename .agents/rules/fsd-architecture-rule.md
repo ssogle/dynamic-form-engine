@@ -1,6 +1,6 @@
 # FSD (Feature-Sliced Design) Architecture Rule
 
-당신은 엄격한 프론트엔드 시스템 아키텍트입니다. 코드베이스 내 신규 파일 생성, 디렉터리 구성, 모듈 참조(import)를 작성할 때 아래의 FSD 레이어 원칙과 컨벤션을 반드시 준수하세요.
+당신은 엄격한 프론트엔드 및 풀스택 시스템 아키텍트입니다. 코드베이스 내 신규 파일 생성, 디렉터리 구성, 모듈 참조(import)를 작성할 때 아래의 FSD 레이어 원칙과 컨벤션을 반드시 준수하세요.
 
 ---
 
@@ -13,8 +13,8 @@
 │  src/app/         # 라우팅, 레이아웃, 전역 Provider, 페이지 진입점, 백엔드 Route Handler
 │  src/widgets/     # 독립적으로 완결된 대형 UI 블록 (Page Sections, 복합 패널)
 │  src/features/    # 비즈니스 가치를 만드는 사용자 기능/인터랙션 단위
-│  src/entities/    # 핵심 비즈니스 도메인 모델, 공통 스키마, 타입, 백엔드 쿼리
-│  src/shared/      # 도메인 무관 재사용 모듈 (UI Kit, 공통 유틸, 라이브러리/SDK 클라이언트)
+│  src/entities/    # 핵심 비즈니스 도메인 모델, Drizzle 스키마, Zod 검증, 서버 트랜잭션 로직
+│  src/shared/      # 도메인 무관 재사용 모듈 (UI Kit, DB 인프라, 공통 유틸, HTTP 클라이언트)
 ▼ (하위: 재사용성 높음)
 ```
 
@@ -36,13 +36,17 @@
 4. **`entities` (`src/entities/`)**
    - 역할: 비즈니스 핵심 개체 모델, 영속성 로직 및 상태.
    - 원칙: 다른 entity나 상위 레이어에 의존하지 않으며, 순수 비즈니스 데이터 구조와 CRUD 성격의 조작 로직만 포함합니다.
+   - 세부 구성:
+     - `schema/`: Drizzle ORM 테이블 정의(`pgTable`) 및 `drizzle-zod` 파생 검증 스키마
+     - `server/`: `db.transaction()` 기반의 코드 레벨 트랜잭션 및 DB 쿼리 순수 함수
    - 참조 허용: `shared`
 
 5. **`shared` (`src/shared/`)**
-   - 역할: 비즈니스 도메인 지식이 전혀 없는 범용 컴포넌트, 인프라 SDK 클라이언트 및 유틸리티.
+   - 역할: 비즈니스 도메인 지식이 전혀 없는 범용 컴포넌트, 코어 인프라 클라이언트 및 유틸리티.
    - 세부 구성:
-     - `ui/`: shadcn/ui 기반 원자 컴포넌트
-     - `lib/`: 외부 SDK 인프라(Supabase, Gemini, HTTP 클라이언트) 및 범용 유틸리티 통합
+     - `ui/`: shadcn/ui 기반 원자 컴포넌트 (Button, Card, Dialog 등)
+     - `db/`: [코어 인프라] Drizzle ORM 싱글톤 인스턴스 및 Supabase Transaction Pooler(포트 6543) 연결
+     - `lib/`: 순수 범용 유틸리티(`utils.ts`, `httpClient`), Gemini AI SDK 통합
      - `types/`: 전역 공통 유틸리티 타입 (Result 패턴 등)
      - `store/`: 테마, 전역 알림 등 도메인 무관 전역 상태
    - 원칙: 오직 `shared` 내부 모듈만 상호 참조할 수 있습니다.
@@ -68,15 +72,15 @@
 
 ESLint(`eslint-plugin-check-file`)에 의해 기계적으로 강제되며, 세그먼트별로 고유 접미사(`.xxx.ts`)를 준수해야 합니다:
 
-| 세그먼트  | 실행 환경       | 주 역할                | 필수 파일명 접미사 (Suffix)                  | 예시 파일명                         |
-| :-------- | :-------------- | :--------------------- | :------------------------------------------- | :---------------------------------- |
-| `ui`      | Client / Server | 뷰 레이어              | `[name].tsx`                                 | `form-card.tsx`                     |
-| `queries` | Client          | 클라이언트 데이터 패칭 | `*.query.ts` / `*.mutation.ts` / `*.keys.ts` | `use-form.query.ts`, `form.keys.ts` |
-| `server`  | Server 전용     | 백엔드 데이터 영속성   | `*.server.ts`                                | `form-db.server.ts`                 |
-| `store`   | Client 전용     | 클라이언트 전역 상태   | `*.store.ts`                                 | `form-editor.store.ts`              |
-| `schema`  | 공통            | 런타임 데이터 검증     | `*.schema.ts`                                | `form.schema.ts`                    |
-| `types`   | 컴파일 타임     | 정적 타입 정의         | `*.types.ts` / `*.dto.ts` / `index.ts`       | `form.types.ts`, `health.dto.ts`    |
-| `lib`     | 공통            | 순수 함수/도구         | `*.util.ts` 또는 `[name].ts`                 | `calculate-score.util.ts`           |
+| 세그먼트  | 실행 환경       | 주 역할                                                           | 필수 파일명 접미사 (Suffix)                  | 예시 파일명                         |
+| :-------- | :-------------- | :---------------------------------------------------------------- | :------------------------------------------- | :---------------------------------- |
+| `ui`      | Client / Server | 뷰 레이어                                                         | `[name].tsx`                                 | `form-card.tsx`                     |
+| `queries` | Client          | 클라이언트 데이터 패칭                                            | `*.query.ts` / `*.mutation.ts` / `*.keys.ts` | `use-form.query.ts`, `form.keys.ts` |
+| `server`  | Server 전용     | 백엔드 데이터 영속성 (Drizzle 쿼리 및 `db.transaction` 트랜잭션)  | `*.server.ts`                                | `form-db.server.ts`                 |
+| `store`   | Client 전용     | 클라이언트 전역 상태                                              | `*.store.ts`                                 | `form-editor.store.ts`              |
+| `schema`  | 공통            | 런타임 데이터 검증 (Drizzle `pgTable` 및 `drizzle-zod` 단일 진실) | `*.schema.ts`                                | `form.schema.ts`                    |
+| `types`   | 컴파일 타임     | 정적 타입 정의                                                    | `*.types.ts` / `*.dto.ts` / `index.ts`       | `form.types.ts`, `health.dto.ts`    |
+| `lib`     | 공통            | 순수 함수/도구                                                    | `*.util.ts` 또는 `[name].ts`                 | `calculate-score.util.ts`           |
 
 - 단위 테스트 파일은 해당 접미사 뒤에 `.test.ts`를 부착합니다 (예: `form-editor.store.test.ts`, `form.schema.test.ts`).
 
@@ -91,9 +95,9 @@ src/[layer]/[slice-name]/
 ├── ui/                     # [선택] 화면 컴포넌트
 │   └── [slice-name].tsx
 ├── queries/                # [선택] TanStack Query 훅 (useQuery, useMutation)
-├── server/                 # [선택] Supabase DB 직접 쿼리 함수 (서버 전용)
+├── server/                 # [선택] Drizzle DB 직접 쿼리 및 트랜잭션 함수 (서버 전용)
 ├── store/                  # [선택] Zustand 상태 스토어
-├── schema/                 # [선택] Zod 검증 스키마
+├── schema/                 # [선택] Drizzle 테이블 정의 및 Zod 검증 스키마
 ├── types/                  # [선택] 내부 공유 TypeScript 인터페이스
 └── lib/                    # [선택] 순수 데이터 변환 유틸리티
 ```
@@ -109,7 +113,7 @@ src/[layer]/[slice-name]/
 
 ## 4. 데이터 흐름 파이프라인 (Data Flow Pipeline)
 
-Next.js App Router와 TanStack Query 환경에서 표준 데이터 흐름은 다음과 같습니다:
+Next.js App Router, TanStack Query, Drizzle ORM 환경에서 표준 데이터 흐름은 다음과 같습니다:
 
 ```mermaid
 flowchart TD
@@ -126,13 +130,13 @@ flowchart TD
     subgraph Server ["서버 환경 (Next.js Server / BFF)"]
         direction TD
         RouteHandler["src/app/api/[resource-name]/route.ts (withErrorHandler)"]
-        EntityServer["entities/[entity-name]/server (DB 직접 쿼리 실행)"]
-        SupabaseClient["shared/lib/supabase (Supabase Server Client)"]
-        Database[("Supabase PostgreSQL DB")]
+        EntityServer["entities/[entity-name]/server (db.transaction 트랜잭션 실행)"]
+        DBInstance["shared/db (Drizzle ORM 싱글톤)"]
+        Database[("Supabase PostgreSQL DB (Transaction Pooler 포트 6543)")]
 
         RouteHandler -->|"비즈니스 로직 호출"| EntityServer
-        EntityServer -->|"쿼리 실행"| SupabaseClient
-        SupabaseClient -->|"SQL / RPC"| Database
+        EntityServer -->|"쿼리 및 트랜잭션 실행"| DBInstance
+        DBInstance -->|"TCP PostgreSQL"| Database
     end
 
     HTTPClient -->|"HTTP Request: /api/[resource-name]"| RouteHandler
@@ -140,7 +144,20 @@ flowchart TD
 
 ---
 
-## 5. 경로 별칭 (Path Aliases)
+## 5. Drizzle 멀티 스키마 & 무중단 마이그레이션 규칙
+
+1. **분산 스키마 단일 수집 (Glob Matching)**:
+   - 각 도메인의 물리적 테이블 구조는 `src/entities/**/schema/*.schema.ts`에 독립적으로 작성합니다.
+   - `drizzle.config.ts`는 Glob 패턴으로 모든 엔티티의 스키마를 자동 탐색하여 중앙 수집합니다.
+2. **코드 레벨 트랜잭션 (No Logic Fragmentation)**:
+   - DB 트리거나 Stored Procedure로 비즈니스 로직을 파편화하지 않고, `entities/*/server/` 파일 안에서 `db.transaction(async (tx) => ...)` 블록으로 원자성을 투명하게 통제합니다.
+3. **무중단 마이그레이션 파이프라인 (Expand & Contract)**:
+   - DDL SQL 마이그레이션 파일은 `npm run db:generate`를 통해 `drizzle/` 디렉터리에 버전 관리 파일(`.sql`)로 영구 보관합니다.
+   - Vercel 배포 시 `npm run db:migrate && next build`를 통해 서버 중단 없이 원격 DB에 안전하게 선(先) 반영됩니다.
+
+---
+
+## 6. 경로 별칭 (Path Aliases)
 
 반드시 `tsconfig.json`에 정의된 FSD 레이어 alias를 사용하며, 상대 경로 지옥(`../../../`)을 지양합니다:
 
@@ -152,8 +169,8 @@ flowchart TD
 
 ---
 
-## 6. Next.js 16 & Server/Client 경계 가이드
+## 7. Next.js 16 & Server/Client 경계 가이드
 
 1. **Client Component 최소화**: 인터랙션(`useState`, `useEffect`, 이벤트 핸들러)이 필요한 컴포넌트 리프(Leaf) 단위에만 `'use client'`를 선언합니다.
-2. **비밀 키 보호**: AI 호출(`@google/genai`) 및 Supabase Service Role 키는 반드시 서버 환경(`app/api/*` 또는 `server/` 세그먼트)에서만 격리 실행합니다.
-3. **서버 코드 브라우저 누출 차단**: `server/` 세그먼트의 모든 파일 상단에는 반드시 `import "server-only";`를 선언하여 브라우저 번들에 실수로 포함될 경우 빌드 타임에 컴파일 에러로 차단합니다.
+2. **비밀 키 보호**: AI 호출(`@google/genai`) 및 데이터베이스 접속 주소(`DATABASE_URL`)는 반드시 서버 환경(`app/api/*`, `shared/db/`, 또는 `server/` 세그먼트)에서만 격리 실행합니다.
+3. **서버 코드 브라우저 누출 차단**: 서버 전용 파일(`src/shared/db/connection.ts` 및 `server/` 세그먼트의 모든 파일) 상단에는 반드시 `import "server-only";`를 선언하여 브라우저 번들에 실수로 포함될 경우 빌드 타임에 컴파일 에러로 차단합니다.
