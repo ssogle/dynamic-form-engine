@@ -116,3 +116,19 @@ export const insertFormSchema = createInsertSchema(forms, {
 export type InsertForm = z.infer<typeof insertFormSchema>;
 export type UpdateForm = z.infer<typeof updateFormSchema>;
 ```
+
+---
+
+## 6. YAGNI 원칙과 실용적 미니멀리즘 (Pragmatic Minimalism)
+
+본 프로젝트는 불필요한 기술 부채와 유지보수 비용을 차단하기 위해 **YAGNI(You Aren't Gonna Need It)** 철학을 철저히 준수합니다.
+
+### 1) 추측성 코딩(Speculative Coding) 금지
+
+- 현재 활성 스펙(`docs/specs/active/`)이나 테스트 케이스에 명시되지 않은 "미래에 혹시 필요할지도 모르는 기능"을 선제적으로 구현하지 않습니다.
+- 사용되지 않는 옵션 파라미터, 호출처 없는 유틸리티 함수, 막연한 확장성용 설정 객체를 코드베이스에 남겨두지 마세요.
+
+### 2) 조기 추상화(Premature Abstraction) 경계
+
+- 동일한 비즈니스 로직이나 패턴이 실제로 3회 이상 중복(Rule of Three)되기 전까지는 섣부른 조기 추상화(복잡한 제네릭, 팩토리 계층, 플러그인 인터페이스)를 도입하지 않습니다.
+- 중복보다 나쁜 것은 잘못된 추상화(Wrong Abstraction)입니다. 현재 요구사항을 가장 직관적이고 읽기 쉽게 해결하는 최소한의 코드를 작성하세요.

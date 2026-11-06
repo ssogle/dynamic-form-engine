@@ -46,15 +46,31 @@ sequenceDiagram
 
 본 저장소는 개발 생산성과 아키텍처 정합성을 기계적으로 통제하기 위한 **엔지니어링 하네스(Harness)** 가드레일을 준수합니다.
 
-| 분류              | 가드레일 도구                    | 통제 목적 및 효과                                                                                               | 규칙 문서                                                                                  |
-| :---------------- | :------------------------------- | :-------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------- |
-| **아키텍처 경계** | `eslint-plugin-boundaries`       | FSD 레이어 간 단방향 의존성 강제, 세부 구현 직통 import 차단 및 Public API(`index.ts`) 강제                     | [.agents/rules/fsd-architecture-rule.md](.agents/rules/fsd-architecture-rule.md)           |
-| **코딩 패러다임** | ESLint `no-restricted-syntax`    | 함수형 지향, `class` 및 `this` 키워드 원천 차단, `{ data, error }` Result 패턴 준수                             | [.agents/rules/coding-paradigm-rule.md](.agents/rules/coding-paradigm-rule.md)             |
-| **파일 컨벤션**   | `eslint-plugin-check-file`       | 전역 `kebab-case` 파일/폴더 네이밍 강제 (OS 간 대소문자 경로 불일치 원천 차단)                                  | [.agents/rules/fsd-architecture-rule.md](.agents/rules/fsd-architecture-rule.md)           |
-| **타입 가드레일** | TypeScript Strict Options        | `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` 적용으로 동적 데이터 런타임 `undefined` 결함 사전 방어 | [tsconfig.json](tsconfig.json)                                                             |
-| **테스트 하네스** | Vitest + React Testing Library   | ROI 중심 테스트 전략 (도메인 변환기 및 복합 인터랙션 중심 TDD 루프 확립)                                        | [.agents/rules/testing-strategy-rule.md](.agents/rules/testing-strategy-rule.md)           |
-| **UI 거버넌스**   | Tailwind CSS v4 + shadcn/ui      | `@/shared/ui` 최우선 재사용, 시맨틱 토큰(`bg-background`, `text-foreground`) 필수화                             | [.agents/rules/ui-and-styling-rule.md](.agents/rules/ui-and-styling-rule.md)               |
-| **커밋 거버넌스** | Husky + lint-staged + Commitlint | Conventional Commits 규격 강제, 빠른 커밋 리듬 유지를 위한 점진적 검증                                          | [.agents/rules/git-commit-automation-rule.md](.agents/rules/git-commit-automation-rule.md) |
+| 분류              | 가드레일 도구                    | 통제 목적 및 효과                                                                                                         | 규칙 문서                                                                                                          |
+| :---------------- | :------------------------------- | :------------------------------------------------------------------------------------------------------------------------ | :----------------------------------------------------------------------------------------------------------------- |
+| **아키텍처 경계** | `eslint-plugin-boundaries`       | FSD 레이어 간 단방향 의존성 강제, 세부 구현 직통 import 차단 및 Public API(`index.ts`) 강제                               | [.agents/rules/fsd-architecture-rule.md](.agents/rules/fsd-architecture-rule.md)                                   |
+| **코딩 패러다임** | ESLint `no-restricted-syntax`    | 함수형 지향, `class` 및 `this` 키워드 원천 차단, `{ data, error }` Result 패턴 준수                                       | [.agents/rules/coding-paradigm-rule.md](.agents/rules/coding-paradigm-rule.md)                                     |
+| **파일 컨벤션**   | `eslint-plugin-check-file`       | 전역 `kebab-case` 파일/폴더 네이밍 강제 (OS 간 대소문자 경로 불일치 원천 차단)                                            | [.agents/rules/fsd-architecture-rule.md](.agents/rules/fsd-architecture-rule.md)                                   |
+| **테스트 하네스** | Vitest + React Testing Library   | ROI 중심 테스트 전략 (도메인 변환기 및 복합 인터랙션 중심 TDD 루프 확립)                                                  | [.agents/rules/testing-strategy-rule.md](.agents/rules/testing-strategy-rule.md)                                   |
+| **UI 거버넌스**   | Tailwind CSS v4 + shadcn/ui      | `@/shared/ui` 최우선 재사용, 시맨틱 토큰(`bg-background`, `text-foreground`) 필수화                                       | [.agents/rules/ui-and-styling-rule.md](.agents/rules/ui-and-styling-rule.md)                                       |
+| **스펙 거버넌스** | Spec-Driven Dev + YAGNI          | [`TEMPLATE.md`](docs/specs/TEMPLATE.md) 기반 Non-Goals 엄격 통제, 추측성 오버엔지니어링 차단 및 검증된 요구사항 중심 구현 | [규칙 문서](.agents/rules/spec-driven-development-rule.md) / [자동화 스킬](.agents/skills/spec-authoring/SKILL.md) |
+| **커밋 거버넌스** | Husky + lint-staged + Commitlint | Conventional Commits 규격 강제, 빠른 커밋 리듬 유지를 위한 점진적 검증                                                    | [.agents/rules/git-commit-automation-rule.md](.agents/rules/git-commit-automation-rule.md)                         |
+
+### AI Agent Governance & Harness Documents
+
+본 레포지토리는 AI 페어 프로그래밍 환경에서 코드 품질과 아키텍처 일관성을 기계적으로 유지하기 위해 정교한 에이전트 거버넌스 체계를 운용합니다. 아래 링크를 통해 각 분야별 표준 명세를 직접 열람할 수 있습니다.
+
+- **상위 운영 헌장**: [`AGENTS.md`](AGENTS.md) (골든 룰, YAGNI, 올인원 검증 파이프라인)
+- **아키텍처 & 설계 규격**:
+  - [FSD 아키텍처 규칙](.agents/rules/fsd-architecture-rule.md) - 레이어 단방향 의존성 및 Public API 원칙
+  - [코딩 패러다임 규칙](.agents/rules/coding-paradigm-rule.md) - 함수형 지향, Result 패턴, 경계선 Zod 검증, YAGNI
+  - [UI & 스타일링 규칙](.agents/rules/ui-and-styling-rule.md) - shadcn/ui 재사용, Tailwind v4 시맨틱 토큰
+- **프로세스 & 자동화 스킬**:
+  - [스펙 주도 개발(SDD) 규칙](.agents/rules/spec-driven-development-rule.md) - 5단계 적응형 라이프사이클 및 브랜치 격리
+  - [스펙 표준 템플릿](docs/specs/TEMPLATE.md) - 단일 진실 원천(SSOT) 마크다운 양식
+  - [스펙 작성 자동화 스킬](.agents/skills/spec-authoring/SKILL.md) - 대화형 초안 생성 및 브랜치 분기 스킬
+  - [ROI 중심 테스트 전략](.agents/rules/testing-strategy-rule.md) - 도메인 런타임 및 핵심 인터랙션 중심 TDD
+  - [Git 커밋 자동화 규칙](.agents/rules/git-commit-automation-rule.md) - Conventional Commits 컨벤션
 
 ---
 
@@ -98,10 +114,10 @@ src/
 - **결정**: 커밋 단계(`pre-commit`)에서는 `lint-staged`와 `typecheck`만 실행하여 빠른 커밋 리듬(~2초)을 보존하고, 테스트는 개발 시 `npm run test:watch`로 실시간 피드백 수행.
 - **이유**: 테스트 스위트 증가 시 커밋 지연으로 인한 개발 생산성 저하 및 `--no-verify` 우회 습관 방지.
 
-### 5. 국제화(i18n) 지연 결정 (YAGNI 원칙 준수)
+### 5. YAGNI 기반 점진적 설계 및 스코프 통제 (vs 조기 추상화 및 오버엔지니어링)
 
-- **결정**: 초기 단계에서 i18n 라이브러리(`next-intl`) 세팅을 배제하고 단일 언어로 핵심 도메인에 집중.
-- **이유**: 현재 프로토타입의 최우선 가치는 B2B 동적 폼 엔진과 AI 파서 완성도이며, 차후 대외 공개나 다국어 확장이 필요할 때 URL 경로 기반(`/[locale]/...`)으로 전환하는 것이 SEO 및 구조상 유리함.
+- **결정**: "나중에 쓸지도 모른다"는 막연한 추측성 코딩(불필요한 i18n 라이브러리 도입, 호출처 없는 유틸리티, 조기 플러그인 추상화)을 배제하고, `docs/specs/`의 Non-Goals를 통해 현재 검증된 핵심 요구사항만 집중 구현.
+- **이유**: 주니어/초기 프로젝트에서 흔히 발생하는 오버엔지니어링(Over-engineering)과 불필요한 유지보수 부채를 원천 차단하고, 실제 사용자 인터랙션 검증 피드백에 맞춰 점진적·안정적으로 시스템을 고도화하기 위함.
 
 ---
 

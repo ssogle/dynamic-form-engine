@@ -58,19 +58,32 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - 테스트, 타입 검사, 린트, 마이그레이션 등 프로젝트 내부 도구를 실행할 때 임의로 `npx vitest`, `npx tsc`, `npx eslint` 등을 직접 호출하는 것을 엄격히 금지합니다.
 - 반드시 `package.json`의 `"scripts"`에 정의된 공식 스크립트(`npm test`, `npm run check`, `npm run verify`, `npm run typecheck` 등)만 사용하세요. 특정 테스트 파일만 실행할 때도 반드시 `npm test -- [파일경로]` 형식을 준수하세요.
 
+### 8) 스펙 주도 개발 (SDD) 및 아카이브 가드레일 준수
+
+- 신규 기능 개발 및 대규모 리팩터링은 반드시 `docs/specs/active/`에 표준 스펙을 정의하고 해당 식별자 브랜치(`feat/spec-...`)에서 진행하세요.
+- `docs/specs/archived/` 디렉터리의 문서는 과거 동결된 기록입니다. 새로운 코드 작성 시 이를 현재 시스템의 단일 진실 원천(Source of Truth)으로 참조하는 것을 금지하며, 오직 `/src` 최신 코드와 `docs/specs/active/`만 참조하세요.
+- 코드 작성 전에는 반드시 파일 및 테스트 단위의 에이전트 실행 계획(Task Plan)을 먼저 제시하고 사용자 승인을 받으세요.
+
+### 9) YAGNI 및 조기 추상화 금지 (YAGNI & Anti-Overengineering)
+
+- **지금 당장 스펙과 테스트 케이스에 명시되지 않은 미래의 기능, 미사용 제네릭, 막연한 추측성 유틸리티 함수나 설정 옵션을 임의로 미리 작성하지 마세요.**
+- "나중에 쓸지도 모른다"는 가정으로 과도한 추상화 레이어나 불필요한 팩토리/플러그인 구조를 도입하는 것을 엄격히 금지합니다.
+- 항상 현재 요구사항을 가장 단순하고 명료하게 만족하는 최소한의 코드(KISS 원칙)만 작성하세요.
+
 ---
 
 ## 3. 세부 거버넌스 규칙 문서 인덱스 (`.agents/rules/`)
 
 구체적인 작업 단계에서는 반드시 아래의 세부 규칙 문서를 읽고 엄격히 준수하세요:
 
-| 분야                  | 규칙 문서 경로                                                                             | 핵심 가이드 내용                                           |
-| :-------------------- | :----------------------------------------------------------------------------------------- | :--------------------------------------------------------- |
-| **아키텍처 & 네이밍** | [.agents/rules/fsd-architecture-rule.md](.agents/rules/fsd-architecture-rule.md)           | FSD 레이어 계층, kebab-case 파일/폴더 네이밍, Public API   |
-| **코딩 패러다임**     | [.agents/rules/coding-paradigm-rule.md](.agents/rules/coding-paradigm-rule.md)             | 함수형 지향, class/this 금지, { data, error } Result 패턴  |
-| **테스트 전략 (TDD)** | [.agents/rules/testing-strategy-rule.md](.agents/rules/testing-strategy-rule.md)           | ROI 중심 테스트, 테스트 대상(도메인/인터랙션) vs 제외 대상 |
-| **UI & 스타일링**     | [.agents/rules/ui-and-styling-rule.md](.agents/rules/ui-and-styling-rule.md)               | shadcn/ui 재사용, Tailwind v4 시맨틱 토큰, 배럴 파일 금지  |
-| **커밋 컨벤션**       | [.agents/rules/git-commit-automation-rule.md](.agents/rules/git-commit-automation-rule.md) | Conventional Commits 규격 (feat, fix, refactor 등)         |
+| 분야                     | 규칙 문서 경로                                                                                 | 핵심 가이드 내용                                              |
+| :----------------------- | :--------------------------------------------------------------------------------------------- | :------------------------------------------------------------ |
+| **아키텍처 & 네이밍**    | [.agents/rules/fsd-architecture-rule.md](.agents/rules/fsd-architecture-rule.md)               | FSD 레이어 계층, kebab-case 파일/폴더 네이밍, Public API      |
+| **코딩 패러다임**        | [.agents/rules/coding-paradigm-rule.md](.agents/rules/coding-paradigm-rule.md)                 | 함수형 지향, class/this 금지, { data, error } Result 패턴     |
+| **테스트 전략 (TDD)**    | [.agents/rules/testing-strategy-rule.md](.agents/rules/testing-strategy-rule.md)               | ROI 중심 테스트, 테스트 대상(도메인/인터랙션) vs 제외 대상    |
+| **UI & 스타일링**        | [.agents/rules/ui-and-styling-rule.md](.agents/rules/ui-and-styling-rule.md)                   | shadcn/ui 재사용, Tailwind v4 시맨틱 토큰, 배럴 파일 금지     |
+| **스펙 주도 개발 (SDD)** | [.agents/rules/spec-driven-development-rule.md](.agents/rules/spec-driven-development-rule.md) | 5단계 SDD 라이프사이클, TEMPLATE 기반 스펙, 아카이브 가드레일 |
+| **커밋 컨벤션**          | [.agents/rules/git-commit-automation-rule.md](.agents/rules/git-commit-automation-rule.md)     | Conventional Commits 규격 (feat, fix, refactor 등)            |
 
 ---
 
