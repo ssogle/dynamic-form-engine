@@ -70,20 +70,26 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - "나중에 쓸지도 모른다"는 가정으로 과도한 추상화 레이어나 불필요한 팩토리/플러그인 구조를 도입하는 것을 엄격히 금지합니다.
 - 항상 현재 요구사항을 가장 단순하고 명료하게 만족하는 최소한의 코드(KISS 원칙)만 작성하세요.
 
+### 10) GitHub Flow 및 PR 기반 머지/브랜치 삭제 원칙 (GitHub Flow & PR Lifecycle)
+
+- **`master` 브랜치 직접 푸시 절대 금지**: `master`는 상시 배포 가능한 상태를 유지해야 하며, 모든 코드는 단명 작업 브랜치에서 분기 후 **반드시 Pull Request(PR)를 통해서만 머지**합니다.
+- **머지 후 브랜치 즉시 삭제**: PR이 `master`로 머지 완료된 즉시 해당 원격 및 로컬 작업 브랜치는 삭제하여 레포지토리를 청정하게 유지합니다.
+- **PR 공식 템플릿 준수 (Single Source of Truth)**: PR 서식의 단일 진실 원천은 [`.github/pull_request_template.md`](file://.github/pull_request_template.md)입니다. 에이전트가 PR 본문을 작성할 때는 반드시 해당 템플릿 파일을 직접 읽고 양식과 체크리스트를 누락 없이 100% 준수하여 작성합니다.
+
 ---
 
 ## 3. 세부 거버넌스 규칙 문서 인덱스 (`.agents/rules/`)
 
 구체적인 작업 단계에서는 반드시 아래의 세부 규칙 문서를 읽고 엄격히 준수하세요:
 
-| 분야                     | 규칙 문서 경로                                                                                 | 핵심 가이드 내용                                              |
-| :----------------------- | :--------------------------------------------------------------------------------------------- | :------------------------------------------------------------ |
-| **아키텍처 & 네이밍**    | [.agents/rules/fsd-architecture-rule.md](.agents/rules/fsd-architecture-rule.md)               | FSD 레이어 계층, kebab-case 파일/폴더 네이밍, Public API      |
-| **코딩 패러다임**        | [.agents/rules/coding-paradigm-rule.md](.agents/rules/coding-paradigm-rule.md)                 | 함수형 지향, class/this 금지, { data, error } Result 패턴     |
-| **테스트 전략 (TDD)**    | [.agents/rules/testing-strategy-rule.md](.agents/rules/testing-strategy-rule.md)               | ROI 중심 테스트, 테스트 대상(도메인/인터랙션) vs 제외 대상    |
-| **UI & 스타일링**        | [.agents/rules/ui-and-styling-rule.md](.agents/rules/ui-and-styling-rule.md)                   | shadcn/ui 재사용, Tailwind v4 시맨틱 토큰, 배럴 파일 금지     |
-| **스펙 주도 개발 (SDD)** | [.agents/rules/spec-driven-development-rule.md](.agents/rules/spec-driven-development-rule.md) | 5단계 SDD 라이프사이클, TEMPLATE 기반 스펙, 아카이브 가드레일 |
-| **커밋 컨벤션**          | [.agents/rules/git-commit-automation-rule.md](.agents/rules/git-commit-automation-rule.md)     | Conventional Commits 규격 (feat, fix, refactor 등)            |
+| 분야                         | 규칙 문서 경로                                                                                 | 핵심 가이드 내용                                                       |
+| :--------------------------- | :--------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------- |
+| **아키텍처 & 네이밍**        | [.agents/rules/fsd-architecture-rule.md](.agents/rules/fsd-architecture-rule.md)               | FSD 레이어 계층, kebab-case 파일/폴더 네이밍, Public API               |
+| **코딩 패러다임**            | [.agents/rules/coding-paradigm-rule.md](.agents/rules/coding-paradigm-rule.md)                 | 함수형 지향, class/this 금지, { data, error } Result 패턴              |
+| **테스트 전략 (TDD)**        | [.agents/rules/testing-strategy-rule.md](.agents/rules/testing-strategy-rule.md)               | ROI 중심 테스트, 테스트 대상(도메인/인터랙션) vs 제외 대상             |
+| **UI & 스타일링**            | [.agents/rules/ui-and-styling-rule.md](.agents/rules/ui-and-styling-rule.md)                   | shadcn/ui 재사용, Tailwind v4 시맨틱 토큰, 배럴 파일 금지              |
+| **스펙 주도 개발 (SDD)**     | [.agents/rules/spec-driven-development-rule.md](.agents/rules/spec-driven-development-rule.md) | 5단계 SDD 라이프사이클, TEMPLATE 기반 스펙, 아카이브 가드레일          |
+| **Git 워크플로우 & 커밋/PR** | [.agents/rules/git-commit-automation-rule.md](.agents/rules/git-commit-automation-rule.md)     | GitHub Flow, PR 템플릿 준수, 머지 후 브랜치 삭제, Conventional Commits |
 
 ---
 
