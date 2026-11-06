@@ -8,6 +8,16 @@ export {
   forms,
   insertFormSchema,
   selectFormSchema,
+  updateFormSchema,
   type Form,
   type InsertForm,
+  type UpdateForm,
 } from "./schema/form.schema";
+
+export {
+  findActiveForms,
+  findFormById,
+  insertForm,
+  updateFormById,
+  softDeleteFormById,
+} from "./server/form.server";

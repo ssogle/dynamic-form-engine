@@ -53,6 +53,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - 상위 레이어는 하위 레이어만 참조하며, 동일 레이어 간 교차 참조는 금지됩니다.
 - `widgets`, `features`, `entities`의 세부 내부 구현 파일을 직통 import하지 말고, 슬라이스 루트의 `index.ts`를 통해서만 참조하세요.
 
+### 7) 공식 npm 스크립트 실행 준수 (Never Use npx for Defined Scripts)
+
+- 테스트, 타입 검사, 린트, 마이그레이션 등 프로젝트 내부 도구를 실행할 때 임의로 `npx vitest`, `npx tsc`, `npx eslint` 등을 직접 호출하는 것을 엄격히 금지합니다.
+- 반드시 `package.json`의 `"scripts"`에 정의된 공식 스크립트(`npm test`, `npm run check`, `npm run verify`, `npm run typecheck` 등)만 사용하세요. 특정 테스트 파일만 실행할 때도 반드시 `npm test -- [파일경로]` 형식을 준수하세요.
+
 ---
 
 ## 3. 세부 거버넌스 규칙 문서 인덱스 (`.agents/rules/`)
@@ -76,24 +81,21 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **코어 라이브러리**: React 19, TypeScript 5 (Strict Options)
 - **스타일링**: Tailwind CSS v4, shadcn/ui
 - **테스트 러너**: Vitest 3.x, `@vitejs/plugin-react`, `jsdom`, `@testing-library/react`
-- **도메인 인프라**: Zod, Supabase (`@supabase/supabase-js`, `pgvector`), Google Gen AI (`@google/genai`)
+- **도메인 인프라**: Zod, PostgreSQL (`pgvector`, Drizzle ORM), Google Gen AI (`@google/genai`)
 
 ---
 
 ## 5. 작업 완료 전 필수 검증 파이프라인 (Verification Loop)
 
-에이전트는 코드 작성을 마친 후 사용자에게 보고하기 전에, 반드시 터미널에서 아래 4대 검증을 순차 실행하여 **결함 0건**을 확인해야 합니다:
+에이전트는 코드 작성을 마친 후 사용자에게 보고하기 전에, 반드시 터미널에서 통합 검증 스크립트를 실행하여 **결함 0건**을 확인해야 합니다:
 
 ```bash
-# 1. 단위 및 컴포넌트 테스트 검증
-npm test
+# [올인원 검증] 타입체크 -> 린트 -> 포맷체크 -> 단위/컴포넌트 테스트 전체 자동 완주
+npm run verify
 
-# 2. TypeScript 정적 타입 검증
-npm run typecheck
+# (참고) 서식 어긋남 발생 시 자동 교정
+npm run fix
 
-# 3. FSD 경계 및 네이밍 린트 검증
-npm run lint
-
-# 4. Prettier 포맷팅 검증
-npm run format:check
+# (참고) 테스트 제외 정적 분석 3종만 빠르게 검사할 때
+npm run check
 ```

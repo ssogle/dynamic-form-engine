@@ -51,6 +51,12 @@ export const forms = pgTable("forms", {
    * 폼 스키마가 마지막으로 수정된 일시 (UTC 기준 타임스탬프)
    */
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+
+  /**
+   * 폼 소프트 삭제 일시 (UTC 기준 타임스탬프, 미삭제 시 null)
+   * 실제 레코드를 영구 파기하지 않고 본 컬럼에 삭제 시각을 기록하여 소프트 삭제를 수행합니다.
+   */
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
 /**
@@ -76,12 +82,23 @@ export const selectFormSchema = createSelectSchema(forms);
 
 /**
  * 폼 엔티티 TypeScript 정적 타입 (조회 결과 모델)
- * selectFormSchema로부터 자동 추론되므로 DB 스키마와 100% 동기화됩니다.
+ * forms 테이블 정의로부터 직접 자동 추론되므로 DB 스키마와 100% 동기화됩니다.
  */
-export type Form = z.infer<typeof selectFormSchema>;
+export type Form = typeof forms.$inferSelect;
 
 /**
  * 폼 신규 생성 입력 데이터 TypeScript 정적 타입
  * insertFormSchema로부터 자동 추론됩니다.
  */
 export type InsertForm = z.infer<typeof insertFormSchema>;
+
+/**
+ * 폼 수정 시 클라이언트 요청 본문을 검증하는 Zod 스키마
+ * 모든 필드가 선택 항목(partial)이며 기본키(id) 및 생성일은 변경할 수 없습니다.
+ */
+export const updateFormSchema = insertFormSchema.partial().omit({ id: true });
+
+/**
+ * 폼 정보 수정 입력 데이터 TypeScript 정적 타입
+ */
+export type UpdateForm = z.infer<typeof updateFormSchema>;

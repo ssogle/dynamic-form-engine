@@ -1,6 +1,7 @@
 "use client";
 
 import { HealthIndicator } from "@/features/check-server-health";
+import { FormList } from "@/features/list-forms";
 import { useCounterStore } from "@/shared/store/counter.store";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
@@ -26,6 +27,11 @@ export default function Home() {
         {/* TanStack Query + BFF 통신 헬스체크 연동 카드 */}
         <div className="w-full max-w-sm">
           <HealthIndicator />
+        </div>
+
+        {/* Drizzle ORM + PostgreSQL DB 폼 목록 실시간 연동 카드 */}
+        <div className="w-full max-w-md">
+          <FormList />
         </div>
 
         {/* Zustand 전역 상태 연동 테스트 카드 */}

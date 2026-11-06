@@ -37,7 +37,7 @@
    - 역할: 비즈니스 핵심 개체 모델, 영속성 로직 및 상태.
    - 원칙: 다른 entity나 상위 레이어에 의존하지 않으며, 순수 비즈니스 데이터 구조와 CRUD 성격의 조작 로직만 포함합니다.
    - 세부 구성:
-     - `schema/`: Drizzle ORM 테이블 정의(`pgTable`) 및 `drizzle-zod` 파생 검증 스키마
+     - `schema/`: Drizzle ORM 테이블 정의(`pgTable`) 및 `drizzle-zod` 파생 검증 스키마 (조회 모델은 `$inferSelect`, 입력 모델은 `z.infer` 파생)
      - `server/`: `db.transaction()` 기반의 코드 레벨 트랜잭션 및 DB 쿼리 순수 함수
    - 참조 허용: `shared`
 
@@ -45,7 +45,7 @@
    - 역할: 비즈니스 도메인 지식이 전혀 없는 범용 컴포넌트, 코어 인프라 클라이언트 및 유틸리티.
    - 세부 구성:
      - `ui/`: shadcn/ui 기반 원자 컴포넌트 (Button, Card, Dialog 등)
-     - `db/`: [코어 인프라] Drizzle ORM 싱글톤 인스턴스 및 Supabase Transaction Pooler(포트 6543) 연결
+     - `db/`: [코어 인프라] Drizzle ORM 싱글톤 인스턴스 및 PostgreSQL DB 연결 (Transaction Pooler 및 Direct)
      - `lib/`: 순수 범용 유틸리티(`utils.ts`, `httpClient`), Gemini AI SDK 통합
      - `types/`: 전역 공통 유틸리티 타입 (Result 패턴 등)
      - `store/`: 테마, 전역 알림 등 도메인 무관 전역 상태
@@ -116,30 +116,36 @@ src/[layer]/[slice-name]/
 Next.js App Router, TanStack Query, Drizzle ORM 환경에서 표준 데이터 흐름은 다음과 같습니다:
 
 ```mermaid
-flowchart TD
-    subgraph Client ["브라우저 환경 (Client Layer)"]
-        direction TD
-        UI["features/ui 또는 entities/ui (컴포넌트)"]
-        Queries["features/queries 또는 entities/queries (useQuery / useMutation)"]
-        HTTPClient["shared/lib/http (httpClient)"]
+sequenceDiagram
+    autonumber
+    actor User as 사용자 (User)
+    participant UI as Feature UI (features/*/ui)
+    participant Query as TanStack Query (features/*/queries)
+    participant HTTP as httpClient (shared/lib/http)
+    participant Router as Route Handler (app/api/*)
+    participant Server as Entity Server (entities/*/server)
+    participant Drizzle as Drizzle ORM (shared/db)
+    participant DB as PostgreSQL DB
 
-        UI -->|"호출"| Queries
-        Queries -->|"API 요청"| HTTPClient
+    User->>UI: 사용자 인터랙션 (조회 / 폼 제출)
+    UI->>Query: useQuery / useMutation 트리거
+    Query->>HTTP: httpClient 요청 전송
+    HTTP->>Router: HTTP Request (GET/POST /api/v1/*)
+
+    rect rgb(240, 248, 255)
+        Note over Router: 1. withErrorHandler 전역 예외 가드<br/>2. Zod 스키마 런타임 검증 (insertFormSchema)
+        Router->>Server: 순수 영속성 함수 호출 (findActiveForms / insertForm)
+        Server->>Drizzle: db.select() / db.insert() 실행
+        Drizzle->>DB: TCP SQL 쿼리 전송 (포트 6543/5432)
+        DB-->>Drizzle: 영속 레코드 반환
+        Drizzle-->>Server: Form 레코드 반환 (typeof forms.$inferSelect)
+        Server-->>Router: 데이터 반환
+        Router-->>HTTP: 200 OK / 201 Created (apiResponse)
     end
 
-    subgraph Server ["서버 환경 (Next.js Server / BFF)"]
-        direction TD
-        RouteHandler["src/app/api/[resource-name]/route.ts (withErrorHandler)"]
-        EntityServer["entities/[entity-name]/server (db.transaction 트랜잭션 실행)"]
-        DBInstance["shared/db (Drizzle ORM 싱글톤)"]
-        Database[("Supabase PostgreSQL DB (Transaction Pooler 포트 6543)")]
-
-        RouteHandler -->|"비즈니스 로직 호출"| EntityServer
-        EntityServer -->|"쿼리 및 트랜잭션 실행"| DBInstance
-        DBInstance -->|"TCP PostgreSQL"| Database
-    end
-
-    HTTPClient -->|"HTTP Request: /api/[resource-name]"| RouteHandler
+    HTTP-->>Query: JSON 응답 파싱 완료
+    Query-->>UI: 상태 머신 갱신 (data, isLoading, isError)
+    UI-->>User: 화면 렌더링 갱신
 ```
 
 ---

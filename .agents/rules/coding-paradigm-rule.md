@@ -73,3 +73,46 @@ export const createFormValidator = (schema: Schema): FormValidator => ({
 
 - 반복되는 횡단 관심사(로깅, 에러 핸들링, 인증 검증 등)는 클래스 데코레이터나 미들웨어 상속 대신, **함수를 인자로 받아 새 함수를 반환하는 고차 함수**로 해결합니다.
   - 예: `withErrorHandler(async (req) => { ... })`
+
+---
+
+## 5. 데이터 모델링 및 경계선 런타임 검증 원칙 (Zod & Type Governance)
+
+본 프로젝트는 런타임 검증 비용을 최소화하고 타입 안전성을 극대화하기 위해 **"경계선 검증 원칙(Boundary Validation Principle)"**을 준수합니다.
+
+### 1) 경계선(Boundary) 런타임 검증 원칙
+
+Zod의 런타임 유효성 검사(`safeParse`)는 **"신뢰할 수 없는 외부 데이터가 시스템 내부로 유입되는 경계선"**에서만 실행합니다:
+
+- **검증 필수 대상 (Untrusted Boundaries)**:
+  1. **사용자 Form 입력**: 브라우저에서 제출된 생성/수정 요청 본문 (오타, 특수문자, 악의적 페이로드 방어)
+  2. **AI(LLM) 구조화 응답**: Gemini Structured Outputs로 파싱된 비정형 데이터 (환각, 키 누락, 타입 불일치 방어)
+  3. **외부 웹훅/서드파티 API**: 사외 시스템에서 인입되는 비정형 페이로드
+- **검증 불필요 대상 (Trusted Internals)**:
+  - **데이터베이스 조회 결과 레코드**: 이미 DB 제약조건(PK, NOT NULL 등)과 초기 검증을 거쳐 영속화된 신뢰 데이터입니다. 내부 DB 조회 결과에 불필요하게 Zod 런타임 검증을 반복 실행하는 CPU/메모리 오버헤드를 금지합니다.
+
+### 2) 조회(Read) 모델 타이핑 규칙
+
+- DB 엔티티 조회 모델(`Form`, `Submission` 등)은 Drizzle ORM의 테이블 정의로부터 직접 자동 추론되는 **`typeof table.$inferSelect`**를 단일 원천(SSOT)으로 사용합니다.
+- Drizzle 드라이버가 반환하는 실제 쿼리 결과 객체와 1:1로 일치하여 타입 불일치(TS2322) 결함을 방지합니다.
+
+```typescript
+// [Good] DB 원천 정적 타입 단일화
+export type Form = typeof forms.$inferSelect;
+```
+
+### 3) 입력/수정(Write) 모델 타이핑 규칙
+
+- 클라이언트가 서버로 전송하는 생성/수정 요청 모델(`InsertForm`, `UpdateForm` 등)은 비즈니스 검증 규칙(최소 글자 수, 정규식 패턴 등)이 포함된 Zod 스키마로부터 **`z.infer<typeof schema>`**로 파생합니다.
+- 프론트엔드 입력 폼(React Hook Form)과 백엔드 Route Handler 양쪽에서 동일한 스키마를 공유하여 이중 방어막을 형성합니다.
+
+```typescript
+// [Good] Zod 검증 스키마로부터 비즈니스 입력 타입 파생
+export const insertFormSchema = createInsertSchema(forms, {
+  slug: (schema) => schema.min(2).regex(/^[a-z0-9-]+$/),
+  title: (schema) => schema.min(1),
+});
+
+export type InsertForm = z.infer<typeof insertFormSchema>;
+export type UpdateForm = z.infer<typeof updateFormSchema>;
+```

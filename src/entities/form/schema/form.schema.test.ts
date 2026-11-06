@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { insertFormSchema, selectFormSchema } from "./form.schema";
+import { insertFormSchema, selectFormSchema, updateFormSchema } from "./form.schema";
 
 describe("Form Schema Validation Engine", () => {
   describe("insertFormSchema (폼 신규 생성 검증)", () => {
@@ -84,7 +84,7 @@ describe("Form Schema Validation Engine", () => {
   });
 
   describe("selectFormSchema (DB 조회 엔티티 검증)", () => {
-    it("DB에서 조회된 완성된 폼 엔티티 레코드를 정상 파싱해야 한다", () => {
+    it("DB에서 조회된 완성된 폼 엔티티 레코드(deletedAt 포함)를 정상 파싱해야 한다", () => {
       const mockDbRecord = {
         id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
         slug: "project-log",
@@ -93,6 +93,7 @@ describe("Form Schema Validation Engine", () => {
         schemaDefinition: { fields: [] },
         createdAt: new Date("2026-11-05T00:00:00Z"),
         updatedAt: new Date("2026-11-05T00:00:00Z"),
+        deletedAt: null,
       };
 
       const result = selectFormSchema.safeParse(mockDbRecord);
@@ -100,7 +101,19 @@ describe("Form Schema Validation Engine", () => {
       if (result.success) {
         expect(result.data.id).toBe(mockDbRecord.id);
         expect(result.data.slug).toBe("project-log");
+        expect(result.data.deletedAt).toBeNull();
       }
+    });
+  });
+
+  describe("updateFormSchema (폼 정보 부분 수정 검증)", () => {
+    it("일부 필드(title만 변경)만 전달되어도 유효해야 한다", () => {
+      const partialUpdate = {
+        title: "수정된 프로젝트 작업 기록",
+      };
+
+      const result = updateFormSchema.safeParse(partialUpdate);
+      expect(result.success).toBe(true);
     });
   });
 });

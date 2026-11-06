@@ -38,7 +38,7 @@
 변경 영역의 핵심 아키텍처 및 디렉토리 명칭을 소문자로 명시합니다:
 
 - Routing & Renders: app, layout, page, middleware, actions
-- Data & Backend: api, supabase, queries, mutations, store
+- Data & Backend: api, db, queries, mutations, store
 - Components & UI: components, ui, hooks, styles
 - Config & Core: config, deps, auth, env, seo
 

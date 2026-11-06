@@ -1,0 +1,41 @@
+import type { NextRequest } from "next/server";
+import { z } from "zod";
+import { findActiveForms, insertForm, insertFormSchema } from "@/entities/form";
+import { apiResponse, badRequest, withErrorHandler } from "@/shared/lib/http";
+
+/**
+ * GET /api/v1/forms
+ *
+ * 등록된 활성 폼(소프트 삭제되지 않은 폼) 목록을 생성 일시 최신순으로 조회하여 반환합니다.
+ *
+ * @returns 200 OK와 함께 Form[] 배열 반환
+ */
+export const GET = withErrorHandler(async () => {
+  const formList = await findActiveForms();
+  return apiResponse.ok(formList);
+});
+
+/**
+ * POST /api/v1/forms
+ *
+ * 신규 폼 메타데이터를 등록합니다.
+ * 요청 본문은 insertFormSchema를 통해 엄격히 검증되며, 검증 실패 시 400 Bad Request를 반환합니다.
+ *
+ * @param req 클라이언트의 JSON 요청 본문(slug, title, schemaDefinition 등)
+ * @returns 201 Created와 함께 영속화된 단일 Form 객체 반환
+ */
+export const POST = withErrorHandler(async (req: NextRequest) => {
+  const body: unknown = await req.json();
+  const parsed = insertFormSchema.safeParse(body);
+
+  if (!parsed.success) {
+    throw badRequest(
+      "폼 생성 요청 형식이 올바르지 않습니다.",
+      z.flattenError(parsed.error).fieldErrors
+    );
+  }
+
+  const createdForm = await insertForm(parsed.data);
+
+  return apiResponse.created(createdForm);
+});

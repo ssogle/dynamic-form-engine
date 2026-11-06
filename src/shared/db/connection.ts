@@ -18,8 +18,8 @@ if (!connectionString) {
 }
 
 /**
- * Supabase Transaction Pooler (포트 6543) 연결 드라이버
- * max: 10으로 풀 크기를 제어하고, Transaction Pooler 권장 옵션(prepare: false)을 적용합니다.
+ * PostgreSQL 연결 드라이버
+ * max: 10으로 풀 크기를 제어하고, Transaction Pooler 및 서버리스 환경에 최적화된 옵션(prepare: false)을 적용합니다.
  */
 const client =
   globalThis.__globalPostgresClient ??

@@ -21,34 +21,23 @@
 ## 2. System Architecture
 
 ```mermaid
-flowchart TD
-    subgraph Client["사용자 입력 (Client Layer)"]
-        direction LR
-        InputPrompt["자연어 프롬프트<br/>(폼 생성/수정)"]
-        InputDoc["비정형 데이터<br/>(영수증·계약서·문서 이미지)"]
-    end
+sequenceDiagram
+    autonumber
+    actor User as 사용자 / 검수자
+    participant Web as Form Runtime Web
+    participant Router as 1. Semantic Router
+    participant Gemini as 2. Gemini Structured Outputs
+    participant DB as PostgreSQL DB
 
-    subgraph Storage["저장소 (Supabase PostgreSQL)"]
-        DBForms[("forms 테이블<br/>(등록된 폼 양식 & 벡터)")]
-        DBSubmissions[("form_submissions 테이블<br/>(최종 제출 데이터)")]
-    end
-
-    subgraph NextServer["Next.js 16 (App Router / 파이프라인 엔진)"]
-        Router["1. Semantic Router<br/>(어떤 폼을 쓸지 자동 판별)"]
-        GeminiEngine["2. AI Structured Outputs Engine<br/>(선택된 폼 규격에 맞게 데이터 추출)"]
-        FormRuntime["3. Form Runtime Engine<br/>(웹 화면 인풋창에 자동 바인딩)"]
-        AuditTrail["4. Audit Trail 검수 UX<br/>(사람이 확인 후 최종 제출)"]
-
-        Router -->|"폼 양식 확정"| GeminiEngine
-        GeminiEngine -->|"추출된 JSON 데이터"| FormRuntime
-        FormRuntime -->|"화면 렌더링"| AuditTrail
-    end
-
-    InputPrompt --> Router
-    InputDoc --> Router
-
-    Router <-->|"모호할 때: 유사한 폼 검색 및 양식 조회"| DBForms
-    AuditTrail -->|"최종 검수 완료 데이터 저장"| DBSubmissions
+    User->>Web: 비정형 데이터(영수증·계약서) 입력
+    Web->>Router: 적합한 폼 양식 판별 요청
+    Router->>DB: 등록된 폼 스키마 및 벡터 검색
+    DB-->>Router: 최적 매칭 폼 양식 반환
+    Router->>Gemini: 폼 스키마 기반 정제 프롬프트 전송
+    Gemini-->>Web: 스키마 규격에 맞춘 구조화된 JSON 반환
+    Web-->>User: 폼 인풋창에 데이터 자동 바인딩 & 위험 필드 하이라이팅
+    User->>Web: 최종 검수(Audit Trail) 및 제출 클릭
+    Web->>DB: form_submissions 테이블에 최종 적재
 ```
 
 ---
@@ -79,7 +68,7 @@ src/
 ├── widgets/      # 결합 블록: 독립적으로 완결된 대형 복합 UI 패널
 ├── features/     # 기능 단위: 사용자 인터랙션 및 유스케이스 로직 (폼 빌더, 런타임 검수기)
 ├── entities/     # 도메인 모델: 폼 스키마 규격 정의, 비즈니스 핵심 엔티티 및 스키마 변환기
-└── shared/       # 공통 인프라: 재사용 UI 키트(shadcn/ui), SDK 클라이언트 및 유틸리티(HTTP, Supabase, Gemini)
+└── shared/       # 공통 인프라: 재사용 UI 키트(shadcn/ui), SDK 클라이언트 및 유틸리티(HTTP, DB, Gemini)
 ```
 
 - **Public API 거버넌스**: `entities`, `features`, `widgets` 레이어는 슬라이스 루트의 `index.ts`를 통해서만 외부 참조를 허용하며, 내부 세부 파일로의 직통 참조는 ESLint 단계에서 엄격히 차단됩니다.
@@ -132,22 +121,24 @@ cp .env.example .env.local
 ```
 
 ```env
+DATABASE_URL=postgresql://postgres:[PASSWORD]@[HOST]:[PORT]/[DATABASE]
 GEMINI_API_KEY=your_gemini_api_key_here
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url_here
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 ```
 
 ### 3. Available Scripts
 
-| 명령어                  | 설명                                            |
-| :---------------------- | :---------------------------------------------- |
-| `npm run dev`           | Next.js 로컬 개발 서버 실행 (Turbopack)         |
-| `npm run build`         | 프로덕션 빌드 생성                              |
-| `npm run start`         | 프로덕션 서버 실행                              |
-| `npm test`              | Vitest 기반 전체 단위/컴포넌트 테스트 1회 실행  |
-| `npm run test:watch`    | 파일 변경 감지 실시간 TDD 루프 실행             |
-| `npm run test:coverage` | V8 엔진 기반 테스트 커버리지 리포트 생성        |
-| `npm run typecheck`     | TypeScript 전체 정적 타입 검사 (`tsc --noEmit`) |
-| `npm run lint`          | ESLint (FSD 경계 및 네이밍 컨벤션 검사)         |
-| `npm run format`        | Prettier 코드 포맷팅 자동 수정                  |
-| `npm run format:check`  | Prettier 코드 스타일 일치 여부 검사             |
+| 명령어                  | 설명                                                               |
+| :---------------------- | :----------------------------------------------------------------- |
+| `npm run dev`           | Next.js 로컬 개발 서버 실행 (Turbopack)                            |
+| `npm run build`         | 프로덕션 빌드 생성                                                 |
+| `npm run start`         | 프로덕션 서버 실행                                                 |
+| `npm run verify`        | [통합 검증] 타입 검사 + 린트 + 포맷 + 전체 테스트 완주 (결함 점검) |
+| `npm run check`         | [정적 검사] 타입 검사 + 린트 + 포맷 일치 여부 검사                 |
+| `npm run fix`           | [자동 교정] Prettier 코드 포맷팅 및 ESLint 자동 수정               |
+| `npm test`              | Vitest 기반 전체 단위/컴포넌트 테스트 1회 실행                     |
+| `npm run test:watch`    | 파일 변경 감지 실시간 TDD 루프 실행                                |
+| `npm run test:coverage` | V8 엔진 기반 테스트 커버리지 리포트 생성                           |
+| `npm run typecheck`     | TypeScript 전체 정적 타입 검사 (`tsc --noEmit`)                    |
+| `npm run lint`          | ESLint (FSD 경계 및 네이밍 컨벤션 검사)                            |
+| `npm run format`        | Prettier 코드 포맷팅 자동 수정                                     |
+| `npm run format:check`  | Prettier 코드 스타일 일치 여부 검사                                |

@@ -141,11 +141,11 @@ const eslintConfig = defineConfig([
         },
       ],
 
-      // 6. 디렉터리 폴더명 컨벤션 (kebab-case 강제)
+      // 6. 디렉터리 폴더명 컨벤션 (kebab-case 강제, Next.js 동적 라우팅 세그먼트가 포함된 src/app은 제외)
       "check-file/folder-naming-convention": [
         "error",
         {
-          "src/**/!(app)/**": "KEBAB_CASE",
+          "src/!(app)/**": "KEBAB_CASE",
         },
       ],
 
@@ -165,6 +165,20 @@ const eslintConfig = defineConfig([
       ],
       "prefer-const": "error",
       "no-var": "error",
+    },
+  },
+
+  // 8. TypeScript 타입 인지 Deprecated 가드레일 (warn 레벨)
+  {
+    files: ["**/*.ts", "**/*.tsx"],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-deprecated": "warn",
     },
   },
 ]);
