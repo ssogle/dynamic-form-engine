@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import * as queryModule from "../queries/use-forms.query";
+import * as formEntity from "@/entities/form";
 import { FormList } from "./form-list";
 
 const createTestQueryClient = () =>
@@ -24,29 +24,29 @@ describe("FormList (폼 목록 컴포넌트)", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(queryModule, "useCreateSampleFormMutation").mockReturnValue({
+    vi.spyOn(formEntity, "useCreateFormMutation").mockReturnValue({
       mutate: mockCreateMutate,
       isPending: false,
-    } as unknown as ReturnType<typeof queryModule.useCreateSampleFormMutation>);
+    } as unknown as ReturnType<typeof formEntity.useCreateFormMutation>);
 
-    vi.spyOn(queryModule, "useUpdateFormMutation").mockReturnValue({
+    vi.spyOn(formEntity, "useUpdateFormMutation").mockReturnValue({
       mutate: mockUpdateMutate,
       isPending: false,
-    } as unknown as ReturnType<typeof queryModule.useUpdateFormMutation>);
+    } as unknown as ReturnType<typeof formEntity.useUpdateFormMutation>);
 
-    vi.spyOn(queryModule, "useDeleteFormMutation").mockReturnValue({
+    vi.spyOn(formEntity, "useDeleteFormMutation").mockReturnValue({
       mutate: mockDeleteMutate,
       isPending: false,
-    } as unknown as ReturnType<typeof queryModule.useDeleteFormMutation>);
+    } as unknown as ReturnType<typeof formEntity.useDeleteFormMutation>);
   });
 
   it("로딩 중일 때 스켈레톤 로딩 상태를 표시해야 한다", () => {
-    vi.spyOn(queryModule, "useFormsQuery").mockReturnValue({
+    vi.spyOn(formEntity, "useFormsQuery").mockReturnValue({
       data: undefined,
       isLoading: true,
       isError: false,
       error: null,
-    } as unknown as ReturnType<typeof queryModule.useFormsQuery>);
+    } as unknown as ReturnType<typeof formEntity.useFormsQuery>);
 
     renderWithClient(<FormList />);
 
@@ -54,12 +54,12 @@ describe("FormList (폼 목록 컴포넌트)", () => {
   });
 
   it("폼 데이터가 없을 때 빈 목록 안내 문구와 샘플 생성 버튼을 표시해야 한다", () => {
-    vi.spyOn(queryModule, "useFormsQuery").mockReturnValue({
+    vi.spyOn(formEntity, "useFormsQuery").mockReturnValue({
       data: [],
       isLoading: false,
       isError: false,
       error: null,
-    } as unknown as ReturnType<typeof queryModule.useFormsQuery>);
+    } as unknown as ReturnType<typeof formEntity.useFormsQuery>);
 
     renderWithClient(<FormList />);
 
@@ -81,27 +81,31 @@ describe("FormList (폼 목록 컴포넌트)", () => {
       },
     ];
 
-    vi.spyOn(queryModule, "useFormsQuery").mockReturnValue({
+    vi.spyOn(formEntity, "useFormsQuery").mockReturnValue({
       data: mockForms,
       isLoading: false,
       isError: false,
       error: null,
-    } as unknown as ReturnType<typeof queryModule.useFormsQuery>);
+    } as unknown as ReturnType<typeof formEntity.useFormsQuery>);
 
     renderWithClient(<FormList />);
 
     expect(screen.getByText("일일 업무 보고서")).toBeInTheDocument();
     expect(screen.getByText("daily-report")).toBeInTheDocument();
     expect(screen.getByText("매일 진행한 업무 내용을 기록합니다.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "캔버스 열기" })).toHaveAttribute(
+      "href",
+      "/builder/forms/daily-report"
+    );
   });
 
   it("샘플 폼 생성 버튼 클릭 시 새로운 폼 생성을 요청해야 한다", () => {
-    vi.spyOn(queryModule, "useFormsQuery").mockReturnValue({
+    vi.spyOn(formEntity, "useFormsQuery").mockReturnValue({
       data: [],
       isLoading: false,
       isError: false,
       error: null,
-    } as unknown as ReturnType<typeof queryModule.useFormsQuery>);
+    } as unknown as ReturnType<typeof formEntity.useFormsQuery>);
 
     renderWithClient(<FormList />);
 
@@ -132,12 +136,12 @@ describe("FormList (폼 목록 컴포넌트)", () => {
       },
     ];
 
-    vi.spyOn(queryModule, "useFormsQuery").mockReturnValue({
+    vi.spyOn(formEntity, "useFormsQuery").mockReturnValue({
       data: mockForms,
       isLoading: false,
       isError: false,
       error: null,
-    } as unknown as ReturnType<typeof queryModule.useFormsQuery>);
+    } as unknown as ReturnType<typeof formEntity.useFormsQuery>);
 
     renderWithClient(<FormList />);
 
@@ -165,12 +169,12 @@ describe("FormList (폼 목록 컴포넌트)", () => {
       },
     ];
 
-    vi.spyOn(queryModule, "useFormsQuery").mockReturnValue({
+    vi.spyOn(formEntity, "useFormsQuery").mockReturnValue({
       data: mockForms,
       isLoading: false,
       isError: false,
       error: null,
-    } as unknown as ReturnType<typeof queryModule.useFormsQuery>);
+    } as unknown as ReturnType<typeof formEntity.useFormsQuery>);
 
     renderWithClient(<FormList />);
 

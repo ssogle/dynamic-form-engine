@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { findActiveForms, insertForm, insertFormSchema } from "@/entities/form";
+import { insertFormSchema } from "@/entities/form";
+import { findActiveForms, insertForm } from "@/entities/form/server";
 import { apiResponse, badRequest, withErrorHandler } from "@/shared/lib/http";
 
 /**

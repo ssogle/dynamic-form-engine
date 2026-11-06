@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import {
@@ -13,11 +14,11 @@ import {
 } from "@/shared/ui/card";
 import { Skeleton } from "@/shared/ui/skeleton";
 import {
-  useCreateSampleFormMutation,
+  useCreateFormMutation,
   useDeleteFormMutation,
   useFormsQuery,
   useUpdateFormMutation,
-} from "../queries/use-forms.query";
+} from "@/entities/form";
 
 /**
  * 폼 목록 조회, 등록, 수정, 소프트 삭제 인터랙션 카드 위젯
@@ -26,7 +27,7 @@ import {
  */
 export function FormList() {
   const { data: forms, isLoading, isError, error } = useFormsQuery();
-  const createFormMutation = useCreateSampleFormMutation();
+  const createFormMutation = useCreateFormMutation();
   const updateFormMutation = useUpdateFormMutation();
   const deleteFormMutation = useDeleteFormMutation();
 
@@ -169,11 +170,14 @@ export function FormList() {
               </Badge>
             </div>
             {form.description ? (
-              <p className="text-muted-foreground text-xs leading-relaxed">{form.description}</p>
+              <p className="text-muted-foreground text-xs/relaxed">{form.description}</p>
             ) : null}
             <div className="text-muted-foreground/80 mt-1 flex items-center justify-between text-[11px]">
               <span>ID: {form.id.slice(0, 8)}...</span>
               <div className="flex items-center gap-2">
+                <Button size="xs" variant="outline" asChild>
+                  <Link href={`/builder/forms/${form.slug}`}>캔버스 열기</Link>
+                </Button>
                 <Button
                   size="xs"
                   variant="ghost"

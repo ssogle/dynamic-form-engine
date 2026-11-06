@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   findActiveForms,
   findFormById,
+  findFormBySlug,
   insertForm,
   softDeleteFormById,
   updateFormById,
@@ -99,6 +100,27 @@ describe("Form Server Repository (entities/form/server)", () => {
       mockLimit.mockResolvedValueOnce([]);
 
       const result = await findFormById("non-existent-id");
+
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe("findFormBySlug", () => {
+    it("일치하는 슬러그의 활성 폼 1건을 조회하여 반환해야 한다", async () => {
+      mockLimit.mockResolvedValueOnce([sampleForm]);
+
+      const result = await findFormBySlug("daily-task-report");
+
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+      expect(mockWhere).toHaveBeenCalledTimes(1);
+      expect(mockLimit).toHaveBeenCalledWith(1);
+      expect(result).toEqual(sampleForm);
+    });
+
+    it("일치하는 슬러그의 폼이 없으면 undefined를 반환해야 한다", async () => {
+      mockLimit.mockResolvedValueOnce([]);
+
+      const result = await findFormBySlug("non-existent-slug");
 
       expect(result).toBeUndefined();
     });

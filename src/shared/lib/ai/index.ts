@@ -1,1 +1,1 @@
-export { GEMINI_MODELS, getGeminiModel, type GeminiModelType } from "./gemini";
+export { AI_MODELS, getAiModel, type AiModelTier } from "./model";

@@ -62,20 +62,22 @@ src/
 │       ├── store/navigator-chat.store.ts  # 네비게이터 대화 내역 및 UI 패널 상태 (위젯 스코프)
 │       └── index.ts
 ├── features/
-│   ├── execute-navigator-action/          # LLM 의도 해석 및 액션 이벤트 도출 기능
+│   ├── execute-navigator-action/          # LLM 의도 해석 및 액션 실행 파이프라인 (DB 영속화 연동)
 │   │   ├── lib/action-parser.ts           # Gemini 기반 자연어 파서
 │   │   ├── types/action.types.ts          # 액션 Zod 스키마 및 Result 타입
-│   │   ├── queries/use-navigator.mutation.ts # 액션 실행 및 컨텍스트 연동 뮤테이션
+│   │   ├── queries/use-navigator.mutation.ts # 액션 실행 및 TanStack Query 캐시 갱신
 │   │   └── index.ts
-│   └── preview-dynamic-form/              # 순수 폼 프리뷰어 (entities/form 스토어 구독)
+│   └── preview-dynamic-form/              # 마우스 편집이 없는 순수 폼 프리뷰어
 │       ├── ui/form-preview-canvas.tsx     # 폼 프리뷰 캔버스 컴포넌트
 │       ├── ui/field-registry.tsx          # text, textarea, number, select 4종 매핑
 │       ├── ui/form-field-wrapper.tsx      # 라벨, 필수 표시(*), 설명 문구 공통 래퍼
 │       └── index.ts
 ├── entities/
-│   └── form/                              # 폼 비즈니스 도메인 모델 및 상태
-│       ├── schema/form.schema.ts          # 기존 forms 테이블 및 Zod 스키마
-│       ├── store/form-preview.store.ts    # 현재 프리뷰 중인 활성 폼 스키마 상태 (엔티티 스코프)
+│   └── form/                              # 폼 비즈니스 도메인 모델 및 서버 상태
+│       ├── schema/form.schema.ts          # 기존 forms 테이블 및 Drizzle/Zod 스키마
+│       ├── types/form-field.types.ts      # 4종 코어 필드 및 활성 폼 규격
+│       ├── queries/use-form-detail.query.ts # TanStack Query 단건 폼 조회 훅 (단일 진실 원천)
+│       ├── queries/form.keys.ts           # 쿼리 키 팩토리
 │       ├── server/form.server.ts          # 폼 DB 영속화 서버 로직
 │       └── index.ts
 └── shared/
@@ -105,14 +107,14 @@ sequenceDiagram
     ActionFeat->>FormStore: getState().currentForm (현재 폼 컨텍스트 조회)
     FormStore-->>ActionFeat: null (현재 활성 폼 없음)
     ActionFeat->>LLM: 자연어 + 현재 컨텍스트 전달
-    LLM-->>ActionFeat: 액션 응답 (CREATE_FORM + targetPath: "/builder/project-form")
+    LLM-->>ActionFeat: 액션 응답 (CREATE_FORM + slug: "project-form")
     ActionFeat-->>Shell: onActionResolved(action) [Events Up: 이벤트 상위 보고]
 
     Note over Shell: 상위 위젯 관제탑에서 액션 분기 및 하향 명령
     Shell->>FormStore: setForm(newFormSchema) [Data Down: 폼 스키마 초기화]
-    Shell->>Router: router.push("/builder/project-form") [화면 자율주행 이동]
+    Shell->>Router: router.push("/builder/forms/project-form") [화면 자율주행 이동]
     Shell-->>User: "프로젝트 폼을 생성하고 빌더 화면으로 이동했습니다." 대화 응답
-    Router->>Preview: /builder/project-form 페이지 로드
+    Router->>Preview: /builder/forms/project-form 페이지 로드
     Preview->>FormStore: currentForm 구독
     Preview-->>User: 생성된 폼 캔버스 화면 렌더링
     end
@@ -180,7 +182,11 @@ export const navigatorActionSchema = z.discriminatedUnion("type", [
    */
   z.object({
     type: z.literal("NAVIGATE"),
-    targetPath: z.string().describe("이동할 경로 (예: /builder/project-info, /forms)"),
+    targetPath: z
+      .string()
+      .describe(
+        "이동할 경로 (예: /builder/forms/project-info, /builder/forms, /builder/views, /consumer)"
+      ),
     message: z.string().describe("이동 안내 메시지"),
   }),
 
@@ -246,16 +252,26 @@ export type ActionResult<T> =
 
 ## 6. 마일스톤 및 검증 계획 (Milestones & Verification)
 
-1. **Step 1: Domain & Preview Foundation (TDD)**
-   - `entities/form/store/form-preview.store.ts` 구현 및 단위 테스트
-   - `features/preview-dynamic-form/` 코어 4종 필드 렌더러 및 캔버스 UI 구현 및 컴포넌트 테스트
-2. **Step 2: Action Engine & Parser (TDD)**
-   - `features/execute-navigator-action/lib/action-parser.ts` Gemini 연동 파서 및 단위 테스트
-   - `features/execute-navigator-action/` 뮤테이션 훅 구현
-3. **Step 3: Navigator Shell Widget & Layout Integration**
-   - `widgets/navigator-shell/` 대화 패널, 스토어 및 하향 디스패치 오케스트레이션 구현
-   - `src/app/(workspace)/layout.tsx` 지속형 분할 레이아웃 배치
-4. **Step 4: End-to-End Verification**
-   - 자연어 지시를 통한 라우팅 -> 폼 생성 -> 실시간 필드 수정 완주 검증
-   - `npm test` 단위/컴포넌트 테스트 100% 통과
-   - `npm run verify` (타입체크, 린트, 포맷) 무결점 완주
+1. [x] **Step 1: Domain & Query Pipeline (TDD)**
+   - `entities/form/types/form-field.types.ts`: 코어 4종 필드 Zod 스키마 정의
+   - `entities/form/server/form.server.ts`: URL 슬러그 기반 `findFormBySlug` 구현 및 단위 테스트
+   - `entities/form/queries/`: 단건 조회, 목록 조회, 생성/수정/삭제 쿼리/뮤테이션 훅 구현 및 테스트
+   - `entities/form/server.ts` & `index.ts`: Next.js 16 App Router `server-only` 경계 분리
+2. [x] **Step 2: Preview Foundation (TDD)**
+   - `features/preview-dynamic-form/ui/form-field-wrapper.tsx`: 라벨, 필수(*) 표식, 설명 공통 래퍼
+   - `features/preview-dynamic-form/ui/field-registry.tsx`: 코어 4종 필드(`text`, `textarea`, `number`, `select`) 매핑
+   - `features/preview-dynamic-form/ui/form-preview-canvas.tsx`: 실시간 순수 프리뷰 캔버스 구현 및 컴포넌트 테스트 7건 통과
+3. [x] **Step 3: Action Engine & API Pipeline (TDD)**
+   - `features/execute-navigator-action/types/action.types.ts`: 액션 유니온(`NAVIGATE`, `CREATE_FORM`, `UPDATE_SCHEMA`) 정의
+   - `features/execute-navigator-action/lib/action-parser.ts`: 안전 파서 및 단위 테스트 7건 통과
+   - `src/app/api/v1/navigator/route.ts`: Gemini Structured Outputs 기반 BFF 엔드포인트 구현 및 테스트 4건 통과
+   - `features/execute-navigator-action/queries/use-navigator.mutation.ts`: React Query 뮤테이션 훅 구현 및 테스트 3건 통과
+4. [x] **Step 4: Navigator Shell Widget & Layout Integration (TDD)**
+   - `widgets/navigator-shell/store/navigator-chat.store.ts`: Zustand 대화 UI 스토어 구현 및 테스트 5건 통과
+   - `widgets/navigator-shell/ui/navigator-shell.tsx`: 관제탑 위젯 컴포넌트 구현 및 테스트 3건 통과
+   - `src/app/builder/layout.tsx`: 상주 패널 지속형 분할 레이아웃 조립 (네비게이션 탭 포함)
+   - `src/app/builder/forms/[slug]/page.tsx`: 실시간 캔버스 라우팅 페이지 연동
+   - `src/app/page.tsx`: 루트 게이트웨이 정돈 (빌더 vs 컨슈머) 및 보일러플레이트 제거
+5. [x] **Step 5: End-to-End Verification**
+   - `npm run verify` (tsc, eslint, prettier, vitest) 22개 파일 97개 테스트 결함 0건 완주
+   - `npm run build` Next.js 16.4.4 Turbopack 프로덕션 빌드 성공 확인

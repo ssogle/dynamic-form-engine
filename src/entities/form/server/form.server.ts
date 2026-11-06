@@ -33,6 +33,25 @@ export const findFormById = async (id: string): Promise<Form | undefined> => {
 };
 
 /**
+ * 특정 슬러그(slug)를 가진 활성 폼(소프트 삭제되지 않은 폼) 1건을 조회합니다.
+ *
+ * URL 경로(/builder/[slug])를 통한 폼 프리뷰 및 네비게이터 자율주행 시
+ * 읽기 친화적 슬러그로 폼 데이터를 빠르게 특정할 때 사용됩니다.
+ *
+ * @param slug 조회할 폼 URL 고유 식별 슬러그 (예: "project-info")
+ * @returns 일치하는 Form 객체 또는 undefined
+ */
+export const findFormBySlug = async (slug: string): Promise<Form | undefined> => {
+  const [form] = await db
+    .select()
+    .from(forms)
+    .where(and(eq(forms.slug, slug), isNull(forms.deletedAt)))
+    .limit(1);
+
+  return form;
+};
+
+/**
  * 신규 폼 메타데이터를 데이터베이스에 영속화합니다.
  *
  * @param data 유효성 검증을 통과한 신규 폼 데이터
