@@ -102,12 +102,16 @@ src/[layer]/[slice-name]/
 └── lib/                    # [선택] 순수 데이터 변환 유틸리티
 ```
 
-### Public API (`index.ts`) 원칙
+### Public API (`index.ts` & `server.ts`) 원칙
 
-- 외부 레이어에서는 반드시 슬라이스 루트의 `index.ts`를 통해서만 모듈을 가져옵니다.
-  - [Good] `import { FormCard } from "@/entities/form";`
+- 외부 레이어에서는 반드시 슬라이스 루트의 공인된 진입점을 통해서만 모듈을 가져옵니다. 내부 구현 파일의 직통 참조는 금지됩니다.
+  - [Good] `import { useFormsQuery } from "@/entities/form";`
   - [Bad] `import { FormCard } from "@/entities/form/ui/form-card";` (Deep import 차단)
-- 내부 구현용으로만 쓰는 파일이나 서버 전용 코드가 외부로 무분별하게 노출되지 않도록 `index.ts`에서 선별적으로 export합니다.
+- **Next.js App Router Server/Client 경계 분리 (`server-only` 가드레일)**:
+  - 브라우저 클라이언트 컴포넌트(`"use client"`)에 DB 연결 라이브러리(`postgres`, `drizzle-orm`)나 `server-only` 모듈이 유출되는 것을 원천 차단하기 위해 슬라이스 루트 진입점을 2개로 분리합니다:
+    - **`index.ts` (클라이언트 및 범용 진입점)**: 브라우저가 안전하게 참조할 수 있는 Zod 스키마, 정적 타입, TanStack Query 훅만 export합니다.
+    - **`server.ts` (서버 전용 진입점)**: `server-only`가 선언된 Drizzle DB 직접 쿼리, 트랜잭션 함수를 export합니다.
+    - 서버 환경인 `app` 레이어(Route Handlers, Server Actions)는 `@/entities/[slice]/server`를 통해 서버 로직을 안전하게 참조합니다.
 
 ---
 
