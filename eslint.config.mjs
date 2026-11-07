@@ -48,13 +48,17 @@ const eslintConfig = defineConfig([
         {
           default: "disallow",
           policies: [
-            // app: app 내부 및 모든 하위 레이어 허용 (widgets, features는 index.ts만, entities는 index.ts 및 server.ts 허용)
+            // app: app 내부 및 모든 하위 레이어 허용 (widgets는 index.ts만, features와 entities는 index.ts 및 server.ts 허용)
             {
               from: { element: { type: "app" } },
               allow: [
                 { to: { element: { type: "app" } } },
                 { to: { element: { type: "widgets", fileInternalPath: "index.{ts,tsx}" } } },
-                { to: { element: { type: "features", fileInternalPath: "index.{ts,tsx}" } } },
+                {
+                  to: {
+                    element: { type: "features", fileInternalPath: "{index,server}.{ts,tsx}" },
+                  },
+                },
                 {
                   to: {
                     element: { type: "entities", fileInternalPath: "{index,server}.{ts,tsx}" },
@@ -72,11 +76,15 @@ const eslintConfig = defineConfig([
                 { to: { element: { type: "shared" } } },
               ],
             },
-            // features: features 내부(동일 슬라이스 자동 허용) 및 entities (index.ts만), shared 허용
+            // features: features 내부(동일 슬라이스 자동 허용) 및 entities ({index,server}.{ts,tsx}), shared 허용
             {
               from: { element: { type: "features" } },
               allow: [
-                { to: { element: { type: "entities", fileInternalPath: "index.{ts,tsx}" } } },
+                {
+                  to: {
+                    element: { type: "entities", fileInternalPath: "{index,server}.{ts,tsx}" },
+                  },
+                },
                 { to: { element: { type: "shared" } } },
               ],
             },

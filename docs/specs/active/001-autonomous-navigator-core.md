@@ -65,8 +65,8 @@ src/
 │   │   └── views/page.tsx                 # 뷰어 대시보드 페이지
 │   ├── consumer/                          # 최종 사용자 폼 응답 작성 페이지
 │   └── api/v1/navigator/                  # AI Navigator BFF 엔드포인트
-│       ├── route.ts                       # Vercel AI SDK 기반 Tool Calling 실행 핸들러
-│       └── route.test.ts                  # 백엔드 도구 호출 오케스트레이션 검증 테스트
+│       ├── route.ts                       # Thin Route Handler (입력 검증 및 러너 위임)
+│       └── route.test.ts                  # HTTP 계층 검증 테스트
 ├── widgets/
 │   └── navigator-shell/                   # 상시 상주형 네비게이터 지휘자 (중앙 관제탑)
 │       ├── ui/navigator-shell.tsx         # 채팅 패널 배치, 히스토리 동봉 및 라우팅 디스패치
@@ -74,6 +74,10 @@ src/
 │       └── index.ts
 ├── features/
 │   ├── execute-navigator-action/          # LLM 도구 카탈로그 및 액션 실행 파이프라인
+│   │   ├── server/                        # 서버 전용 오케스트레이션 엔진
+│   │   │   ├── navigator-runner.server.ts # 시스템 프롬프트, 맥락 합성, 도구 추론 실행
+│   │   │   └── navigator-runner.server.test.ts # 엔진 비즈니스 단위 테스트
+│   │   ├── server.ts                      # 서버 전용 Public API 엔트리포인트
 │   │   ├── lib/navigator-tools.ts         # 5종 도구 카탈로그 (navigate, createForm, updateSchema, deleteForm, listForms)
 │   │   ├── lib/action-parser.ts           # 액션 안전 파서
 │   │   ├── types/action.types.ts          # 액션 Zod 스키마, 대화 히스토리 및 Result 타입
@@ -209,7 +213,7 @@ export interface ExecuteNavigatorActionPayload {
 3. [x] **Step 3: Tool Catalog & AI Model Abstraction (TDD)**
    - `shared/lib/ai/model.ts`: Vercel AI SDK 기반 공급자 중립적 AI 모델 계층(`getAiModel`) 구축 및 테스트 3건 통과
    - `features/execute-navigator-action/lib/navigator-tools.ts`: 5종 도구 카탈로그 구현 및 단위 테스트 7건 통과
-   - `src/app/api/v1/navigator/route.ts`: 입체적 시스템 맥락 주입 및 도구 호출 BFF 핸들러 구현 및 테스트 8건 통과
+   - `features/execute-navigator-action/server/`: AI 오케스트레이션 엔진(`navigator-runner.server.ts`) 분리 및 BFF Thin Route 핸들러 구현 (테스트 8건 통과)
    - `features/execute-navigator-action/queries/use-navigator.mutation.ts`: React Query 뮤테이션 훅 구현 및 테스트 3건 통과
 4. [x] **Step 4: Navigator Shell Widget & Layout Integration (TDD)**
    - `widgets/navigator-shell/store/navigator-chat.store.ts`: Zustand 대화 UI 스토어 구현 및 테스트 5건 통과
@@ -218,5 +222,5 @@ export interface ExecuteNavigatorActionPayload {
    - `src/app/builder/forms/[slug]/page.tsx`: 실시간 캔버스 라우팅 페이지 연동
    - `src/app/page.tsx`: 루트 게이트웨이 정돈 (빌더 vs 컨슈머)
 5. [x] **Step 5: End-to-End Verification**
-   - `npm run verify` (tsc, eslint, prettier, vitest) **23개 파일 110개 테스트 결함 0건 완주**
+   - `npm run verify` (tsc, eslint, prettier, vitest) **24개 파일 108개 테스트 결함 0건 완주**
    - `npm run build` Next.js 16.4.4 Turbopack 프로덕션 빌드 성공 확인
