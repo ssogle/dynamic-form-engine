@@ -68,27 +68,40 @@
 
 ```text
 src/
+├── shared/
+│   └── db/
+│       └── tables/                            # [중앙화] 물리 DB 테이블 DDL 정의 (외래키 및 CASCADE 무결성)
+│           ├── forms.table.ts
+│           └── form-submissions.table.ts
 ├── entities/
 │   ├── form/                                  # [수정] findPublishedForms, findPublishedFormBySlug 추가
+│   │   ├── schema/
+│   │   │   ├── form.schema.ts                 # 폼 클라이언트 검증 Zod 스키마
+│   │   │   └── form-field.schema.ts           # 4종 코어 필드 및 활성 폼 규격 Zod 스키마
+│   │   └── server/
+│   │       └── form.server.ts
 │   └── form-submission/                       # [신규] 제출 데이터 도메인 엔티티
 │       ├── schema/
-│       │   └── form-submission.schema.ts      # Drizzle 테이블 & Zod 스키마
-│       ├── types/
-│       │   └── form-submission.types.ts
+│       │   └── form-submission.schema.ts      # 폼 응답 검증 Zod 스키마 및 파생 타입
 │       ├── server/
 │       │   └── form-submission.server.ts      # CRUD 쿼리 함수 (insert, find, update, delete)
 │       ├── queries/
-│       │   ├── submission.keys.ts
-│       │   ├── use-form-submissions.query.ts
-│       │   ├── use-submission-detail.query.ts
-│       │   └── use-submission.mutation.ts
+│       │   ├── form-submissions.keys.ts       # TanStack Query 캐시 키 팩토리
+│       │   ├── use-form-submissions.query.ts  # 폼 응답 목록 조회 훅
+│       │   └── use-form-submissions.mutation.ts # 폼 응답 제출/수정/삭제 뮤테이션 훅
 │       ├── index.ts
 │       └── server.ts
 ├── features/
 │   ├── execute-navigator-builder-action/      # [기존] 빌더 AI 액션 실행 피처
+│   │   ├── schema/
+│   │   │   └── action.schema.ts               # 액션 Zod 스키마
+│   │   └── types/
+│   │       └── action.types.ts                # 순수 TypeScript 인터페이스
 │   ├── execute-navigator-consumer-action/     # [신규] 컨슈머 AI 액션 실행 피처
+│   │   ├── schema/
+│   │   │   └── consumer-action.schema.ts      # 컨슈머 액션 Zod 스키마
 │   │   ├── types/
-│   │   │   └── consumer-action.types.ts
+│   │   │   └── consumer-action.types.ts       # 순수 TypeScript 인터페이스
 │   │   ├── queries/
 │   │   │   └── use-consumer-navigator.mutation.ts
 │   │   ├── lib/
@@ -142,7 +155,7 @@ src/
             └── route.ts                       # POST (mode: "builder" | "consumer" 분기 처리)
 ```
 
-### 2) 데이터베이스 DDL 명세 (`form_submissions`)
+### 2) 데이터베이스 DDL 명세 (`src/shared/db/tables/form-submissions.table.ts`)
 
 ```typescript
 export const formSubmissions = pgTable(

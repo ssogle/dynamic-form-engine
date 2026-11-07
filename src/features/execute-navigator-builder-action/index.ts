@@ -9,15 +9,20 @@ export {
   navigateActionSchema,
   createFormActionSchema,
   updateSchemaActionSchema,
+  publishFormActionSchema,
   navigatorActionSchema,
-  type NavigateAction,
-  type CreateFormAction,
-  type UpdateSchemaAction,
-  type NavigatorAction,
-  type ActionResult,
-  type ChatHistoryMessage,
-  type ExecuteNavigatorActionPayload,
-  type NavigatorExecutionResponse,
+} from "./schema/action.schema";
+
+export type {
+  NavigateAction,
+  CreateFormAction,
+  UpdateSchemaAction,
+  PublishFormAction,
+  NavigatorAction,
+  ActionResult,
+  ChatHistoryMessage,
+  ExecuteNavigatorActionPayload,
+  NavigatorExecutionResponse,
 } from "./types/action.types";
 
 export { parseNavigatorAction, sanitizeSlug } from "./lib/action-parser";

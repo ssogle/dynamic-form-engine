@@ -15,12 +15,16 @@ const mockInsert = vi.fn();
 const mockValues = vi.fn();
 const mockReturning = vi.fn();
 
-vi.mock("@/shared/db", () => ({
-  db: {
-    select: () => mockSelect(),
-    insert: (table: unknown) => mockInsert(table),
-  },
-}));
+vi.mock("@/shared/db", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/shared/db")>();
+  return {
+    ...actual,
+    db: {
+      select: () => mockSelect(),
+      insert: (table: unknown) => mockInsert(table),
+    },
+  };
+});
 
 describe("Route Handler: /api/v1/forms", () => {
   beforeEach(() => {

@@ -37,7 +37,7 @@
    - 역할: 비즈니스 핵심 개체 모델, 영속성 로직 및 상태.
    - 원칙: 다른 entity나 상위 레이어에 의존하지 않으며, 순수 비즈니스 데이터 구조와 CRUD 성격의 조작 로직만 포함합니다.
    - 세부 구성:
-     - `schema/`: Drizzle ORM 테이블 정의(`pgTable`) 및 `drizzle-zod` 파생 검증 스키마 (조회 모델은 `$inferSelect`, 입력 모델은 `z.infer` 파생)
+     - `schema/`: 클라이언트 요청 검증용 Zod 스키마(`createInsertSchema`, `z.object`) 및 `z.infer` 파생 도메인 모델 (물리 DB 테이블 DDL은 `shared/db/tables` 참조)
      - `server/`: `db.transaction()` 기반의 코드 레벨 트랜잭션 및 DB 쿼리 순수 함수
    - 참조 허용: `shared`
 
@@ -45,7 +45,7 @@
    - 역할: 비즈니스 도메인 지식이 전혀 없는 범용 컴포넌트, 코어 인프라 클라이언트 및 유틸리티.
    - 세부 구성:
      - `ui/`: shadcn/ui 기반 원자 컴포넌트 (Button, Card, Dialog 등)
-     - `db/`: [코어 인프라] Drizzle ORM 싱글톤 인스턴스 및 PostgreSQL DB 연결 (Transaction Pooler 및 Direct)
+     - `db/`: [코어 인프라] Drizzle ORM 싱글톤 인스턴스, PostgreSQL DB 연결, 및 물리 테이블 DDL (`tables/*.table.ts`)
      - `lib/`: 순수 범용 유틸리티(`utils.ts`, `httpClient`), Gemini AI SDK 통합
      - `types/`: 전역 공통 유틸리티 타입 (Result 패턴 등)
      - `store/`: 테마, 전역 알림 등 도메인 무관 전역 상태
@@ -64,7 +64,23 @@
 
 ---
 
-## 3. 슬라이스 내부 표준 세그먼트 규칙 (Slice Segments)
+## 3. 스키마, 타입, 테이블 분리 거버넌스 (Schema vs Types vs Tables)
+
+에이전트와 개발자 간의 모호성을 원천 차단하기 위해 데이터 정의 파일은 다음 단일 기준을 엄격히 준수합니다:
+
+1. **`src/shared/db/tables/*.table.ts` (DB 테이블 정의)**:
+   - Drizzle ORM의 `pgTable` 정의 전용입니다.
+   - RDBMS 외래키, 인덱스, CASCADE 무결성을 보장하기 위해 모든 물리 테이블 DDL은 이곳에 집중 배치합니다.
+2. **`src/{entities,features}/*/schema/*.schema.ts` (Zod 검증 스키마)**:
+   - 런타임에 실행되는 Zod 유효성 검증기(`z.object`, `createInsertSchema` 등) 및 정규식, 도구 파라미터 스키마 전용입니다.
+   - 스키마로부터 파생되는 TypeScript 정적 타입(`z.infer`)은 해당 스키마 파일 하단에서 함께 export합니다.
+3. **`src/{entities,features}/*/types/*.types.ts` (순수 TypeScript 타입)**:
+   - 컴파일 타임에만 존재하는 순수 TypeScript `type` 및 `interface` 전용입니다.
+   - **가드레일**: `types/` 폴더 내부 파일에서는 `import { z } from "zod"`를 통한 런타임 검증기 선언이 엄격히 금지됩니다.
+
+---
+
+## 4. 슬라이스 내부 표준 세그먼트 규칙 (Slice Segments)
 
 모호한 명칭인 `model/`과 `api/`는 도메인 슬라이스 내부에서 사용하지 않습니다. 역할이 명확한 아래 7개 표준 세그먼트만 허용됩니다.
 
@@ -72,15 +88,16 @@
 
 ESLint(`eslint-plugin-check-file`)에 의해 기계적으로 강제되며, 세그먼트별로 고유 접미사(`.xxx.ts`)를 준수해야 합니다:
 
-| 세그먼트  | 실행 환경       | 주 역할                                                           | 필수 파일명 접미사 (Suffix)                  | 예시 파일명                         |
-| :-------- | :-------------- | :---------------------------------------------------------------- | :------------------------------------------- | :---------------------------------- |
-| `ui`      | Client / Server | 뷰 레이어                                                         | `[name].tsx`                                 | `form-card.tsx`                     |
-| `queries` | Client          | 클라이언트 데이터 패칭                                            | `*.query.ts` / `*.mutation.ts` / `*.keys.ts` | `use-form.query.ts`, `form.keys.ts` |
-| `server`  | Server 전용     | 백엔드 데이터 영속성 (Drizzle 쿼리 및 `db.transaction` 트랜잭션)  | `*.server.ts`                                | `form-db.server.ts`                 |
-| `store`   | Client 전용     | 클라이언트 전역 상태                                              | `*.store.ts`                                 | `form-editor.store.ts`              |
-| `schema`  | 공통            | 런타임 데이터 검증 (Drizzle `pgTable` 및 `drizzle-zod` 단일 진실) | `*.schema.ts`                                | `form.schema.ts`                    |
-| `types`   | 컴파일 타임     | 정적 타입 정의                                                    | `*.types.ts` / `*.dto.ts` / `index.ts`       | `form.types.ts`, `health.dto.ts`    |
-| `lib`     | 공통            | 순수 함수/도구                                                    | `*.util.ts` 또는 `[name].ts`                 | `calculate-score.util.ts`           |
+| 세그먼트  | 실행 환경       | 주 역할                                                             | 필수 파일명 접미사 (Suffix)                  | 예시 파일명                         |
+| :-------- | :-------------- | :------------------------------------------------------------------ | :------------------------------------------- | :---------------------------------- |
+| `ui`      | Client / Server | 뷰 레이어                                                           | `[name].tsx`                                 | `form-card.tsx`                     |
+| `queries` | Client          | 클라이언트 데이터 패칭                                              | `*.query.ts` / `*.mutation.ts` / `*.keys.ts` | `use-form.query.ts`, `form.keys.ts` |
+| `server`  | Server 전용     | 백엔드 데이터 영속성 (Drizzle 쿼리 및 `db.transaction` 트랜잭션)    | `*.server.ts`                                | `form-db.server.ts`                 |
+| `store`   | Client 전용     | 클라이언트 전역 상태                                                | `*.store.ts`                                 | `form-editor.store.ts`              |
+| `schema`  | 공통            | 런타임 데이터 검증 (Zod `z.object` 및 `drizzle-zod` 파생 스키마)    | `*.schema.ts`                                | `form.schema.ts`                    |
+| `types`   | 컴파일 타임     | 순수 정적 타입 정의 (**Zod import 금지**, 순수 type/interface)      | `*.types.ts` / `*.dto.ts` / `index.ts`       | `action.types.ts`, `health.dto.ts`  |
+| `lib`     | 공통            | 순수 함수/도구                                                      | `*.util.ts` 또는 `[name].ts`                 | `calculate-score.util.ts`           |
+| `tables`  | 공통 (shared)   | 물리 DB 테이블 DDL (`pgTable`, `src/shared/db/tables/` 인프라 전용) | `*.table.ts`                                 | `forms.table.ts`                    |
 
 - 단위 테스트 파일은 해당 접미사 뒤에 `.test.ts`를 부착합니다 (예: `form-editor.store.test.ts`, `form.schema.test.ts`).
 
@@ -115,7 +132,7 @@ src/[layer]/[slice-name]/
 
 ---
 
-## 4. 데이터 흐름 파이프라인 (Data Flow Pipeline)
+## 5. 데이터 흐름 파이프라인 (Data Flow Pipeline)
 
 Next.js App Router, TanStack Query, Drizzle ORM 환경에서 표준 데이터 흐름은 다음과 같습니다:
 
@@ -154,11 +171,11 @@ sequenceDiagram
 
 ---
 
-## 5. Drizzle 멀티 스키마 & 무중단 마이그레이션 규칙
+## 6. Drizzle 테이블 DDL 및 무중단 마이그레이션 규칙
 
-1. **분산 스키마 단일 수집 (Glob Matching)**:
-   - 각 도메인의 물리적 테이블 구조는 `src/entities/**/schema/*.schema.ts`에 독립적으로 작성합니다.
-   - `drizzle.config.ts`는 Glob 패턴으로 모든 엔티티의 스키마를 자동 탐색하여 중앙 수집합니다.
+1. **중앙 집중식 물리 테이블 DDL (`src/shared/db/tables/*.table.ts`)**:
+   - RDBMS 외래키 참조 및 물리 삭제 시의 CASCADE 제약조건을 온전히 보장하기 위해 물리적 테이블 구조는 `src/shared/db/tables/*.table.ts`에 독립적으로 작성합니다.
+   - `drizzle.config.ts`는 `./src/shared/db/tables/*.table.ts` Glob 패턴으로 모든 테이블 정의를 자동 탐색하여 중앙 수집합니다.
 2. **코드 레벨 트랜잭션 (No Logic Fragmentation)**:
    - DB 트리거나 Stored Procedure로 비즈니스 로직을 파편화하지 않고, `entities/*/server/` 파일 안에서 `db.transaction(async (tx) => ...)` 블록으로 원자성을 투명하게 통제합니다.
 3. **무중단 마이그레이션 파이프라인 (Expand & Contract)**:
@@ -167,7 +184,7 @@ sequenceDiagram
 
 ---
 
-## 6. 경로 별칭 (Path Aliases)
+## 7. 경로 별칭 (Path Aliases)
 
 반드시 `tsconfig.json`에 정의된 FSD 레이어 alias를 사용하며, 상대 경로 지옥(`../../../`)을 지양합니다:
 
@@ -179,7 +196,7 @@ sequenceDiagram
 
 ---
 
-## 7. Next.js 16 & Server/Client 경계 가이드
+## 8. Next.js 16 & Server/Client 경계 가이드
 
 1. **Client Component 최소화**: 인터랙션(`useState`, `useEffect`, 이벤트 핸들러)이 필요한 컴포넌트 리프(Leaf) 단위에만 `'use client'`를 선언합니다.
 2. **비밀 키 보호**: AI 호출(`@google/genai`) 및 데이터베이스 접속 주소(`DATABASE_URL`)는 반드시 서버 환경(`app/api/*`, `shared/db/`, 또는 `server/` 세그먼트)에서만 격리 실행합니다.

@@ -21,7 +21,7 @@ export {
   type CoreFieldType,
   type CoreFormField,
   type ActiveForm,
-} from "./types/form-field.types";
+} from "./schema/form-field.schema";
 
 export { formKeys } from "./queries/form.keys";
 export { getForms, useFormsQuery } from "./queries/use-forms.query";

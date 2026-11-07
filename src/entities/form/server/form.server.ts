@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/shared/db";
 import { forms, type Form, type InsertForm, type UpdateForm } from "../schema/form.schema";
 
@@ -123,4 +123,35 @@ export const softDeleteFormsBySlugs = async (slugs: string[]): Promise<Form[]> =
     })
     .where(and(inArray(forms.slug, slugs), isNull(forms.deletedAt)))
     .returning();
+};
+
+/**
+ * 공식 발행(publishedAt IS NOT NULL)되었으며 소프트 삭제되지 않은 활성 폼 목록을 조회합니다.
+ * 컨슈머 포털에서 일반 응답자가 참여 가능한 폼 목록을 렌더링할 때 사용됩니다.
+ *
+ * @returns 발행된 Form[] 배열 반환 (최신 생성일순 정렬)
+ */
+export const findPublishedForms = async (): Promise<Form[]> => {
+  return await db
+    .select()
+    .from(forms)
+    .where(and(isNotNull(forms.publishedAt), isNull(forms.deletedAt)))
+    .orderBy(desc(forms.createdAt));
+};
+
+/**
+ * 특정 슬러그를 가진 발행된 활성 폼 1건을 조회합니다.
+ * 미발행 초안 상태이거나 소프트 삭제된 폼은 undefined를 반환하여 컨슈머 접근을 원천 차단합니다.
+ *
+ * @param slug 조회할 폼의 고유 식별 슬러그
+ * @returns 발행된 Form 객체 또는 undefined
+ */
+export const findPublishedFormBySlug = async (slug: string): Promise<Form | undefined> => {
+  const [form] = await db
+    .select()
+    .from(forms)
+    .where(and(eq(forms.slug, slug), isNotNull(forms.publishedAt), isNull(forms.deletedAt)))
+    .limit(1);
+
+  return form;
 };

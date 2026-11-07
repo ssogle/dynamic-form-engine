@@ -13,6 +13,8 @@ export {
   findActiveForms,
   findFormById,
   findFormBySlug,
+  findPublishedForms,
+  findPublishedFormBySlug,
   insertForm,
   updateFormById,
   softDeleteFormById,

@@ -83,6 +83,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **중앙 DB 시계 권한 (Central Clock Authority)**: Drizzle ORM 및 DB 갱신 쿼리에서는 애플리케이션 서버의 `new Date()` 대신 PostgreSQL 중앙 시계인 `sql`now()``를 사용하여 분산 컨테이너 환경의 Clock Drift를 원천 방지합니다.
 - **Null-safe 공통 유틸리티 사용**: UI 포맷팅(`formatDate`, `formatDateTime`, `formatRelativeTime`, `formatUtc`) 및 직렬화(`nowUtcIso`, `toUtcIso`)는 `@/shared/lib/utils`에 정의된 함수를 통해서만 수행합니다.
 
+### 12) 데이터 정의 파일 거버넌스 (Tables vs Schema vs Types)
+
+- **DB 물리 테이블 DDL**: 반드시 `src/shared/db/tables/*.table.ts`에만 작성합니다. (Drizzle `pgTable`, 외래키 및 CASCADE 제약조건 중앙화)
+- **런타임 검증 Zod 스키마**: 반드시 `src/{entities,features}/*/schema/*.schema.ts`에만 작성합니다. (`z.object`, `createInsertSchema` 및 파생 타입 `z.infer`)
+- **순수 TypeScript 정적 타입**: 반드시 `src/{entities,features}/*/types/*.types.ts`에만 작성하며, **Zod 런타임 스키마 선언(`import { z } from 'zod'`)은 엄격히 금지**됩니다.
+
 ---
 
 ## 3. 세부 거버넌스 규칙 문서 인덱스 (`.agents/rules/`)

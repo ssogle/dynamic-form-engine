@@ -7,7 +7,7 @@ import {
   type InsertForm,
   type UpdateForm,
 } from "@/entities/form";
-import { slugRegex } from "../types/action.types";
+import { slugRegex } from "../schema/action.schema";
 import { sanitizeSlug } from "../lib/action-parser";
 import { nowUtcIso } from "@/shared/lib/utils";
 

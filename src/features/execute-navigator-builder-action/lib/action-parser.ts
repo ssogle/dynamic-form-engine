@@ -1,9 +1,6 @@
 import { z } from "zod";
-import {
-  navigatorActionSchema,
-  type NavigatorAction,
-  type ActionResult,
-} from "../types/action.types";
+import { navigatorActionSchema, type NavigatorAction } from "../schema/action.schema";
+import type { ActionResult } from "../types/action.types";
 
 /**
  * 폼 슬러그 문자열을 안전한 kebab-case로 정규화합니다.

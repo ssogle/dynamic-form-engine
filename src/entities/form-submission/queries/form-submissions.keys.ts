@@ -1,0 +1,10 @@
+/**
+ * 폼 응답(Form Submission) 엔티티 TanStack Query 캐시 키 팩토리
+ *
+ * 폼별 응답 목록 및 단건 응답 조회 캐시의 일관성을 보장하기 위한 단일 진실 원천(SSOT) 팩토리입니다.
+ */
+export const formSubmissionsKeys = {
+  all: ["submissions"] as const,
+  byForm: (formIdOrSlug: string) => [...formSubmissionsKeys.all, "byForm", formIdOrSlug] as const,
+  detail: (id: string) => [...formSubmissionsKeys.all, "detail", id] as const,
+};

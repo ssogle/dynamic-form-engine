@@ -117,6 +117,7 @@ const eslintConfig = defineConfig([
       "check-file/folder-match-with-fex": [
         "error",
         {
+          "*.table.{ts,tsx}": "**/tables/",
           "*.store.{ts,tsx}": "**/store/",
           "*.schema.{ts,tsx}": "**/schema/",
           "*.server.{ts,tsx}": "**/server/",
@@ -135,6 +136,9 @@ const eslintConfig = defineConfig([
           // 슬라이스 내부 비표준 세그먼트 폴더 차단 (7대 표준 세그먼트만 허용, 슬라이스 루트 index.{ts,tsx}는 허용)
           "src/{widgets,features,entities}/*/!(ui|queries|server|store|schema|types|lib|index.ts|index.tsx)/**":
             "src/**/{ui,queries,server,store,schema,types,lib}/**",
+
+          // tables 폴더 내 파일은 반드시 .table.ts 접미사를 가져야 함 (테스트 및 index 제외)
+          "src/**/tables/**/!(*.table|*.table.test|index).{ts,tsx}": "*.table.ts",
 
           // store 폴더 내 파일은 반드시 .store.ts 접미사를 가져야 함 (테스트 및 index 제외)
           "src/**/store/**/!(*.store|*.store.test|index).{ts,tsx}": "*.store.ts",

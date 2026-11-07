@@ -1,0 +1,28 @@
+/**
+ * Form Submission 엔티티 클라이언트 및 공용 Public API
+ *
+ * FSD 단방향 참조 원칙에 따라 외부 레이어는 본 index.ts를 통해서만
+ * 제출 스키마, 타입, TanStack Query 훅을 참조합니다.
+ */
+export {
+  formSubmissions,
+  insertFormSubmissionSchema,
+  updateFormSubmissionSchema,
+  selectFormSubmissionSchema,
+  type FormSubmission,
+  type InsertFormSubmission,
+  type UpdateFormSubmission,
+} from "./schema/form-submission.schema";
+
+export { formSubmissionsKeys } from "./queries/form-submissions.keys";
+
+export { getFormSubmissions, useFormSubmissionsQuery } from "./queries/use-form-submissions.query";
+
+export {
+  submitFormResponse,
+  updateFormSubmission,
+  deleteFormSubmission,
+  useSubmitFormMutation,
+  useUpdateSubmissionMutation,
+  useDeleteSubmissionMutation,
+} from "./queries/use-form-submissions.mutation";
