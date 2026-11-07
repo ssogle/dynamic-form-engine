@@ -1,11 +1,16 @@
+> [!WARNING]
+> **ARCHIVED SPECIFICATION (READ-ONLY)**
+> 본 문서는 구현 완료 후 동결된 과거 기록입니다.
+> 현재 시스템의 구현 규격은 `/src` 실제 코드를 참조하세요. AI 에이전트는 이 문서를 최신 코드로 인용하지 마십시오.
+
 # [Spec-001] Autonomous AI Navigator & Core Form Previewer
 
 > [!NOTE]
 >
-> - **상태 (Status)**: Active (구현 완료 및 검증 통과, 고도화 단계)
+> - **상태 (Status)**: Archived (구현 완료 및 동결)
 > - **브랜치 (Branch)**: `feat/spec-001-autonomous-navigator-core`
 > - **작성일 (Created)**: 2026-11-07
-> - **완료일 (Archived)**: -
+> - **완료일 (Archived)**: 2026-11-08
 
 ---
 
@@ -230,7 +235,7 @@ export interface ExecuteNavigatorActionPayload {
    - `features/execute-navigator-action/lib/navigator-tools.ts`: 7종 도구 카탈로그(`navigate`, `listForms`, `createForm`, `updateSchema`, `deleteForm`, `deleteForms`, `publishForm`) 구현 및 단위 테스트 11건 통과
    - `features/execute-navigator-action/server/`: AI 오케스트레이션 엔진(`navigator-runner.server.ts`) 분리 및 BFF Thin Route 핸들러 구현 (테스트 8건 통과)
    - `features/execute-navigator-action/queries/use-navigator.mutation.ts`: React Query 뮤테이션 훅 구현 및 테스트 3건 통과
-   - `shared/lib/utils/date.util.ts`: Null-safe 한국어 시간 포맷터 구현 및 단위 테스트 12건 통과, ESLint 가드레일 추가
+   - `shared/lib/utils/date.util.ts`: Null-safe 한국어 시간 포맷터 구현 및 단위 테스트 16건 통과, ESLint 가드레일 추가
 4. [x] **Step 4: Navigator Shell Widget & Layout Integration (TDD)**
    - `widgets/navigator-shell/store/navigator-chat.store.ts`: Zustand 대화 UI 스토어 구현 및 테스트 5건 통과
    - `widgets/navigator-shell/ui/navigator-shell.tsx`: 대화 히스토리(`messages`) 동봉 및 라우팅/오케스트레이션 패널 구현 및 테스트 5건 통과
@@ -238,5 +243,5 @@ export interface ExecuteNavigatorActionPayload {
    - `src/app/builder/forms/[slug]/page.tsx`: 실시간 캔버스 라우팅 페이지 연동
    - `src/app/page.tsx`: 루트 게이트웨이 정돈 (빌더 vs 컨슈머)
 5. [x] **Step 5: End-to-End Verification**
-   - `npm run verify` (tsc, eslint, prettier, vitest) **25개 파일 131개 테스트 결함 0건 완주**
+   - `npm run verify` (tsc, eslint, prettier, vitest) **25개 파일 135개 테스트 결함 0건 완주**
    - `npm run build` Next.js 16.4.4 Turbopack 프로덕션 빌드 성공 확인
