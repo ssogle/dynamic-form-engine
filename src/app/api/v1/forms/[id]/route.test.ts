@@ -14,8 +14,8 @@ const mockSet = vi.fn();
 const mockWhere = vi.fn();
 const mockReturning = vi.fn();
 
-vi.mock("@/shared/db", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/shared/db")>();
+vi.mock("@/shared/db/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/shared/db/server")>();
   return {
     ...actual,
     db: {

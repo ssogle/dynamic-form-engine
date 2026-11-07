@@ -1,6 +1,6 @@
 import "server-only";
 import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
-import { db } from "@/shared/db";
+import { db } from "@/shared/db/server";
 import { forms, type Form, type InsertForm, type UpdateForm } from "../schema/form.schema";
 
 /**
