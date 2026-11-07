@@ -111,11 +111,17 @@ src/
 │   │   │   └── execute-consumer-action.server.ts
 │   │   ├── index.ts
 │   │   └── server.ts
-│   ├── submit-form-response/                  # [신규] 폼 런타임 유효성 검증 및 입력 화면
-│   │   ├── lib/
-│   │   │   └── dynamic-submission-validator.ts
+│   ├── render-dynamic-form/                   # [통합] 빌더 프리뷰와 컨슈머 제출을 단일 수용하는 동적 폼 렌더러 & 검증 엔진
+│   │   ├── schema/
+│   │   │   ├── dynamic-form.schema.ts         # 동적 Zod 스키마 조립 및 런타임 검증 엔진
+│   │   │   └── dynamic-form.schema.test.ts
+│   │   ├── types/
+│   │   │   └── render-dynamic-form.types.ts   # 모드(preview | submission), Props 및 검증 결과 타입
 │   │   ├── ui/
-│   │   │   └── consumer-form-renderer.tsx
+│   │   │   ├── dynamic-form-renderer.tsx      # React Hook Form 연동 메인 폼 뷰어 (mode: preview | submission)
+│   │   │   ├── dynamic-field.tsx              # 필드별 shadcn 인풋 매퍼 (register / Controller 바인딩)
+│   │   │   ├── form-field-wrapper.tsx         # 라벨, 필수 표시, 에러 메시지 공통 래퍼
+│   │   │   └── dynamic-form-renderer.test.tsx # 프리뷰 및 제출 인터랙션 테스트
 │   │   └── index.ts
 │   └── manage-form-submissions/               # [신규] 제출 데이터 목록 및 수정/삭제 인터랙션
 │       ├── ui/
@@ -179,19 +185,31 @@ export const formSubmissions = pgTable(
 );
 ```
 
-### 3) 런타임 유효성 검증 함수 시그니처
+### 3) 런타임 동적 Zod 스키마 조립 및 검증 명세 (`features/render-dynamic-form`)
+
+클라이언트의 실시간 React Hook Form 검증과 서버 API의 무결성 검증이 단일 진실 원천(DRY)을 공유하도록 `buildDynamicFormSchema`를 단일 엔진으로 구축합니다:
 
 ```typescript
-export interface ValidationResult {
+export interface SubmissionValidationResult {
   isValid: boolean;
   errors: Record<string, string>;
-  cleanedData: Record<string, unknown>;
+  cleanedData?: Record<string, unknown> | undefined;
 }
 
+/**
+ * 폼 필드 메타데이터 배열을 바탕으로 React Hook Form zodResolver 및 safeParse에서 재사용 가능한 ZodObject를 동적 조립
+ */
+export function buildDynamicFormSchema(
+  fields: CoreFormField[]
+): z.ZodObject<Record<string, z.ZodType>>;
+
+/**
+ * 원시 제출 데이터를 정규화(id -> name)하고 동적 스키마로 검증 및 정제 수행
+ */
 export function validateSubmissionData(
   fields: CoreFormField[],
   rawData: Record<string, unknown>
-): ValidationResult;
+): SubmissionValidationResult;
 ```
 
 ---
@@ -204,6 +222,8 @@ export function validateSubmissionData(
   - 기각 사유: 외형은 유사하나 호출 피처, 액션 디스패치, 상태 스토어, 프롬프트 힌트가 완전히 다릅니다. 단일 컴포넌트에 두 도메인의 분기를 넣으면 결합도가 증가하므로 `navigator-builder-shell`과 `navigator-consumer-shell`로 명확히 분리합니다.
 - **대안 C: 폼 진입 시 빈 응답 레코드를 선(先) 생성하는 방식**
   - 기각 사유: 컨슈머(응답자)는 단발성 참여가 지배적이므로 단순 이탈 시 DB에 쓰레기 데이터(Ghost Record)가 쌓입니다. 따라서 브라우저 상태에서 입력을 유지하다가 [제출하기] 시점에 1회 일괄 전송하는 방식을 채택합니다.
+- **대안 D: 프리뷰(`preview-dynamic-form`)와 컨슈머 제출(`submit-form-response`)을 별도 피처로 분리 유지**
+  - 기각 사유: 폼 필드 렌더링 UI, 유효성 검사 규칙, 인풋 상태 바인딩의 90% 이상이 동일한 도메인 표현입니다. 이를 분리하면 신규 필드(날짜, 체크박스 등) 추가 시 양쪽을 매번 수동 동기화해야 하는 중복 유지보수 비용과 결함 위험이 발생합니다. 따라서 `features/render-dynamic-form` 단일 피처로 통합하고 `mode="preview" | "submission"`으로 분기 제어하는 단일 진실 공급원 방식을 채택했습니다.
 
 ---
 
@@ -220,11 +240,17 @@ export function validateSubmissionData(
 
 ### 단계별 구현 계획
 
-1. **Phase 1: DB 스키마 & Drizzle 엔티티 (`entities/form-submission`)**
-   - 테이블 정의, 마이그레이션 생성, CRUD 서버 함수 및 단위 테스트
-2. **Phase 2: 런타임 유효성 검증 모듈 (`features/submit-form-response/lib`)**
-   - 4종 필드 타입/필수값/선택지 검증 로직 및 TDD 단위 테스트
-3. **Phase 3: 표준 RESTful API 엔드포인트 (`app/api/v1/...`)**
+1. **Phase 1: DB 스키마 & Drizzle 엔티티 (`entities/form-submission`) [완료]**
+   - `form_submissions` 물리 테이블 및 외래키/인덱스 DDL 생성
+   - RDBMS 실제 마이그레이션 적용 (`npm run db:migrate`)
+   - CRUD 서버 함수(`insertSubmission`, `findSubmissionsByFormId`, `updateSubmissionById`, `softDeleteSubmissionById`) 및 단위 테스트 완료
+2. **Phase 2: 프리뷰/제출 통합 폼 렌더러 및 동적 Zod 검증 엔진 (`features/render-dynamic-form`) [완료]**
+   - 동적 Zod 스키마 조립 엔진(`buildDynamicFormSchema`, `validateSubmissionData`) 구축
+   - React Hook Form(`useForm`, `FormProvider`, `zodResolver`) 연동 및 shadcn/ui 인풋 매퍼
+   - `DynamicFormRenderer` 통합 컴포넌트(`mode: "preview" | "submission"`) 구현
+   - 빌더 라이브 캔버스(`/builder/forms/[slug]`) 연동 및 구 디렉터리 정리
+   - 스키마 9개 + 컴포넌트 8개 = 17개 단위 테스트 100% 통과
+3. **Phase 3: 표준 RESTful API 엔드포인트 (`app/api/v1/...`) [대기]**
    - 발행된 폼 조회 필터(`?published=true`), 응답 제출/목록/수정/삭제 REST API 구현 및 통합 테스트
 4. **Phase 4: 컨슈머 라우터 & 레이아웃 구축 (`app/consumer/...`)**
    - 리다이렉트, 상단 탭 헤더(폼 목록 / 뷰 목록), 발행 폼 목록 페이지, 뷰 목록 페이지
