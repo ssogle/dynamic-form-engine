@@ -66,6 +66,33 @@ describe("Route Handler: /api/v1/forms", () => {
       expect(json.data).toHaveLength(1);
       expect(json.data[0].slug).toBe("daily-report");
     });
+
+    it("published=true 쿼리 파라미터 전달 시 발행된 폼 목록을 필터링하여 반환해야 한다", async () => {
+      const mockPublishedForms = [
+        {
+          id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+          slug: "customer-feedback",
+          title: "고객 피드백 설문",
+          description: "발행된 설문",
+          schemaDefinition: { fields: [] },
+          publishedAt: new Date("2026-01-02T00:00:00Z"),
+          createdAt: new Date("2026-01-01T00:00:00Z"),
+          updatedAt: new Date("2026-01-02T00:00:00Z"),
+        },
+      ];
+
+      mockOrderBy.mockResolvedValueOnce(mockPublishedForms);
+
+      const request = new NextRequest("http://localhost:3000/api/v1/forms?published=true");
+      const response = await GET(request, {});
+
+      expect(response.status).toBe(200);
+      const json = await response.json();
+
+      expect(json.success).toBe(true);
+      expect(json.data).toHaveLength(1);
+      expect(json.data[0].slug).toBe("customer-feedback");
+    });
   });
 
   describe("POST /api/v1/forms (신규 폼 등록)", () => {
