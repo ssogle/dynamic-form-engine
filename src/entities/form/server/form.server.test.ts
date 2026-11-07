@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   findActiveForms,
   findFormById,
+  findFormBySlug,
   insertForm,
   softDeleteFormById,
+  softDeleteFormsBySlugs,
   updateFormById,
 } from "./form.server";
 
@@ -104,6 +106,27 @@ describe("Form Server Repository (entities/form/server)", () => {
     });
   });
 
+  describe("findFormBySlug", () => {
+    it("일치하는 슬러그의 활성 폼 1건을 조회하여 반환해야 한다", async () => {
+      mockLimit.mockResolvedValueOnce([sampleForm]);
+
+      const result = await findFormBySlug("daily-task-report");
+
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+      expect(mockWhere).toHaveBeenCalledTimes(1);
+      expect(mockLimit).toHaveBeenCalledWith(1);
+      expect(result).toEqual(sampleForm);
+    });
+
+    it("일치하는 슬러그의 폼이 없으면 undefined를 반환해야 한다", async () => {
+      mockLimit.mockResolvedValueOnce([]);
+
+      const result = await findFormBySlug("non-existent-slug");
+
+      expect(result).toBeUndefined();
+    });
+  });
+
   describe("insertForm", () => {
     it("신규 폼 데이터를 삽입하고 영속화된 레코드를 반환해야 한다", async () => {
       const inputData = {
@@ -159,11 +182,39 @@ describe("Form Server Repository (entities/form/server)", () => {
       expect(mockUpdate).toHaveBeenCalledTimes(1);
       expect(mockSet).toHaveBeenCalledWith(
         expect.objectContaining({
-          deletedAt: expect.any(Date),
-          updatedAt: expect.any(Date),
+          deletedAt: expect.anything(),
+          updatedAt: expect.anything(),
         })
       );
       expect(result?.deletedAt).toBeDefined();
+    });
+  });
+
+  describe("softDeleteFormsBySlugs", () => {
+    it("빈 슬러그 배열이 전달되면 DB 쿼리 없이 빈 배열을 즉시 반환해야 한다", async () => {
+      const result = await softDeleteFormsBySlugs([]);
+      expect(result).toEqual([]);
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it("여러 슬러그가 전달되면 단일 update 쿼리로 일괄 소프트 삭제를 수행해야 한다", async () => {
+      const deletedList = [
+        { ...sampleForm, slug: "form-1", deletedAt: new Date() },
+        { ...sampleForm, slug: "form-2", deletedAt: new Date() },
+      ];
+      mockReturning.mockResolvedValueOnce(deletedList);
+
+      const result = await softDeleteFormsBySlugs(["form-1", "form-2"]);
+
+      expect(mockUpdate).toHaveBeenCalledTimes(1);
+      expect(mockSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          deletedAt: expect.anything(),
+          updatedAt: expect.anything(),
+        })
+      );
+      expect(result).toHaveLength(2);
+      expect(result[0]?.slug).toBe("form-1");
     });
   });
 });

@@ -84,7 +84,7 @@ describe("Form Schema Validation Engine", () => {
   });
 
   describe("selectFormSchema (DB 조회 엔티티 검증)", () => {
-    it("DB에서 조회된 완성된 폼 엔티티 레코드(deletedAt 포함)를 정상 파싱해야 한다", () => {
+    it("DB에서 조회된 완성된 폼 엔티티 레코드(publishedAt, deletedAt 포함)를 정상 파싱해야 한다", () => {
       const mockDbRecord = {
         id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
         slug: "project-log",
@@ -93,6 +93,7 @@ describe("Form Schema Validation Engine", () => {
         schemaDefinition: { fields: [] },
         createdAt: new Date("2026-11-05T00:00:00Z"),
         updatedAt: new Date("2026-11-05T00:00:00Z"),
+        publishedAt: null,
         deletedAt: null,
       };
 
@@ -101,7 +102,28 @@ describe("Form Schema Validation Engine", () => {
       if (result.success) {
         expect(result.data.id).toBe(mockDbRecord.id);
         expect(result.data.slug).toBe("project-log");
+        expect(result.data.publishedAt).toBeNull();
         expect(result.data.deletedAt).toBeNull();
+      }
+    });
+
+    it("발행 일시가 존재하는 폼 엔티티도 정상 파싱해야 한다", () => {
+      const mockPublishedRecord = {
+        id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22",
+        slug: "published-survey",
+        title: "공개 설문조사",
+        description: "공식 설문입니다.",
+        schemaDefinition: { fields: [] },
+        createdAt: new Date("2026-11-05T00:00:00Z"),
+        updatedAt: new Date("2026-11-05T00:00:00Z"),
+        publishedAt: new Date("2026-11-06T12:00:00Z"),
+        deletedAt: null,
+      };
+
+      const result = selectFormSchema.safeParse(mockPublishedRecord);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.publishedAt).toEqual(mockPublishedRecord.publishedAt);
       }
     });
   });

@@ -3,6 +3,7 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import boundaries from "eslint-plugin-boundaries";
 import checkFile from "eslint-plugin-check-file";
+import betterTailwindcss from "eslint-plugin-better-tailwindcss";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -47,14 +48,22 @@ const eslintConfig = defineConfig([
         {
           default: "disallow",
           policies: [
-            // app: app 내부 및 모든 하위 레이어 허용 (widgets, features, entities는 index.ts만 허용)
+            // app: app 내부 및 모든 하위 레이어 허용 (widgets는 index.ts만, features와 entities는 index.ts 및 server.ts 허용)
             {
               from: { element: { type: "app" } },
               allow: [
                 { to: { element: { type: "app" } } },
                 { to: { element: { type: "widgets", fileInternalPath: "index.{ts,tsx}" } } },
-                { to: { element: { type: "features", fileInternalPath: "index.{ts,tsx}" } } },
-                { to: { element: { type: "entities", fileInternalPath: "index.{ts,tsx}" } } },
+                {
+                  to: {
+                    element: { type: "features", fileInternalPath: "{index,server}.{ts,tsx}" },
+                  },
+                },
+                {
+                  to: {
+                    element: { type: "entities", fileInternalPath: "{index,server}.{ts,tsx}" },
+                  },
+                },
                 { to: { element: { type: "shared" } } },
               ],
             },
@@ -67,11 +76,15 @@ const eslintConfig = defineConfig([
                 { to: { element: { type: "shared" } } },
               ],
             },
-            // features: features 내부(동일 슬라이스 자동 허용) 및 entities (index.ts만), shared 허용
+            // features: features 내부(동일 슬라이스 자동 허용) 및 entities ({index,server}.{ts,tsx}), shared 허용
             {
               from: { element: { type: "features" } },
               allow: [
-                { to: { element: { type: "entities", fileInternalPath: "index.{ts,tsx}" } } },
+                {
+                  to: {
+                    element: { type: "entities", fileInternalPath: "{index,server}.{ts,tsx}" },
+                  },
+                },
                 { to: { element: { type: "shared" } } },
               ],
             },
@@ -179,6 +192,54 @@ const eslintConfig = defineConfig([
     },
     rules: {
       "@typescript-eslint/no-deprecated": "warn",
+    },
+  },
+
+  // 9. Tailwind CSS v4 정규 클래스 가드레일 (임의 값 축약 및 표준 토큰 강제)
+  {
+    files: ["**/*.ts", "**/*.tsx"],
+    plugins: {
+      "better-tailwindcss": betterTailwindcss,
+    },
+    rules: {
+      "better-tailwindcss/enforce-canonical-classes": [
+        "error",
+        {
+          entryPoint: "src/app/globals.css",
+        },
+      ],
+    },
+  },
+
+  // 10. 서드파티 시간 라이브러리 직접 import 차단 및 @/shared/lib/utils 단일 창구 강제 가드레일
+  {
+    files: ["**/*.ts", "**/*.tsx"],
+    ignores: ["src/shared/lib/utils/date.util.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "date-fns",
+              message:
+                "서드파티 시간 라이브러리 직접 import는 금지됩니다. 반드시 '@/shared/lib/utils'의 formatDate, formatRelativeTime 등을 사용하세요.",
+            },
+            {
+              name: "date-fns/locale",
+              message:
+                "서드파티 로케일 직접 import는 금지됩니다. 반드시 '@/shared/lib/utils'의 날짜 함수를 사용하세요.",
+            },
+          ],
+          patterns: [
+            {
+              group: ["date-fns/*"],
+              message:
+                "서드파티 시간 라이브러리 하위 모듈 직접 import는 금지됩니다. 반드시 '@/shared/lib/utils'를 사용하세요.",
+            },
+          ],
+        },
+      ],
     },
   },
 ]);
