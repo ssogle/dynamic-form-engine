@@ -18,22 +18,10 @@ const renderWithClient = (ui: React.ReactElement) => {
 };
 
 describe("FormList (폼 목록 컴포넌트)", () => {
-  const mockCreateMutate = vi.fn();
-  const mockUpdateMutate = vi.fn();
   const mockDeleteMutate = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(formEntity, "useCreateFormMutation").mockReturnValue({
-      mutate: mockCreateMutate,
-      isPending: false,
-    } as unknown as ReturnType<typeof formEntity.useCreateFormMutation>);
-
-    vi.spyOn(formEntity, "useUpdateFormMutation").mockReturnValue({
-      mutate: mockUpdateMutate,
-      isPending: false,
-    } as unknown as ReturnType<typeof formEntity.useUpdateFormMutation>);
-
     vi.spyOn(formEntity, "useDeleteFormMutation").mockReturnValue({
       mutate: mockDeleteMutate,
       isPending: false,
@@ -53,7 +41,7 @@ describe("FormList (폼 목록 컴포넌트)", () => {
     expect(screen.getByText("폼 목록을 불러오는 중...")).toBeInTheDocument();
   });
 
-  it("폼 데이터가 없을 때 빈 목록 안내 문구와 샘플 생성 버튼을 표시해야 한다", () => {
+  it("폼 데이터가 없을 때 빈 목록 안내 문구를 표시해야 한다", () => {
     vi.spyOn(formEntity, "useFormsQuery").mockReturnValue({
       data: [],
       isLoading: false,
@@ -64,7 +52,10 @@ describe("FormList (폼 목록 컴포넌트)", () => {
     renderWithClient(<FormList />);
 
     expect(screen.getByText("등록된 폼이 없습니다.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /샘플 폼 생성/i })).toBeInTheDocument();
+    expect(
+      screen.getByText(/AI Navigator 대화창에 자연어로 새로운 폼 생성을 요청해 보세요/)
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /샘플/i })).not.toBeInTheDocument();
   });
 
   it("폼 목록이 존재할 때 제목, 슬러그, 설명이 카드에 정상 렌더링되어야 한다", () => {
@@ -97,62 +88,8 @@ describe("FormList (폼 목록 컴포넌트)", () => {
       "href",
       "/builder/forms/daily-report"
     );
-  });
-
-  it("샘플 폼 생성 버튼 클릭 시 새로운 폼 생성을 요청해야 한다", () => {
-    vi.spyOn(formEntity, "useFormsQuery").mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as unknown as ReturnType<typeof formEntity.useFormsQuery>);
-
-    renderWithClient(<FormList />);
-
-    const button = screen.getByRole("button", { name: /샘플 폼 생성/i });
-    fireEvent.click(button);
-
-    expect(mockCreateMutate).toHaveBeenCalledTimes(1);
-    expect(mockCreateMutate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: expect.any(String),
-        slug: expect.any(String),
-        schemaDefinition: expect.any(Object),
-      })
-    );
-  });
-
-  it("수정 버튼 클릭 시 제목 부분 수정을 요청해야 한다", () => {
-    const mockForms = [
-      {
-        id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-        slug: "daily-report",
-        title: "일일 업무 보고서",
-        description: null,
-        schemaDefinition: { fields: [] },
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        deletedAt: null,
-      },
-    ];
-
-    vi.spyOn(formEntity, "useFormsQuery").mockReturnValue({
-      data: mockForms,
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as unknown as ReturnType<typeof formEntity.useFormsQuery>);
-
-    renderWithClient(<FormList />);
-
-    const updateButton = screen.getByRole("button", { name: "수정" });
-    fireEvent.click(updateButton);
-
-    expect(mockUpdateMutate).toHaveBeenCalledTimes(1);
-    expect(mockUpdateMutate).toHaveBeenCalledWith({
-      id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-      data: { title: "일일 업무 보고서 (수정됨)" },
-    });
+    expect(screen.queryByRole("button", { name: "수정" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "삭제" })).toBeInTheDocument();
   });
 
   it("삭제 버튼 클릭 시 소프트 삭제를 요청해야 한다", () => {
