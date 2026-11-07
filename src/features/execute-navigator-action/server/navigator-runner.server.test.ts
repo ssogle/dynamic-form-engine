@@ -19,6 +19,7 @@ vi.mock("@/entities/form/server", () => ({
   insertForm: vi.fn(),
   updateFormById: vi.fn(),
   softDeleteFormById: vi.fn(),
+  softDeleteFormsBySlugs: vi.fn(),
 }));
 
 describe("runNavigatorEngine (AI Navigator 코어 오케스트레이션 엔진)", () => {
@@ -71,6 +72,7 @@ describe("runNavigatorEngine (AI Navigator 코어 오케스트레이션 엔진)"
       },
       createdAt: new Date(),
       updatedAt: new Date(),
+      publishedAt: null,
       deletedAt: null,
     };
 
@@ -108,6 +110,7 @@ describe("runNavigatorEngine (AI Navigator 코어 오케스트레이션 엔진)"
       title: "고객 피드백 폼",
       description: "고객 의견을 수집합니다.",
       fields: mockCreatedForm.schemaDefinition.fields,
+      publishedAt: null,
     });
   });
 
@@ -142,6 +145,7 @@ describe("runNavigatorEngine (AI Navigator 코어 오케스트레이션 엔진)"
         schemaDefinition: { fields: [] },
         createdAt: new Date(),
         updatedAt: new Date(),
+        publishedAt: null,
         deletedAt: null,
       },
     ]);
@@ -225,5 +229,65 @@ describe("runNavigatorEngine (AI Navigator 코어 오케스트레이션 엔진)"
       targetPath: "/builder/forms",
       message: "'test-form' 폼이 삭제되었습니다.",
     });
+  });
+
+  it("deleteForms 도구가 호출되면 일괄 소프트 삭제를 실행하고 폼 목록으로 NAVIGATE 액션을 반환해야 한다", async () => {
+    vi.spyOn(aiModule, "generateText").mockResolvedValueOnce({
+      text: "'form-1, form-2' 폼이 삭제되었습니다.",
+      toolCalls: [
+        {
+          toolName: "deleteForms",
+          input: { formSlugs: ["form-1", "form-2"] },
+        },
+      ],
+    } as unknown as Awaited<ReturnType<typeof aiModule.generateText>>);
+
+    const result = await runNavigatorEngine({
+      prompt: "form-1이랑 form-2 둘 다 삭제해줘",
+    });
+
+    expect(result.action).toEqual({
+      type: "NAVIGATE",
+      targetPath: "/builder/forms",
+      message: "'form-1, form-2' 폼이 삭제되었습니다.",
+    });
+  });
+
+  it("publishForm 도구가 호출되면 PUBLISH_FORM 액션 및 갱신된 폼 상태를 반환해야 한다", async () => {
+    const publishedDate = new Date("2026-11-08T00:00:00Z");
+    vi.spyOn(formServer, "findFormBySlug").mockResolvedValueOnce({
+      id: "form-123",
+      slug: "event-survey",
+      title: "이벤트 설문",
+      description: null,
+      schemaDefinition: { fields: [] },
+      createdAt: publishedDate,
+      updatedAt: publishedDate,
+      publishedAt: publishedDate,
+      deletedAt: null,
+    });
+
+    vi.spyOn(aiModule, "generateText").mockResolvedValueOnce({
+      text: "'이벤트 설문' 폼이 공식 발행되었습니다.",
+      toolCalls: [
+        {
+          toolName: "publishForm",
+          input: { formSlug: "event-survey", isPublished: true },
+        },
+      ],
+    } as unknown as Awaited<ReturnType<typeof aiModule.generateText>>);
+
+    const result = await runNavigatorEngine({
+      prompt: "이벤트 설문 발행해줘",
+    });
+
+    expect(result.action).toEqual({
+      type: "PUBLISH_FORM",
+      formSlug: "event-survey",
+      isPublished: true,
+      publishedAt: publishedDate.toISOString(),
+      message: "'이벤트 설문' 폼이 공식 발행되었습니다.",
+    });
+    expect(result.updatedForm?.publishedAt).toEqual(publishedDate);
   });
 });

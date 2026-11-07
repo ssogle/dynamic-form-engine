@@ -56,6 +56,12 @@ export const coreFormFieldSchema = z.object({
    * 필드 하단에 표시되는 부가 설명 문구
    */
   description: z.string().optional(),
+
+  /**
+   * 필드 소프트 삭제 일시 (ISO 문자열, 미삭제 시 undefined)
+   * 물리 삭제 대신 타임스탬프를 보존하여 과거 제출 데이터의 라벨 및 타입 무결성을 영구 보존합니다.
+   */
+  deletedAt: z.string().optional(),
 });
 
 export type CoreFormField = z.infer<typeof coreFormFieldSchema>;
@@ -73,6 +79,10 @@ export const activeFormSchema = z.object({
   title: z.string().min(1, "폼 제목을 입력해 주세요."),
   description: z.string().optional(),
   fields: z.array(coreFormFieldSchema).default([]),
+  /**
+   * 폼 발행 일시 (미발행/초안 상태 시 null 또는 undefined)
+   */
+  publishedAt: z.union([z.date(), z.string()]).nullable().optional(),
 });
 
 export type ActiveForm = z.infer<typeof activeFormSchema>;

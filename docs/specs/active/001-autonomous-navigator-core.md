@@ -151,13 +151,28 @@ export const coreFormFieldSchema = z.object({
 });
 ```
 
-#### 도구 카탈로그(Tool Catalog) 5종 규격
+#### 도구 카탈로그(Tool Catalog) 7종 규격
 
 1. `navigate`: 화면 경로 전환 (`/builder/forms`, `/builder/views`, `/consumer`, `/builder/forms/[slug]`)
 2. `listForms`: 활성 폼 목록 조회 및 요약
 3. `createForm`: 신규 폼 DB 저장 및 캔버스 초기화
-4. `updateSchema`: 필드 추가(`ADD_FIELD`), 필드 삭제(`REMOVE_FIELD`), 필드 수정(`MODIFY_FIELD`), 폼 제목/설명 변경(`UPDATE_INFO`)
-5. `deleteForm`: 폼 소프트 삭제(`softDeleteFormById`) 및 폼 목록 복귀
+4. `updateSchema`:
+   - 단일 조작: 필드 추가(`ADD_FIELD`), 필드 소프트 삭제(`REMOVE_FIELD`), 필드 수정(`MODIFY_FIELD`), 메타데이터 변경(`UPDATE_INFO`)
+   - 선언적 일괄 조작: `SET_ALL_FIELDS` (`fields` 배열을 통한 복합 변경, 필드 순서 변경, 제외 필드는 `deletedAt` 소프트 삭제 처리로 데이터 무결성 영구 보존)
+   - 슬러그 변경 지원: `newSlug` 전달 시 슬러그 갱신 및 신규 경로 라우팅 연계
+5. `deleteForm`: 폼 단건 소프트 삭제 (`softDeleteFormById`) 및 폼 목록 복귀
+6. `deleteForms`: 1개 이상의 폼 일괄 배치 소프트 삭제 (`softDeleteFormsBySlugs`)
+7. `publishForm`: 폼 공식 발행(`publishedAt = now()`) 및 초안(`publishedAt = null`) 상태 제어
+
+#### 데이터 무결성 및 인프라 가드레일
+
+1. **부분 고유 인덱스 (Partial Unique Index)**:
+   - `forms` 테이블의 슬러그 고유성을 활성 폼(`WHERE deleted_at IS NULL`)에만 한정하여, 삭제된 폼의 슬러그 재사용 지원 및 충돌 방지.
+2. **필드 레벨 스키마 보존 (`deletedAt`)**:
+   - `CoreFormField`에 `deletedAt?: string`을 부여하여, 폼 필드가 수정/삭제되어도 과거 제출 데이터의 라벨/타입 역직렬화 무결성을 영구 보존.
+3. **공통 날짜 유틸리티 및 린트 가드레일**:
+   - `@/shared/lib/utils` 내 `formatDate`, `formatDateTime`, `formatRelativeTime` 단일 진입점 구축.
+   - `eslint.config.mjs`의 `no-restricted-imports` 규칙으로 서드파티 시간 라이브러리(`date-fns`) 직접 import 원천 차단.
 
 #### 대화 히스토리 및 요청 페이로드 규격
 
@@ -212,9 +227,10 @@ export interface ExecuteNavigatorActionPayload {
    - `features/preview-dynamic-form/ui/form-preview-canvas.tsx`: 실시간 순수 프리뷰 캔버스 구현 및 컴포넌트 테스트 7건 통과
 3. [x] **Step 3: Tool Catalog & AI Model Abstraction (TDD)**
    - `shared/lib/ai/model.ts`: Vercel AI SDK 기반 공급자 중립적 AI 모델 계층(`getAiModel`) 구축 및 테스트 3건 통과
-   - `features/execute-navigator-action/lib/navigator-tools.ts`: 5종 도구 카탈로그 구현 및 단위 테스트 7건 통과
+   - `features/execute-navigator-action/lib/navigator-tools.ts`: 7종 도구 카탈로그(`navigate`, `listForms`, `createForm`, `updateSchema`, `deleteForm`, `deleteForms`, `publishForm`) 구현 및 단위 테스트 11건 통과
    - `features/execute-navigator-action/server/`: AI 오케스트레이션 엔진(`navigator-runner.server.ts`) 분리 및 BFF Thin Route 핸들러 구현 (테스트 8건 통과)
    - `features/execute-navigator-action/queries/use-navigator.mutation.ts`: React Query 뮤테이션 훅 구현 및 테스트 3건 통과
+   - `shared/lib/utils/date.util.ts`: Null-safe 한국어 시간 포맷터 구현 및 단위 테스트 12건 통과, ESLint 가드레일 추가
 4. [x] **Step 4: Navigator Shell Widget & Layout Integration (TDD)**
    - `widgets/navigator-shell/store/navigator-chat.store.ts`: Zustand 대화 UI 스토어 구현 및 테스트 5건 통과
    - `widgets/navigator-shell/ui/navigator-shell.tsx`: 대화 히스토리(`messages`) 동봉 및 라우팅/오케스트레이션 패널 구현 및 테스트 5건 통과
@@ -222,5 +238,5 @@ export interface ExecuteNavigatorActionPayload {
    - `src/app/builder/forms/[slug]/page.tsx`: 실시간 캔버스 라우팅 페이지 연동
    - `src/app/page.tsx`: 루트 게이트웨이 정돈 (빌더 vs 컨슈머)
 5. [x] **Step 5: End-to-End Verification**
-   - `npm run verify` (tsc, eslint, prettier, vitest) **24개 파일 108개 테스트 결함 0건 완주**
+   - `npm run verify` (tsc, eslint, prettier, vitest) **25개 파일 131개 테스트 결함 0건 완주**
    - `npm run build` Next.js 16.4.4 Turbopack 프로덕션 빌드 성공 확인

@@ -82,15 +82,16 @@ sequenceDiagram
 
 본 저장소는 개발 생산성과 아키텍처 정합성을 기계적으로 통제하기 위한 **엔지니어링 하네스(Harness)** 가드레일을 준수합니다.
 
-| 분류              | 가드레일 도구                    | 통제 목적 및 효과                                                                                                         | 규칙 문서                                                                                                          |
-| :---------------- | :------------------------------- | :------------------------------------------------------------------------------------------------------------------------ | :----------------------------------------------------------------------------------------------------------------- |
-| **아키텍처 경계** | `eslint-plugin-boundaries`       | FSD 레이어 간 단방향 의존성 강제, 세부 구현 직통 import 차단 및 Public API(`index.ts`) 강제                               | [.agents/rules/fsd-architecture-rule.md](.agents/rules/fsd-architecture-rule.md)                                   |
-| **코딩 패러다임** | ESLint `no-restricted-syntax`    | 함수형 지향, `class` 및 `this` 키워드 원천 차단, `{ data, error }` Result 패턴 준수                                       | [.agents/rules/coding-paradigm-rule.md](.agents/rules/coding-paradigm-rule.md)                                     |
-| **파일 컨벤션**   | `eslint-plugin-check-file`       | 전역 `kebab-case` 파일/폴더 네이밍 강제 (OS 간 대소문자 경로 불일치 원천 차단)                                            | [.agents/rules/fsd-architecture-rule.md](.agents/rules/fsd-architecture-rule.md)                                   |
-| **테스트 하네스** | Vitest + React Testing Library   | ROI 중심 테스트 전략 (도메인 변환기 및 복합 인터랙션 중심 TDD 루프 확립)                                                  | [.agents/rules/testing-strategy-rule.md](.agents/rules/testing-strategy-rule.md)                                   |
-| **UI 거버넌스**   | Tailwind CSS v4 + shadcn/ui      | `@/shared/ui` 최우선 재사용, 시맨틱 토큰(`bg-background`, `text-foreground`) 필수화                                       | [.agents/rules/ui-and-styling-rule.md](.agents/rules/ui-and-styling-rule.md)                                       |
-| **스펙 거버넌스** | Spec-Driven Dev + YAGNI          | [`TEMPLATE.md`](docs/specs/TEMPLATE.md) 기반 Non-Goals 엄격 통제, 추측성 오버엔지니어링 차단 및 검증된 요구사항 중심 구현 | [규칙 문서](.agents/rules/spec-driven-development-rule.md) / [자동화 스킬](.agents/skills/spec-authoring/SKILL.md) |
-| **커밋 거버넌스** | Husky + lint-staged + Commitlint | Conventional Commits 규격 강제, 빠른 커밋 리듬 유지를 위한 점진적 검증                                                    | [.agents/rules/git-commit-automation-rule.md](.agents/rules/git-commit-automation-rule.md)                         |
+| 분류                   | 가드레일 도구                                                           | 통제 목적 및 효과                                                                                                         | 규칙 문서                                                                                                          |
+| :--------------------- | :---------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------ | :----------------------------------------------------------------------------------------------------------------- |
+| **아키텍처 경계**      | `eslint-plugin-boundaries`                                              | FSD 레이어 간 단방향 의존성 강제, 세부 구현 직통 import 차단 및 Public API(`index.ts`) 강제                               | [.agents/rules/fsd-architecture-rule.md](.agents/rules/fsd-architecture-rule.md)                                   |
+| **코딩 패러다임**      | ESLint `no-restricted-syntax`                                           | 함수형 지향, `class` 및 `this` 키워드 원천 차단, `{ data, error }` Result 패턴 준수                                       | [.agents/rules/coding-paradigm-rule.md](.agents/rules/coding-paradigm-rule.md)                                     |
+| **파일 컨벤션**        | `eslint-plugin-check-file`                                              | 전역 `kebab-case` 파일/폴더 네이밍 강제 (OS 간 대소문자 경로 불일치 원천 차단)                                            | [.agents/rules/fsd-architecture-rule.md](.agents/rules/fsd-architecture-rule.md)                                   |
+| **테스트 하네스**      | Vitest + React Testing Library                                          | ROI 중심 테스트 전략 (도메인 변환기 및 복합 인터랙션 중심 TDD 루프 확립)                                                  | [.agents/rules/testing-strategy-rule.md](.agents/rules/testing-strategy-rule.md)                                   |
+| **UI 거버넌스**        | Tailwind CSS v4 + shadcn/ui                                             | `@/shared/ui` 최우선 재사용, 시맨틱 토큰(`bg-background`, `text-foreground`) 필수화                                       | [.agents/rules/ui-and-styling-rule.md](.agents/rules/ui-and-styling-rule.md)                                       |
+| **스펙 거버넌스**      | Spec-Driven Dev + YAGNI                                                 | [`TEMPLATE.md`](docs/specs/TEMPLATE.md) 기반 Non-Goals 엄격 통제, 추측성 오버엔지니어링 차단 및 검증된 요구사항 중심 구현 | [규칙 문서](.agents/rules/spec-driven-development-rule.md) / [자동화 스킬](.agents/skills/spec-authoring/SKILL.md) |
+| **커밋 거버넌스**      | Husky + lint-staged + Commitlint                                        | Conventional Commits 규격 강제, 빠른 커밋 리듬 유지를 위한 점진적 검증                                                    | [.agents/rules/git-commit-automation-rule.md](.agents/rules/git-commit-automation-rule.md)                         |
+| **날짜/시간 거버넌스** | `date-fns` 래핑 + ESLint `no-restricted-imports` + Drizzle `sql`now()`` | "Store in UTC, Display in Local" 철칙 강제, 중앙 DB 시계 권한 확립, 서드파티 직접 import 원천 차단                        | [.agents/rules/date-and-time-rule.md](.agents/rules/date-and-time-rule.md)                                         |
 
 ### AI Agent Governance & Harness Documents
 
@@ -101,6 +102,7 @@ sequenceDiagram
   - [FSD 아키텍처 규칙](.agents/rules/fsd-architecture-rule.md) - 레이어 단방향 의존성 및 Public API 원칙
   - [코딩 패러다임 규칙](.agents/rules/coding-paradigm-rule.md) - 함수형 지향, Result 패턴, 경계선 Zod 검증, YAGNI
   - [UI & 스타일링 규칙](.agents/rules/ui-and-styling-rule.md) - shadcn/ui 재사용, Tailwind v4 시맨틱 토큰
+  - [날짜 & 시간 처리 규칙](.agents/rules/date-and-time-rule.md) - "Store in UTC, Display in Local" 철칙 및 중앙 DB 시계 권한, 공통 유틸리티 래핑
 - **프로세스 & 자동화 스킬**:
   - [스펙 주도 개발(SDD) 규칙](.agents/rules/spec-driven-development-rule.md) - 5단계 적응형 라이프사이클 및 브랜치 격리
   - [스펙 표준 템플릿](docs/specs/TEMPLATE.md) - 단일 진실 원천(SSOT) 마크다운 양식
@@ -159,6 +161,11 @@ src/
 
 - **결정**: 복잡한 드래그 앤 드롭 캔버스와 설정 모달 패널 대신, 단일 프롬프트 입력과 완성된 결과물의 실시간 렌더링 인터페이스 채택.
 - **이유**: 도메인 전문가에게 불필요한 UI 학습 비용을 전가하지 않고, AI에게 조작을 온전히 위임하여 결과 검토 및 판단(Supervision)에만 집중하도록 보장.
+
+### 7. 중앙 DB 시계 권한 및 UTC 단일 진실 원천 (vs 분산 환경 시계 오차)
+
+- **결정**: DB 레코드 타임스탬프(`updatedAt`, `deletedAt`, `publishedAt`)는 Drizzle의 `sql`now()``를 사용하여 PostgreSQL 중앙 시계에 위임하고, 비-DB 계층(JSONB 직렬화 등)은 `@/shared/lib/utils`의 `nowUtcIso()`로 표준화. UI 표시 시점에만 브라우저 로컬 시간대로 변환("Store in UTC, Display in Local").
+- **이유**: 분산 서버/컨테이너 환경에서 각 인스턴스 런타임의 `new Date()` 호출 시 발생할 수 있는 Clock Drift(시계 불일치) 및 타임존 오차를 원천 방지하고, ESLint `no-restricted-imports` 가드레일로 서드파티 라이브러리(`date-fns`) 직접 참조를 차단하여 날짜 연산 로직을 단일 진실 원천(SSOT)으로 캡슐화하기 위함.
 
 ---
 

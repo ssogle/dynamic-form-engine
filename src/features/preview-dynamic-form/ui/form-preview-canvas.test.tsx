@@ -156,4 +156,39 @@ describe("FormPreviewCanvas (실시간 동적 폼 프리뷰어 캔버스)", () =
     const scoreFieldWrapper = screen.getByText("만족도 점수").closest("[data-field-id]");
     expect(scoreFieldWrapper).toHaveClass("border-primary/50");
   });
+
+  it("deletedAt 속성을 가진 소프트 삭제된 필드는 렌더링 대상에서 제외되어야 한다", () => {
+    const formWithDeletedField = {
+      ...mockActiveForm,
+      fields: [
+        ...mockActiveForm.fields,
+        {
+          id: "field_deleted",
+          name: "oldField",
+          label: "삭제된 질문 항목",
+          type: "text" as const,
+          required: false,
+          deletedAt: "2026-11-08T00:00:00Z",
+        },
+      ],
+    };
+
+    renderWithClient(<FormPreviewCanvas form={formWithDeletedField} />);
+
+    expect(screen.queryByText("삭제된 질문 항목")).not.toBeInTheDocument();
+  });
+
+  it("publishedAt이 설정되어 있으면 발행됨 배지를, 없으면 초안 배지를 표시해야 한다", () => {
+    const { rerender } = renderWithClient(
+      <FormPreviewCanvas form={{ ...mockActiveForm, publishedAt: null }} />
+    );
+    expect(screen.getByText("초안 (Draft)")).toBeInTheDocument();
+
+    rerender(
+      <FormPreviewCanvas
+        form={{ ...mockActiveForm, publishedAt: new Date("2026-11-08T00:00:00Z") }}
+      />
+    );
+    expect(screen.getByText("발행됨")).toBeInTheDocument();
+  });
 });

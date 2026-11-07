@@ -21,6 +21,7 @@ describe("Navigator Tools Catalog (features/execute-navigator-action)", () => {
     },
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
+    publishedAt: null,
     deletedAt: null,
   };
 
@@ -37,6 +38,7 @@ describe("Navigator Tools Catalog (features/execute-navigator-action)", () => {
       schemaDefinition: input.schemaDefinition ?? { fields: [] },
       createdAt: new Date("2026-01-01"),
       updatedAt: new Date("2026-01-01"),
+      publishedAt: null,
       deletedAt: null,
     })),
     updateFormById: vi.fn(async (id: string, updates: UpdateForm): Promise<Form> => ({
@@ -49,6 +51,7 @@ describe("Navigator Tools Catalog (features/execute-navigator-action)", () => {
       schemaDefinition: updates.schemaDefinition ?? mockForm.schemaDefinition,
       createdAt: mockForm.createdAt,
       updatedAt: new Date("2026-01-01"),
+      publishedAt: updates.publishedAt !== undefined ? updates.publishedAt : mockForm.publishedAt,
       deletedAt: mockForm.deletedAt,
     })),
     softDeleteFormById: vi.fn(async (id: string): Promise<Form | undefined> => ({
@@ -56,6 +59,9 @@ describe("Navigator Tools Catalog (features/execute-navigator-action)", () => {
       id,
       deletedAt: new Date(),
     })),
+    softDeleteFormsBySlugs: vi.fn(async (slugs: string[]): Promise<Form[]> =>
+      slugs.map((slug) => ({ ...mockForm, slug, deletedAt: new Date() }))
+    ),
   };
 
   const defaultExecutionOptions = {
@@ -64,7 +70,7 @@ describe("Navigator Tools Catalog (features/execute-navigator-action)", () => {
     context: {},
   };
 
-  it("5종 핵심 도구(navigate, createForm, updateSchema, listForms, deleteForm)가 정의되어 있어야 한다", () => {
+  it("핵심 도구(navigate, createForm, updateSchema, listForms, deleteForm, deleteForms, publishForm)가 정의되어 있어야 한다", () => {
     const tools = createNavigatorTools(mockDeps);
 
     expect(tools.navigate).toBeDefined();
@@ -72,6 +78,8 @@ describe("Navigator Tools Catalog (features/execute-navigator-action)", () => {
     expect(tools.updateSchema).toBeDefined();
     expect(tools.listForms).toBeDefined();
     expect(tools.deleteForm).toBeDefined();
+    expect(tools.deleteForms).toBeDefined();
+    expect(tools.publishForm).toBeDefined();
   });
 
   describe("navigate 도구", () => {
@@ -217,6 +225,109 @@ describe("Navigator Tools Catalog (features/execute-navigator-action)", () => {
         formSlug: "customer-feedback",
         title: "고객 피드백 설문",
       });
+    });
+  });
+
+  describe("deleteForms 도구 (일괄 배치 삭제)", () => {
+    it("여러 폼 슬러그를 한 번에 전달하여 일괄 소프트 삭제를 실행해야 한다", async () => {
+      const tools = createNavigatorTools(mockDeps);
+      const result = (await tools.deleteForms.execute!(
+        { formSlugs: ["form-a", "form-b"] },
+        defaultExecutionOptions
+      )) as {
+        success: boolean;
+        deletedCount: number;
+        deletedSlugs: string[];
+      };
+
+      expect(mockDeps.softDeleteFormsBySlugs).toHaveBeenCalledWith(["form-a", "form-b"]);
+      expect(result.success).toBe(true);
+      expect(result.deletedCount).toBe(2);
+      expect(result.deletedSlugs).toEqual(["form-a", "form-b"]);
+    });
+  });
+
+  describe("publishForm 도구 (발행/초안 제어)", () => {
+    it("isPublished: true 전달 시 publishedAt을 현재 일시로 갱신해야 한다", async () => {
+      const tools = createNavigatorTools(mockDeps);
+      const result = (await tools.publishForm.execute!(
+        { formSlug: "customer-feedback", isPublished: true },
+        defaultExecutionOptions
+      )) as {
+        success: boolean;
+        formSlug: string;
+        isPublished: boolean;
+      };
+
+      expect(mockDeps.findFormBySlug).toHaveBeenCalledWith("customer-feedback");
+      expect(mockDeps.updateFormById).toHaveBeenCalledWith(
+        "form-1",
+        expect.objectContaining({
+          publishedAt: expect.any(Date),
+        })
+      );
+      expect(result.success).toBe(true);
+      expect(result.isPublished).toBe(true);
+    });
+
+    it("isPublished: false 전달 시 publishedAt을 null로 갱신하여 초안 상태로 되돌려야 한다", async () => {
+      const tools = createNavigatorTools(mockDeps);
+      const result = (await tools.publishForm.execute!(
+        { formSlug: "customer-feedback", isPublished: false },
+        defaultExecutionOptions
+      )) as {
+        success: boolean;
+        isPublished: boolean;
+      };
+
+      expect(mockDeps.updateFormById).toHaveBeenCalledWith(
+        "form-1",
+        expect.objectContaining({
+          publishedAt: null,
+        })
+      );
+      expect(result.isPublished).toBe(false);
+    });
+  });
+
+  describe("updateSchema 도구 - SET_ALL_FIELDS (선언적 전체 교체)", () => {
+    it("새 필드 목록을 전달하면 누락된 기존 필드는 deletedAt을 부여하여 소프트 삭제 보존해야 한다", async () => {
+      const tools = createNavigatorTools(mockDeps);
+      const newFields = [
+        {
+          id: "field-deadline",
+          name: "deadline",
+          label: "마감일",
+          type: "text" as const,
+          required: false,
+        },
+      ];
+
+      const result = (await tools.updateSchema.execute!(
+        {
+          formSlug: "customer-feedback",
+          operation: "SET_ALL_FIELDS",
+          fields: newFields,
+        },
+        defaultExecutionOptions
+      )) as {
+        success: boolean;
+        fieldCount: number;
+      };
+
+      expect(mockDeps.updateFormById).toHaveBeenCalledWith(
+        "form-1",
+        expect.objectContaining({
+          schemaDefinition: {
+            fields: expect.arrayContaining([
+              expect.objectContaining({ id: "field-deadline" }),
+              expect.objectContaining({ id: "field-1", deletedAt: expect.any(String) }),
+            ]),
+          },
+        })
+      );
+      expect(result.success).toBe(true);
+      expect(result.fieldCount).toBe(1); // 활성 필드 수는 1개
     });
   });
 });

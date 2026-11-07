@@ -68,6 +68,7 @@ describe("FormList (폼 목록 컴포넌트)", () => {
         schemaDefinition: { fields: [] },
         createdAt: new Date("2026-01-01T00:00:00Z"),
         updatedAt: new Date("2026-01-01T00:00:00Z"),
+        publishedAt: new Date("2026-11-08T00:00:00Z"),
         deletedAt: null,
       },
     ];
@@ -84,6 +85,8 @@ describe("FormList (폼 목록 컴포넌트)", () => {
     expect(screen.getByText("일일 업무 보고서")).toBeInTheDocument();
     expect(screen.getByText("daily-report")).toBeInTheDocument();
     expect(screen.getByText("매일 진행한 업무 내용을 기록합니다.")).toBeInTheDocument();
+    expect(screen.getByText("발행됨")).toBeInTheDocument();
+    expect(screen.getByText(/2026\.11\.08 발행/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "캔버스 열기" })).toHaveAttribute(
       "href",
       "/builder/forms/daily-report"
@@ -102,6 +105,7 @@ describe("FormList (폼 목록 컴포넌트)", () => {
         schemaDefinition: { fields: [] },
         createdAt: new Date(),
         updatedAt: new Date(),
+        publishedAt: null,
         deletedAt: null,
       },
     ];

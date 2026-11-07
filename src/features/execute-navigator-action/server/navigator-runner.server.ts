@@ -6,10 +6,12 @@ import {
   insertForm,
   updateFormById,
   softDeleteFormById,
+  softDeleteFormsBySlugs,
 } from "@/entities/form/server";
 import type { ActiveForm, CoreFormField } from "@/entities/form";
 import { getAiModel } from "@/shared/lib/ai";
 import { createNavigatorTools, extractFieldsFromForm } from "../lib/navigator-tools";
+import { sanitizeSlug } from "../lib/action-parser";
 import type {
   ExecuteNavigatorActionPayload,
   NavigatorAction,
@@ -31,11 +33,14 @@ export const NAVIGATOR_SYSTEM_PROMPT = `
    - 화면을 이동하지 말고(도구 호출 없이 또는 listForms 활용), 해당 폼의 정보와 필드를 대화창에 친절하게 정리하여 답변하세요.
 3. 신규 폼 생성 의도 ("~폼 만들어줘", "~설문지 생성해줘"):
    - 'createForm' 도구를 호출하여 DB에 생성하고 캔버스로 진입하세요.
-4. 현재 폼 필드 조작 의도 (필드 추가, 수정, 삭제, 제목 변경):
+4. 현재 폼 필드 조작 의도 (필드 추가, 수정, 삭제, 제목/슬러그 변경):
    - 현재 열려있는 폼에 대해 'updateSchema' 도구를 호출하세요. 절대로 createForm을 새로 호출하지 마세요.
-5. 폼 삭제 의도 ("~폼 삭제해줘", "~폼 지워줘"):
-   - 'deleteForm' 도구를 호출하여 DB에서 안전하게 소프트 삭제하세요. 삭제 후 폼 목록 화면으로 이동을 안내하세요.
-6. 의도가 완전히 불분명하거나 모호한 경우:
+   - 복합 수정(예: "~빼고 ~넣어줘", 필드 순서 변경, 여러 필드 일괄 추가/삭제)은 operation: "SET_ALL_FIELDS"와 완성된 'fields' 배열을 전달하세요.
+5. 폼 발행 / 비발행 의도 ("~폼 발행해줘", "~공개해줘", "~발행 취소해줘", "~초안으로 돌려줘"):
+   - 'publishForm' 도구를 호출하세요. isPublished: true(발행) 또는 false(비발행/초안)를 지정하세요.
+6. 폼 삭제 의도 ("~폼 삭제해줘", "~폼이랑 ~폼 지워줘"):
+   - 'deleteForms' 도구를 호출하여 DB에서 일괄 소프트 삭제하세요 (단일 삭제 시에도 formSlugs 배열에 담아 전달). 삭제 후 폼 목록 화면으로 이동을 안내하세요.
+7. 의도가 완전히 불분명하거나 모호한 경우:
    - 성급하게 화면을 바꾸지 말고, 캔버스를 열지 내용을 확인할지 친절하게 되물으세요(Clarification).
 `.trim();
 
@@ -96,6 +101,7 @@ export async function runNavigatorEngine(
     insertForm,
     updateFormById,
     softDeleteFormById,
+    softDeleteFormsBySlugs,
   });
 
   // 2. 전체 상황 맥락 수집: 등록된 활성 폼 목록 조회
@@ -160,45 +166,83 @@ export async function runNavigatorEngine(
           title: freshForm.title,
           description: freshForm.description ?? undefined,
           fields: extractFieldsFromForm(freshForm),
+          publishedAt: freshForm.publishedAt,
         };
       }
     } else if (call.toolName === "updateSchema") {
       const input = call.input as {
         formSlug: string;
-        operation: "ADD_FIELD" | "REMOVE_FIELD" | "MODIFY_FIELD" | "UPDATE_INFO";
+        operation: "ADD_FIELD" | "REMOVE_FIELD" | "MODIFY_FIELD" | "UPDATE_INFO" | "SET_ALL_FIELDS";
         targetFieldId?: string;
         fieldData?: Partial<CoreFormField>;
+        fields?: CoreFormField[];
+        newSlug?: string;
         formTitle?: string;
         formDescription?: string;
       };
+
+      const targetSlug = input.newSlug ? sanitizeSlug(input.newSlug) : input.formSlug;
+
       clientAction = {
         type: "UPDATE_SCHEMA",
-        formSlug: input.formSlug,
+        formSlug: targetSlug,
         operation: input.operation,
         targetFieldId: input.targetFieldId,
         fieldData: input.fieldData,
+        fields: input.fields,
+        newSlug: input.newSlug,
         formTitle: input.formTitle,
         formDescription: input.formDescription,
         message: result.text || "폼 스키마가 성공적으로 업데이트되었습니다.",
       };
 
-      const freshForm = await findFormBySlug(input.formSlug);
+      const freshForm = await findFormBySlug(targetSlug);
       if (freshForm) {
         updatedForm = {
           slug: freshForm.slug,
           title: freshForm.title,
           description: freshForm.description ?? undefined,
           fields: extractFieldsFromForm(freshForm),
+          publishedAt: freshForm.publishedAt,
         };
       }
-    } else if (call.toolName === "deleteForm") {
-      const input = call.input as { formSlug: string };
+    } else if (call.toolName === "deleteForm" || call.toolName === "deleteForms") {
+      const slugs =
+        call.toolName === "deleteForms"
+          ? (call.input as { formSlugs: string[] }).formSlugs
+          : [(call.input as { formSlug: string }).formSlug];
+
       clientAction = {
         type: "NAVIGATE",
         targetPath: "/builder/forms",
         message:
-          result.text || `'${input.formSlug}' 폼이 삭제되었습니다. 폼 목록 화면으로 이동합니다.`,
+          result.text || `'${slugs.join(", ")}' 폼이 삭제되었습니다. 폼 목록 화면으로 이동합니다.`,
       };
+    } else if (call.toolName === "publishForm") {
+      const input = call.input as { formSlug: string; isPublished: boolean };
+      const freshForm = await findFormBySlug(input.formSlug);
+
+      clientAction = {
+        type: "PUBLISH_FORM",
+        formSlug: input.formSlug,
+        isPublished: input.isPublished,
+        publishedAt: freshForm?.publishedAt?.toISOString() ?? null,
+        message:
+          result.text ||
+          (input.isPublished
+            ? `'${freshForm?.title ?? input.formSlug}' 폼이 공식 발행되었습니다.`
+            : `'${freshForm?.title ?? input.formSlug}' 폼이 초안(비발행) 상태로 전환되었습니다.`),
+      };
+
+      if (freshForm) {
+        updatedForm = {
+          slug: freshForm.slug,
+          title: freshForm.title,
+          description: freshForm.description ?? undefined,
+          fields: extractFieldsFromForm(freshForm),
+          publishedAt: freshForm.publishedAt,
+        };
+      }
     }
   }
 

@@ -9,6 +9,7 @@ import {
 } from "@/entities/form";
 import { slugRegex } from "../types/action.types";
 import { sanitizeSlug } from "../lib/action-parser";
+import { nowUtcIso } from "@/shared/lib/utils";
 
 /**
  * 폼 엔티티의 schemaDefinition 내부에서 CoreFormField 배열을 안전하게 추출하는 유틸리티
@@ -52,6 +53,7 @@ export interface NavigatorToolsDependencies {
   insertForm: (input: InsertForm) => Promise<Form>;
   updateFormById: (id: string, updates: UpdateForm) => Promise<Form | undefined>;
   softDeleteFormById: (id: string) => Promise<Form | undefined>;
+  softDeleteFormsBySlugs: (slugs: string[]) => Promise<Form[]>;
 }
 
 // 1. navigate 입력 스키마
@@ -83,20 +85,39 @@ const createFormInputSchema = z.object({
 const updateSchemaInputSchema = z.object({
   formSlug: z.string().min(1).describe("수정할 대상 폼의 슬러그"),
   operation: z
-    .enum(["ADD_FIELD", "REMOVE_FIELD", "MODIFY_FIELD", "UPDATE_INFO"])
-    .describe("수행할 스키마 조작 유형"),
+    .enum(["ADD_FIELD", "REMOVE_FIELD", "MODIFY_FIELD", "UPDATE_INFO", "SET_ALL_FIELDS"])
+    .describe("수행할 스키마 조작 유형 (다중 수정이나 복합 필드 변경 시에는 SET_ALL_FIELDS 사용)"),
   targetFieldId: z
     .string()
     .optional()
-    .describe("수정/삭제 대상 필드 식별자 (필드 ID, name 또는 라벨)"),
-  fieldData: coreFormFieldSchema.partial().optional().describe("추가 또는 변경할 필드 데이터"),
+    .describe("수정/삭제 대상 필드 식별자 (단일 필드 ADD/REMOVE/MODIFY 시 사용)"),
+  fieldData: coreFormFieldSchema.partial().optional().describe("추가 또는 변경할 단일 필드 데이터"),
+  fields: z
+    .array(coreFormFieldSchema)
+    .optional()
+    .describe("전체 필드 일괄 교체 시 전달하는 완성된 필드 목록 (SET_ALL_FIELDS 시 필수)"),
+  newSlug: z.string().optional().describe("변경할 새 폼 슬러그"),
   formTitle: z.string().optional().describe("변경할 폼 제목"),
   formDescription: z.string().optional().describe("변경할 폼 설명"),
 });
 
-// 5. deleteForm 입력 스키마
+// 5. deleteForm 입력 스키마 (단일 삭제 호환용)
 const deleteFormInputSchema = z.object({
   formSlug: z.string().min(1).describe("삭제할 대상 폼의 고유 슬러그 또는 식별자"),
+});
+
+// 6. deleteForms 입력 스키마 (일괄 배치 삭제)
+const deleteFormsInputSchema = z.object({
+  formSlugs: z
+    .array(z.string().min(1))
+    .min(1)
+    .describe("삭제할 대상 폼들의 고유 슬러그 목록 (1개 이상 일괄 삭제)"),
+});
+
+// 7. publishForm 입력 스키마 (발행 상태 제어)
+const publishFormInputSchema = z.object({
+  formSlug: z.string().min(1).describe("발행 상태를 변경할 대상 폼의 고유 슬러그"),
+  isPublished: z.boolean().describe("발행 여부 (true: 발행 완료, false: 초안/미발행)"),
 });
 
 /**
@@ -166,13 +187,15 @@ export function createNavigatorTools(deps: NavigatorToolsDependencies) {
 
     updateSchema: tool({
       description:
-        "현재 작업 중인 폼의 스키마(필드 추가, 수정, 삭제) 또는 메타데이터(제목, 설명)를 수정합니다.",
+        "현재 작업 중인 폼의 스키마(필드 추가, 수정, 삭제, 전체 일괄 교체) 또는 메타데이터(제목, 설명, 슬러그)를 수정합니다.",
       inputSchema: updateSchemaInputSchema,
       execute: async ({
         formSlug,
         operation,
         targetFieldId,
         fieldData,
+        fields,
+        newSlug,
         formTitle,
         formDescription,
       }: z.infer<typeof updateSchemaInputSchema>) => {
@@ -187,7 +210,25 @@ export function createNavigatorTools(deps: NavigatorToolsDependencies) {
         const currentFields = extractFieldsFromForm(existingForm);
         let updatedFields: CoreFormField[] = [...currentFields];
 
-        if (operation === "ADD_FIELD" && fieldData) {
+        if (operation === "SET_ALL_FIELDS" || (fields && fields.length > 0)) {
+          const incomingFields = fields ?? [];
+          const nowIso = nowUtcIso();
+
+          // 기존 필드 중 새 목록에 누락된 필드는 소프트 삭제(deletedAt)하여 과거 제출 데이터 무결성 보존
+          const archivedFields = currentFields
+            .filter(
+              (curr) =>
+                !incomingFields.some(
+                  (inc) => matchesTargetField(curr, inc.id) || matchesTargetField(curr, inc.name)
+                )
+            )
+            .map((f) => ({
+              ...f,
+              deletedAt: f.deletedAt ?? nowIso,
+            }));
+
+          updatedFields = [...incomingFields, ...archivedFields];
+        } else if (operation === "ADD_FIELD" && fieldData) {
           const newField: CoreFormField = {
             id: fieldData.id ?? `field_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
             name: fieldData.name ?? `field_${Date.now()}`,
@@ -199,7 +240,14 @@ export function createNavigatorTools(deps: NavigatorToolsDependencies) {
           };
           updatedFields.push(newField);
         } else if (operation === "REMOVE_FIELD" && targetFieldId) {
-          updatedFields = updatedFields.filter((f) => !matchesTargetField(f, targetFieldId));
+          // 소프트 삭제 처리로 과거 응답 데이터 보호
+          const nowIso = nowUtcIso();
+          updatedFields = updatedFields.map((f) => {
+            if (matchesTargetField(f, targetFieldId)) {
+              return { ...f, deletedAt: nowIso };
+            }
+            return f;
+          });
         } else if (operation === "MODIFY_FIELD" && targetFieldId && fieldData) {
           updatedFields = updatedFields.map((f) => {
             if (matchesTargetField(f, targetFieldId)) {
@@ -221,24 +269,28 @@ export function createNavigatorTools(deps: NavigatorToolsDependencies) {
           });
         }
 
+        const cleanNewSlug = newSlug ? sanitizeSlug(newSlug) : undefined;
+
         const updated = await deps.updateFormById(existingForm.id, {
           title: formTitle ?? existingForm.title,
           description: formDescription ?? existingForm.description,
+          ...(cleanNewSlug ? { slug: cleanNewSlug } : {}),
           schemaDefinition: { fields: updatedFields },
         });
 
         return {
           success: true,
           formSlug: updated?.slug ?? existingForm.slug,
+          oldSlug: existingForm.slug,
           operation,
-          fieldCount: updatedFields.length,
+          fieldCount: updatedFields.filter((f) => !f.deletedAt).length,
           title: updated?.title ?? existingForm.title,
         };
       },
     }),
 
     deleteForm: tool({
-      description: "지정된 폼을 시스템(데이터베이스)에서 안전하게 소프트 삭제합니다.",
+      description: "지정된 폼 1건을 시스템(데이터베이스)에서 안전하게 소프트 삭제합니다.",
       inputSchema: deleteFormInputSchema,
       execute: async ({ formSlug }: z.infer<typeof deleteFormInputSchema>) => {
         const existingForm = await deps.findFormBySlug(formSlug);
@@ -255,6 +307,45 @@ export function createNavigatorTools(deps: NavigatorToolsDependencies) {
           success: true,
           formSlug: existingForm.slug,
           title: existingForm.title,
+        };
+      },
+    }),
+
+    deleteForms: tool({
+      description: "지정된 1개 이상의 폼 목록을 단일 호출로 일괄 소프트 삭제합니다.",
+      inputSchema: deleteFormsInputSchema,
+      execute: async ({ formSlugs }: z.infer<typeof deleteFormsInputSchema>) => {
+        const deletedForms = await deps.softDeleteFormsBySlugs(formSlugs);
+        return {
+          success: true,
+          deletedCount: deletedForms.length,
+          deletedSlugs: deletedForms.map((f) => f.slug),
+        };
+      },
+    }),
+
+    publishForm: tool({
+      description: "폼을 공식 발행(공개)하거나 초안(미발행) 상태로 전환합니다.",
+      inputSchema: publishFormInputSchema,
+      execute: async ({ formSlug, isPublished }: z.infer<typeof publishFormInputSchema>) => {
+        const existingForm = await deps.findFormBySlug(formSlug);
+        if (!existingForm) {
+          return {
+            success: false,
+            error: `슬러그가 '${formSlug}'인 폼을 찾을 수 없습니다.`,
+          };
+        }
+
+        const updated = await deps.updateFormById(existingForm.id, {
+          publishedAt: isPublished ? new Date() : null,
+        });
+
+        return {
+          success: true,
+          formSlug: updated?.slug ?? existingForm.slug,
+          title: updated?.title ?? existingForm.title,
+          isPublished,
+          publishedAt: updated?.publishedAt ? updated.publishedAt.toISOString() : null,
         };
       },
     }),

@@ -16,4 +16,5 @@ export {
   insertForm,
   updateFormById,
   softDeleteFormById,
+  softDeleteFormsBySlugs,
 } from "./server/form.server";

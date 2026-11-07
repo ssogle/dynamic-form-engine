@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/shared/db";
 import { forms, type Form, type InsertForm, type UpdateForm } from "../schema/form.schema";
 
@@ -79,7 +79,7 @@ export const updateFormById = async (id: string, data: UpdateForm): Promise<Form
     .update(forms)
     .set({
       ...data,
-      updatedAt: new Date(),
+      updatedAt: sql`now()`,
     })
     .where(and(eq(forms.id, id), isNull(forms.deletedAt)))
     .returning();
@@ -88,7 +88,7 @@ export const updateFormById = async (id: string, data: UpdateForm): Promise<Form
 };
 
 /**
- * 특정 ID의 폼을 소프트 삭제(deletedAt 컬럼을 현재 일시로 갱신)합니다.
+ * 특정 ID의 폼을 소프트 삭제(deletedAt 컬럼을 DB 현재 일시로 갱신)합니다.
  *
  * @param id 소프트 삭제할 폼 고유 식별자(UUID)
  * @returns 소프트 삭제된 Form 객체 또는 대상이 없을 경우 undefined
@@ -97,11 +97,30 @@ export const softDeleteFormById = async (id: string): Promise<Form | undefined> 
   const [deletedForm] = await db
     .update(forms)
     .set({
-      deletedAt: new Date(),
-      updatedAt: new Date(),
+      deletedAt: sql`now()`,
+      updatedAt: sql`now()`,
     })
     .where(and(eq(forms.id, id), isNull(forms.deletedAt)))
     .returning();
 
   return deletedForm;
+};
+
+/**
+ * 지정된 슬러그(slug) 목록에 해당하는 활성 폼들을 단일 쿼리로 일괄 소프트 삭제합니다.
+ *
+ * @param slugs 소프트 삭제할 폼 고유 슬러그 배열
+ * @returns 성공적으로 소프트 삭제 처리된 Form 객체 목록
+ */
+export const softDeleteFormsBySlugs = async (slugs: string[]): Promise<Form[]> => {
+  if (slugs.length === 0) return [];
+
+  return await db
+    .update(forms)
+    .set({
+      deletedAt: sql`now()`,
+      updatedAt: sql`now()`,
+    })
+    .where(and(inArray(forms.slug, slugs), isNull(forms.deletedAt)))
+    .returning();
 };

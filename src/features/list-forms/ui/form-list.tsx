@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/shared/ui/card";
 import { Skeleton } from "@/shared/ui/skeleton";
+import { formatDate } from "@/shared/lib/utils";
 import { useDeleteFormMutation, useFormsQuery } from "@/entities/form";
 
 /**
@@ -106,7 +107,21 @@ export function FormList() {
             className="border-border bg-card flex flex-col gap-2 rounded-lg border p-4 transition-colors"
           >
             <div className="flex items-center justify-between">
-              <span className="text-foreground text-sm font-semibold">{form.title}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-foreground text-sm font-semibold">{form.title}</span>
+                {form.publishedAt ? (
+                  <Badge
+                    variant="default"
+                    className="bg-emerald-600 text-[10px] hover:bg-emerald-700"
+                  >
+                    발행됨
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="text-[10px]">
+                    초안
+                  </Badge>
+                )}
+              </div>
               <Badge variant="outline" className="font-mono text-xs">
                 {form.slug}
               </Badge>
@@ -115,7 +130,16 @@ export function FormList() {
               <p className="text-muted-foreground text-xs/relaxed">{form.description}</p>
             ) : null}
             <div className="text-muted-foreground/80 mt-1 flex items-center justify-between text-[11px]">
-              <span>ID: {form.id.slice(0, 8)}...</span>
+              <span>
+                ID: {form.id.slice(0, 8)}...
+                {form.publishedAt ? (
+                  <span className="ml-2 font-medium text-emerald-600 dark:text-emerald-400">
+                    · {formatDate(form.publishedAt)} 발행
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground ml-2">· 미발행 초안</span>
+                )}
+              </span>
               <div className="flex items-center gap-2">
                 <Button size="xs" variant="outline" asChild>
                   <Link href={`/builder/forms/${form.slug}`}>캔버스 열기</Link>

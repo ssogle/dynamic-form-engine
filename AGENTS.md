@@ -76,6 +76,13 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **머지 후 브랜치 즉시 삭제**: PR이 `master`로 머지 완료된 즉시 해당 원격 및 로컬 작업 브랜치는 삭제하여 레포지토리를 청정하게 유지합니다.
 - **PR 공식 템플릿 준수 (Single Source of Truth)**: PR 서식의 단일 진실 원천은 [`.github/pull_request_template.md`](file://.github/pull_request_template.md)입니다. 에이전트가 PR 본문을 작성할 때는 반드시 해당 템플릿 파일을 직접 읽고 양식과 체크리스트를 누락 없이 100% 준수하여 작성합니다.
 
+### 11) 날짜 및 시간 처리 가드레일 (Date & Time Single Source of Truth)
+
+- **Store in UTC, Display in Local 원칙**: 시스템에 저장/전송되는 모든 시간 데이터는 UTC 표준을 엄수하며, 사용자 화면 렌더링 시점에만 로컬 시간대로 변환합니다.
+- **서드파티 라이브러리 직접 import 원천 금지**: `date-fns` 등 외부 라이브러리를 `app`, `features`, `entities` 등에서 직접 import하는 것을 ESLint 규칙으로 전면 금지하며, 반드시 `@/shared/lib/utils` 공통 래퍼만 사용합니다.
+- **중앙 DB 시계 권한 (Central Clock Authority)**: Drizzle ORM 및 DB 갱신 쿼리에서는 애플리케이션 서버의 `new Date()` 대신 PostgreSQL 중앙 시계인 `sql`now()``를 사용하여 분산 컨테이너 환경의 Clock Drift를 원천 방지합니다.
+- **Null-safe 공통 유틸리티 사용**: UI 포맷팅(`formatDate`, `formatDateTime`, `formatRelativeTime`, `formatUtc`) 및 직렬화(`nowUtcIso`, `toUtcIso`)는 `@/shared/lib/utils`에 정의된 함수를 통해서만 수행합니다.
+
 ---
 
 ## 3. 세부 거버넌스 규칙 문서 인덱스 (`.agents/rules/`)
@@ -90,6 +97,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | **UI & 스타일링**            | [.agents/rules/ui-and-styling-rule.md](.agents/rules/ui-and-styling-rule.md)                   | shadcn/ui 재사용, Tailwind v4 시맨틱 토큰, 배럴 파일 금지              |
 | **스펙 주도 개발 (SDD)**     | [.agents/rules/spec-driven-development-rule.md](.agents/rules/spec-driven-development-rule.md) | 5단계 SDD 라이프사이클, TEMPLATE 기반 스펙, 아카이브 가드레일          |
 | **Git 워크플로우 & 커밋/PR** | [.agents/rules/git-commit-automation-rule.md](.agents/rules/git-commit-automation-rule.md)     | GitHub Flow, PR 템플릿 준수, 머지 후 브랜치 삭제, Conventional Commits |
+| **날짜 & 시간 처리 (UTC)**   | [.agents/rules/date-and-time-rule.md](.agents/rules/date-and-time-rule.md)                     | Store in UTC, Display in Local, DB `sql`now()``, 공통 유틸리티 래핑    |
 
 ---
 

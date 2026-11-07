@@ -44,24 +44,25 @@ export interface FormPreviewCanvasProps {
 
 /**
  * 폼 객체에서 코어 필드 목록을 안전하게 추출하는 순수 유틸리티
+ * 소프트 삭제(deletedAt)된 필드는 렌더링 대상에서 제외합니다.
  */
 function extractFields(form: ActiveForm | Form): CoreFormField[] {
-  if ("fields" in form && Array.isArray(form.fields)) {
-    return form.fields;
-  }
+  let rawFields: CoreFormField[] = [];
 
-  if (
+  if ("fields" in form && Array.isArray(form.fields)) {
+    rawFields = form.fields;
+  } else if (
     "schemaDefinition" in form &&
     form.schemaDefinition !== null &&
     typeof form.schemaDefinition === "object"
   ) {
     const rawSchema = form.schemaDefinition as { fields?: unknown };
     if (Array.isArray(rawSchema.fields)) {
-      return rawSchema.fields as CoreFormField[];
+      rawFields = rawSchema.fields as CoreFormField[];
     }
   }
 
-  return [];
+  return rawFields.filter((f) => !f.deletedAt);
 }
 
 /**
@@ -182,6 +183,15 @@ export function FormPreviewCanvas({
               )}
             </div>
             <div className="flex items-center gap-2">
+              {activeForm.publishedAt ? (
+                <Badge variant="default" className="bg-emerald-600 text-xs hover:bg-emerald-700">
+                  발행됨
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="text-xs">
+                  초안 (Draft)
+                </Badge>
+              )}
               <Badge variant="outline" className="text-xs">
                 {fieldCount}개 항목
               </Badge>
