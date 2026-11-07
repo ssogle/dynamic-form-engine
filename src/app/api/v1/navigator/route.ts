@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { runNavigatorEngine } from "@/features/execute-navigator-action/server";
+import { runNavigatorEngine } from "@/features/execute-navigator-builder-action/server";
 import { apiResponse, badRequest, withErrorHandler } from "@/shared/lib/http";
 
 /**

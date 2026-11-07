@@ -6,39 +6,41 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   useNavigatorActionMutation,
   type NavigatorAction,
-} from "@/features/execute-navigator-action";
+} from "@/features/execute-navigator-builder-action";
 import { formKeys, type Form, type CoreFormField } from "@/entities/form";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/lib/utils";
-import { useNavigatorChatStore } from "../store/navigator-chat.store";
+import { useNavigatorBuilderChatStore } from "../store/navigator-builder-chat.store";
 
 /**
  * 네비게이터 쉘 프로퍼티 인터페이스
  */
-export interface NavigatorShellProps {
+export interface NavigatorBuilderShellProps {
   /**
    * 외부 커스텀 스타일 클래스
    */
   className?: string | undefined;
 }
 
+export type NavigatorShellProps = NavigatorBuilderShellProps;
+
 /**
- * AI Navigator 상주 패널 위젯 (Persistent Shell)
+ * AI Builder Navigator 상주 패널 위젯 (Persistent Shell)
  *
  * 화면 전체의 자율주행 관제탑 역할을 수행하며, 사용자의 자연어 발화를 실시간 액션으로 변환하고
  * 화면 라우팅 이동 및 스키마 변경을 총괄 지휘합니다.
  */
-export function NavigatorShell({ className }: NavigatorShellProps) {
+export function NavigatorBuilderShell({ className }: NavigatorBuilderShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const queryClient = useQueryClient();
 
-  const messages = useNavigatorChatStore((state) => state.messages);
-  const isGenerating = useNavigatorChatStore((state) => state.isGenerating);
-  const addMessage = useNavigatorChatStore((state) => state.addMessage);
-  const setIsGenerating = useNavigatorChatStore((state) => state.setIsGenerating);
-  const clearMessages = useNavigatorChatStore((state) => state.clearMessages);
+  const messages = useNavigatorBuilderChatStore((state) => state.messages);
+  const isGenerating = useNavigatorBuilderChatStore((state) => state.isGenerating);
+  const addMessage = useNavigatorBuilderChatStore((state) => state.addMessage);
+  const setIsGenerating = useNavigatorBuilderChatStore((state) => state.setIsGenerating);
+  const clearMessages = useNavigatorBuilderChatStore((state) => state.clearMessages);
 
   const [inputValue, setInputValue] = React.useState("");
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
@@ -302,3 +304,5 @@ export function NavigatorShell({ className }: NavigatorShellProps) {
     </aside>
   );
 }
+
+export const NavigatorShell = NavigatorBuilderShell;

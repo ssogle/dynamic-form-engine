@@ -2,9 +2,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import * as navigatorFeature from "@/features/execute-navigator-action";
-import { useNavigatorChatStore } from "../store/navigator-chat.store";
-import { NavigatorShell } from "./navigator-shell";
+import * as navigatorFeature from "@/features/execute-navigator-builder-action";
+import { useNavigatorBuilderChatStore } from "../store/navigator-builder-chat.store";
+import { NavigatorBuilderShell } from "./navigator-builder-shell";
 
 // Next.js 라우터 모킹
 const mockPush = vi.fn();
@@ -28,14 +28,14 @@ const renderWithClient = (ui: React.ReactElement) => {
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 };
 
-describe("NavigatorShell (상주형 AI Navigator 패널 위젯)", () => {
+describe("NavigatorBuilderShell (상주형 AI Builder Navigator 패널 위젯)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useNavigatorChatStore.getState().reset();
+    useNavigatorBuilderChatStore.getState().reset();
   });
 
   it("기본 웰컴 메시지와 입력창이 화면에 렌더링되어야 한다", () => {
-    renderWithClient(<NavigatorShell />);
+    renderWithClient(<NavigatorBuilderShell />);
 
     expect(screen.getByText("AI Navigator")).toBeInTheDocument();
     expect(screen.getByText(/안녕하세요! AI Navigator입니다/)).toBeInTheDocument();
@@ -57,7 +57,7 @@ describe("NavigatorShell (상주형 AI Navigator 패널 위젯)", () => {
       isPending: false,
     } as unknown as ReturnType<typeof navigatorFeature.useNavigatorActionMutation>);
 
-    renderWithClient(<NavigatorShell />);
+    renderWithClient(<NavigatorBuilderShell />);
 
     const input = screen.getByPlaceholderText(/무엇을 도와드릴까요/);
     const sendButton = screen.getByRole("button", { name: "전송" });
@@ -105,7 +105,7 @@ describe("NavigatorShell (상주형 AI Navigator 패널 위젯)", () => {
       isPending: false,
     } as unknown as ReturnType<typeof navigatorFeature.useNavigatorActionMutation>);
 
-    renderWithClient(<NavigatorShell />);
+    renderWithClient(<NavigatorBuilderShell />);
 
     const input = screen.getByPlaceholderText(/무엇을 도와드릴까요/);
     const sendButton = screen.getByRole("button", { name: "전송" });
@@ -132,7 +132,7 @@ describe("NavigatorShell (상주형 AI Navigator 패널 위젯)", () => {
       isPending: false,
     } as unknown as ReturnType<typeof navigatorFeature.useNavigatorActionMutation>);
 
-    renderWithClient(<NavigatorShell />);
+    renderWithClient(<NavigatorBuilderShell />);
 
     const input = screen.getByPlaceholderText(/무엇을 도와드릴까요/);
     const sendButton = screen.getByRole("button", { name: "전송" });
@@ -160,16 +160,16 @@ describe("NavigatorShell (상주형 AI Navigator 패널 위젯)", () => {
     } as unknown as ReturnType<typeof navigatorFeature.useNavigatorActionMutation>);
 
     // 이전 대화 2건(사용자 1건, 어시스턴트 1건) 미리 추가
-    useNavigatorChatStore.getState().addMessage({
+    useNavigatorBuilderChatStore.getState().addMessage({
       role: "user",
       content: "고객만족도 폼 보여줘",
     });
-    useNavigatorChatStore.getState().addMessage({
+    useNavigatorBuilderChatStore.getState().addMessage({
       role: "assistant",
       content: "고객만족도 폼에는 이름과 평점 필드가 있습니다. 어떻게 수정해드릴까요?",
     });
 
-    renderWithClient(<NavigatorShell />);
+    renderWithClient(<NavigatorBuilderShell />);
 
     const input = screen.getByPlaceholderText(/무엇을 도와드릴까요/);
     const sendButton = screen.getByRole("button", { name: "전송" });

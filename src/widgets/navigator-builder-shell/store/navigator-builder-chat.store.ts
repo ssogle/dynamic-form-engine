@@ -1,10 +1,10 @@
 import { create } from "zustand";
-import type { NavigatorAction } from "@/features/execute-navigator-action";
+import type { NavigatorAction } from "@/features/execute-navigator-builder-action";
 
 /**
  * 네비게이터 대화 메시지 모델
  */
-export interface NavigatorChatMessage {
+export interface NavigatorBuilderChatMessage {
   /**
    * 메시지 고유 식별자 (예: msg_123456789)
    */
@@ -31,14 +31,16 @@ export interface NavigatorChatMessage {
   createdAt: string;
 }
 
+export type NavigatorChatMessage = NavigatorBuilderChatMessage;
+
 /**
  * 네비게이터 대화 스토어 상태 및 액션 인터페이스
  */
-export interface NavigatorChatState {
+export interface NavigatorBuilderChatState {
   /**
    * 대화 내역 목록
    */
-  messages: NavigatorChatMessage[];
+  messages: NavigatorBuilderChatMessage[];
 
   /**
    * LLM 추론 및 백엔드 실행 중 여부
@@ -53,7 +55,7 @@ export interface NavigatorChatState {
   /**
    * 신규 메시지 추가 액션
    */
-  addMessage: (message: Omit<NavigatorChatMessage, "id" | "createdAt">) => void;
+  addMessage: (message: Omit<NavigatorBuilderChatMessage, "id" | "createdAt">) => void;
 
   /**
    * 생성 진행 상태 플래그 갱신 액션
@@ -76,10 +78,12 @@ export interface NavigatorChatState {
   reset: () => void;
 }
 
+export type NavigatorChatState = NavigatorBuilderChatState;
+
 /**
  * 초기 기본 웰컴 메시지 상수
  */
-const INITIAL_WELCOME_MESSAGE: NavigatorChatMessage = {
+const INITIAL_WELCOME_MESSAGE: NavigatorBuilderChatMessage = {
   id: "msg_welcome",
   role: "assistant",
   content:
@@ -93,13 +97,13 @@ const INITIAL_WELCOME_MESSAGE: NavigatorChatMessage = {
  * 서버 상태(폼 데이터)는 TanStack Query 캐시가 담당하며,
  * 본 스토어는 브라우저 상주 패널의 일시적 대화 내역과 UI 포커스 상태만 책임집니다.
  */
-export const useNavigatorChatStore = create<NavigatorChatState>()((set) => ({
+export const useNavigatorBuilderChatStore = create<NavigatorBuilderChatState>()((set) => ({
   messages: [INITIAL_WELCOME_MESSAGE],
   isGenerating: false,
   selectedFieldId: null,
 
   addMessage: (message) => {
-    const newMessage: NavigatorChatMessage = {
+    const newMessage: NavigatorBuilderChatMessage = {
       ...message,
       id: `msg_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`,
       createdAt: new Date().toISOString(),
@@ -138,3 +142,5 @@ export const useNavigatorChatStore = create<NavigatorChatState>()((set) => ({
       selectedFieldId: null,
     }),
 }));
+
+export const useNavigatorChatStore = useNavigatorBuilderChatStore;

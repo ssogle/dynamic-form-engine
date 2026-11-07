@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import * as navigatorServer from "@/features/execute-navigator-action/server";
+import * as navigatorServer from "@/features/execute-navigator-builder-action/server";
 import { POST } from "./route";
 
 // navigator engine 서비스 모킹
-vi.mock("@/features/execute-navigator-action/server", () => ({
+vi.mock("@/features/execute-navigator-builder-action/server", () => ({
   runNavigatorEngine: vi.fn(),
 }));
 

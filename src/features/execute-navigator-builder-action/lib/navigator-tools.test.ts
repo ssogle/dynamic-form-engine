@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createNavigatorTools } from "./navigator-tools";
 import { type CoreFormField, type Form, type InsertForm, type UpdateForm } from "@/entities/form";
 
-describe("Navigator Tools Catalog (features/execute-navigator-action)", () => {
+describe("Navigator Tools Catalog (features/execute-navigator-builder-action)", () => {
   const mockForm: Form = {
     id: "form-1",
     slug: "customer-feedback",
