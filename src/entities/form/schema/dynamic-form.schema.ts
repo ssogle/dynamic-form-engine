@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { CoreFormField } from "@/entities/form";
-import type { SubmissionValidationResult } from "../types/render-dynamic-form.types";
+import type { CoreFormField } from "./form-field.schema";
+import type { SubmissionValidationResult } from "../types/dynamic-form.types";
 
 /**
  * 텍스트 및 텍스트영역 필드 검증 스키마 생성기

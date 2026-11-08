@@ -23,6 +23,11 @@ export {
   type ActiveForm,
 } from "./schema/form-field.schema";
 
+export { extractActiveFields } from "./lib/extract-active-fields";
+
+export { buildDynamicFormSchema, validateSubmissionData } from "./schema/dynamic-form.schema";
+export type { SubmissionValidationResult } from "./types/dynamic-form.types";
+
 export { formKeys } from "./queries/form.keys";
 export { getForms, useFormsQuery } from "./queries/use-forms.query";
 export { getPublishedForms, usePublishedFormsQuery } from "./queries/use-published-forms.query";

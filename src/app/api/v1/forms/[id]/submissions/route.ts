@@ -1,37 +1,13 @@
 import type { NextRequest } from "next/server";
 import { findFormById } from "@/entities/form/server";
-import type { CoreFormField } from "@/entities/form";
+import { extractActiveFields, validateSubmissionData } from "@/entities/form";
 import { findSubmissionsByFormId, insertSubmission } from "@/entities/form-submission/server";
-import { validateSubmissionData } from "@/features/render-dynamic-form";
 import { apiResponse, badRequest, notFound, withErrorHandler } from "@/shared/lib/http";
 
 interface RouteContext {
   params: Promise<{
     id: string;
   }>;
-}
-
-/**
- * 폼 객체로부터 코어 필드 정의 배열을 안전하게 추출합니다.
- */
-function extractFieldsFromForm(form: {
-  fields?: unknown;
-  schemaDefinition?: unknown;
-}): CoreFormField[] {
-  if (Array.isArray(form.fields)) {
-    return form.fields as CoreFormField[];
-  }
-
-  if (
-    form.schemaDefinition !== null &&
-    typeof form.schemaDefinition === "object" &&
-    "fields" in form.schemaDefinition &&
-    Array.isArray((form.schemaDefinition as { fields?: unknown }).fields)
-  ) {
-    return (form.schemaDefinition as { fields: CoreFormField[] }).fields;
-  }
-
-  return [];
 }
 
 /**
@@ -94,7 +70,7 @@ export const POST = withErrorHandler(async (req: NextRequest, context: RouteCont
   }
 
   // 3. 폼 필드 스키마 기반 런타임 동적 Zod 유효성 검증
-  const fields = extractFieldsFromForm(form);
+  const fields = extractActiveFields(form);
   const validationResult = validateSubmissionData(fields, rawData);
 
   if (!validationResult.isValid) {

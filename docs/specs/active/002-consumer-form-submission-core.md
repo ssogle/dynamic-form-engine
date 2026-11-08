@@ -74,10 +74,16 @@ src/
 │           ├── forms.table.ts
 │           └── form-submissions.table.ts
 ├── entities/
-│   ├── form/                                  # [수정] findPublishedForms, findPublishedFormBySlug 추가
+│   ├── form/                                  # [수정] findPublishedForms, extractActiveFields, 동적 스키마 빌더 추가
 │   │   ├── schema/
 │   │   │   ├── form.schema.ts                 # 폼 클라이언트 검증 Zod 스키마
-│   │   │   └── form-field.schema.ts           # 4종 코어 필드 및 활성 폼 규격 Zod 스키마
+│   │   │   ├── form-field.schema.ts           # 4종 코어 필드 및 활성 폼 규격 Zod 스키마
+│   │   │   ├── dynamic-form.schema.ts         # [승격] 동적 Zod 스키마 조립 및 런타임 검증 엔진
+│   │   │   └── dynamic-form.schema.test.ts
+│   │   ├── lib/
+│   │   │   └── extract-active-fields.ts       # ActiveForm 및 Form 공통 활성 필드 추출 헬퍼
+│   │   ├── types/
+│   │   │   └── dynamic-form.types.ts          # SubmissionValidationResult 타입
 │   │   └── server/
 │   │       └── form.server.ts
 │   └── form-submission/                       # [신규] 제출 데이터 도메인 엔티티
@@ -111,12 +117,9 @@ src/
 │   │   │   └── execute-consumer-action.server.ts
 │   │   ├── index.ts
 │   │   └── server.ts
-│   ├── render-dynamic-form/                   # [통합] 빌더 프리뷰와 컨슈머 제출을 단일 수용하는 동적 폼 렌더러 & 검증 엔진
-│   │   ├── schema/
-│   │   │   ├── dynamic-form.schema.ts         # 동적 Zod 스키마 조립 및 런타임 검증 엔진
-│   │   │   └── dynamic-form.schema.test.ts
+│   ├── render-dynamic-form/                   # [통합] 빌더 프리뷰와 컨슈머 제출을 단일 수용하는 동적 폼 렌더러
 │   │   ├── types/
-│   │   │   └── render-dynamic-form.types.ts   # 모드(preview | submission), Props 및 검증 결과 타입
+│   │   │   └── render-dynamic-form.types.ts   # 모드(preview | submission), Props 타입
 │   │   ├── ui/
 │   │   │   ├── dynamic-form-renderer.tsx      # React Hook Form 연동 메인 폼 뷰어 (mode: preview | submission)
 │   │   │   ├── dynamic-field.tsx              # 필드별 shadcn 인풋 매퍼 (register / Controller 바인딩)
@@ -185,7 +188,7 @@ export const formSubmissions = pgTable(
 );
 ```
 
-### 3) 런타임 동적 Zod 스키마 조립 및 검증 명세 (`features/render-dynamic-form`)
+### 3) 런타임 동적 Zod 스키마 조립 및 검증 명세 (`entities/form/schema`)
 
 클라이언트의 실시간 React Hook Form 검증과 서버 API의 무결성 검증이 단일 진실 원천(DRY)을 공유하도록 `buildDynamicFormSchema`를 단일 엔진으로 구축합니다:
 

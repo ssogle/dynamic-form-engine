@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { CoreFormField } from "@/entities/form";
 import { buildDynamicFormSchema, validateSubmissionData } from "./dynamic-form.schema";
 
-describe("Dynamic Form Schema & Validator (features/render-dynamic-form/schema)", () => {
+describe("Dynamic Form Schema & Validator (entities/form/schema)", () => {
   const mockFields: CoreFormField[] = [
     {
       id: "f1",
@@ -189,6 +189,28 @@ describe("Dynamic Form Schema & Validator (features/render-dynamic-form/schema)"
         targetPosition: "Unknown",
       });
       expect(parseFailure.success).toBe(false);
+    });
+
+    it("표준 4종 외의 비표준 필드 타입에 대해 기본 fallback 스키마를 생성하고 필수 여부를 올바르게 검증해야 한다", () => {
+      const customFields: CoreFormField[] = [
+        {
+          id: "custom_1",
+          name: "customColor",
+          label: "커스텀 색상",
+          type: "color" as unknown as CoreFormField["type"],
+          required: true,
+        },
+      ];
+
+      const schema = buildDynamicFormSchema(customFields);
+
+      // 1. 필수 입력 미충족 시 검증 실패
+      const failResult = schema.safeParse({ customColor: "" });
+      expect(failResult.success).toBe(false);
+
+      // 2. 값 전달 시 통과
+      const passResult = schema.safeParse({ customColor: "#ff0000" });
+      expect(passResult.success).toBe(true);
     });
   });
 });

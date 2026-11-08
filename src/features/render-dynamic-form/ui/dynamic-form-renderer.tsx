@@ -3,40 +3,15 @@
 import * as React from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { ActiveForm, Form, CoreFormField } from "@/entities/form";
-import { useFormDetailQuery } from "@/entities/form";
+import type { CoreFormField } from "@/entities/form";
+import { useFormDetailQuery, extractActiveFields, buildDynamicFormSchema } from "@/entities/form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { cn } from "@/shared/lib/utils";
-import { buildDynamicFormSchema } from "../schema/dynamic-form.schema";
 import type { DynamicFormRendererProps } from "../types/render-dynamic-form.types";
 import { DynamicField } from "./dynamic-field";
-
-/**
- * 폼 객체에서 소프트 삭제되지 않은 활성 필드 목록을 안전하게 추출합니다.
- */
-function extractActiveFields(form?: ActiveForm | Form | null): CoreFormField[] {
-  if (!form) return [];
-
-  let rawFields: CoreFormField[] = [];
-
-  if ("fields" in form && Array.isArray(form.fields)) {
-    rawFields = form.fields;
-  } else if (
-    "schemaDefinition" in form &&
-    form.schemaDefinition !== null &&
-    typeof form.schemaDefinition === "object"
-  ) {
-    const rawSchema = form.schemaDefinition as { fields?: unknown };
-    if (Array.isArray(rawSchema.fields)) {
-      rawFields = rawSchema.fields as CoreFormField[];
-    }
-  }
-
-  return rawFields.filter((f) => !f.deletedAt);
-}
 
 /**
  * 활성 필드 목록으로부터 React Hook Form의 기본값 객체를 생성합니다.

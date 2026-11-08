@@ -112,7 +112,7 @@ export default function ConsumerFormsPage() {
                 발행일시: {formatDate(form.publishedAt)}
               </CardContent>
 
-              <CardFooter className="flex items-center gap-2 pt-0">
+              <CardFooter className="flex items-center gap-2">
                 <Button asChild className="flex-1 font-medium" size="sm">
                   <Link href={`/consumer/forms/${form.slug}`}>응답 작성하기</Link>
                 </Button>
