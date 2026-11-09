@@ -12,8 +12,8 @@ dotenv.config({ path: ".env.local" });
  */
 export default defineConfig({
   dialect: "postgresql",
-  // shared/db/tables 하위의 모든 물리 DDL 테이블 정의 파일을 자동 수집합니다.
-  schema: "./src/shared/db/tables/*.table.ts",
+  // shared/tables 하위의 모든 물리 DDL 테이블 정의 파일을 자동 수집합니다.
+  schema: "./src/shared/tables/*.table.ts",
   out: "./drizzle",
   dbCredentials: {
     url: process.env.DATABASE_URL ?? "",

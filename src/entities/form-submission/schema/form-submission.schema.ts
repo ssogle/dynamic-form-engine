@@ -1,10 +1,10 @@
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
-import { formSubmissions } from "@/shared/db";
+import { formSubmissions } from "@/shared/tables";
 
 /**
  * 폼 응답 데이터 테이블 (form_submissions) re-export
- * 물리 DDL 정의는 @/shared/db/schema/form-submissions.schema.ts에 위치하며,
+ * 물리 DDL 정의는 @/shared/tables/form-submissions.table.ts에 위치하며,
  * 도메인 레이어에서 일관된 타입 참조를 위해 노출합니다.
  */
 export { formSubmissions };

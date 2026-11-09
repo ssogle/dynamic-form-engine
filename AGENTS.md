@@ -87,7 +87,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ### 12) 데이터 정의 파일 거버넌스 (Tables vs Schema vs Types)
 
-- **DB 물리 테이블 DDL**: 반드시 `src/shared/db/tables/*.table.ts`에만 작성합니다. (Drizzle `pgTable`, 외래키 및 CASCADE 제약조건 중앙화)
+- **DB 물리 테이블 DDL**: 반드시 `src/shared/tables/*.table.ts`에만 작성합니다. (Drizzle `pgTable`, 외래키 및 CASCADE 제약조건 중앙화)
 - **런타임 검증 Zod 스키마**: 반드시 `src/{entities,features}/*/schema/*.schema.ts`에만 작성합니다. (`z.object`, `createInsertSchema` 및 파생 타입 `z.infer`)
 - **순수 TypeScript 정적 타입**: 반드시 `src/{entities,features}/*/types/*.types.ts`에만 작성하며, **Zod 런타임 스키마 선언(`import { z } from 'zod'`)은 엄격히 금지**됩니다.
 

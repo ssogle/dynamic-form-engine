@@ -109,7 +109,7 @@ flowchart TD
 
 에이전트와 개발자 간의 모호성을 원천 차단하기 위해 데이터 정의 파일은 다음 단일 기준을 엄격히 준수합니다:
 
-1. **`src/shared/db/tables/*.table.ts` (DB 테이블 정의)**:
+1. **`src/shared/tables/*.table.ts` (DB 테이블 정의)**:
    - Drizzle ORM의 `pgTable` 정의 전용입니다.
    - RDBMS 외래키, 인덱스, CASCADE 무결성을 보장하기 위해 모든 물리 테이블 DDL은 이곳에 집중 배치합니다.
 2. **`src/{entities,features}/*/schema/*.schema.ts` (Zod 검증 스키마)**:
@@ -129,16 +129,16 @@ flowchart TD
 
 ESLint(`eslint-plugin-check-file`)에 의해 기계적으로 강제되며, 세그먼트별로 고유 접미사(`.xxx.ts`)를 준수해야 합니다:
 
-| 세그먼트  | 실행 환경       | 주 역할                                                             | 필수 파일명 접미사 (Suffix)                  | 예시 파일명                         |
-| :-------- | :-------------- | :------------------------------------------------------------------ | :------------------------------------------- | :---------------------------------- |
-| `ui`      | Client / Server | 뷰 레이어                                                           | `[name].tsx`                                 | `form-card.tsx`                     |
-| `queries` | Client          | 클라이언트 데이터 패칭                                              | `*.query.ts` / `*.mutation.ts` / `*.keys.ts` | `use-form.query.ts`, `form.keys.ts` |
-| `server`  | Server 전용     | 백엔드 데이터 영속성 (Drizzle 쿼리 및 `db.transaction` 트랜잭션)    | `*.server.ts`                                | `form-db.server.ts`                 |
-| `store`   | Client 전용     | 클라이언트 전역 상태                                                | `*.store.ts`                                 | `form-editor.store.ts`              |
-| `schema`  | 공통            | 런타임 데이터 검증 (Zod `z.object` 및 `drizzle-zod` 파생 스키마)    | `*.schema.ts`                                | `form.schema.ts`                    |
-| `types`   | 컴파일 타임     | 순수 정적 타입 정의 (**Zod import 금지**, 순수 type/interface)      | `*.types.ts` / `*.dto.ts` / `index.ts`       | `action.types.ts`, `health.dto.ts`  |
-| `lib`     | 공통            | 순수 함수/도구                                                      | `*.util.ts` 또는 `[name].ts`                 | `calculate-score.util.ts`           |
-| `tables`  | 공통 (shared)   | 물리 DB 테이블 DDL (`pgTable`, `src/shared/db/tables/` 인프라 전용) | `*.table.ts`                                 | `forms.table.ts`                    |
+| 세그먼트  | 실행 환경       | 주 역할                                                          | 필수 파일명 접미사 (Suffix)                  | 예시 파일명                         |
+| :-------- | :-------------- | :--------------------------------------------------------------- | :------------------------------------------- | :---------------------------------- |
+| `ui`      | Client / Server | 뷰 레이어                                                        | `[name].tsx`                                 | `form-card.tsx`                     |
+| `queries` | Client          | 클라이언트 데이터 패칭                                           | `*.query.ts` / `*.mutation.ts` / `*.keys.ts` | `use-form.query.ts`, `form.keys.ts` |
+| `server`  | Server 전용     | 백엔드 데이터 영속성 (Drizzle 쿼리 및 `db.transaction` 트랜잭션) | `*.server.ts`                                | `form-db.server.ts`                 |
+| `store`   | Client 전용     | 클라이언트 전역 상태                                             | `*.store.ts`                                 | `form-editor.store.ts`              |
+| `schema`  | 공통            | 런타임 데이터 검증 (Zod `z.object` 및 `drizzle-zod` 파생 스키마) | `*.schema.ts`                                | `form.schema.ts`                    |
+| `types`   | 컴파일 타임     | 순수 정적 타입 정의 (**Zod import 금지**, 순수 type/interface)   | `*.types.ts` / `*.dto.ts` / `index.ts`       | `action.types.ts`, `health.dto.ts`  |
+| `lib`     | 공통            | 순수 함수/도구                                                   | `*.util.ts` 또는 `[name].ts`                 | `calculate-score.util.ts`           |
+| `tables`  | 공통 (shared)   | 물리 DB 테이블 DDL (`pgTable`, `src/shared/tables/` 전용)        | `*.table.ts`                                 | `forms.table.ts`                    |
 
 - 단위 테스트 파일은 해당 접미사 뒤에 `.test.ts`를 부착합니다 (예: `form-editor.store.test.ts`, `form.schema.test.ts`).
 
@@ -214,9 +214,9 @@ sequenceDiagram
 
 ## 7. Drizzle 테이블 DDL 및 무중단 마이그레이션 규칙
 
-1. **중앙 집중식 물리 테이블 DDL (`src/shared/db/tables/*.table.ts`)**:
-   - RDBMS 외래키 참조 및 물리 삭제 시의 CASCADE 제약조건을 온전히 보장하기 위해 물리적 테이블 구조는 `src/shared/db/tables/*.table.ts`에 독립적으로 작성합니다.
-   - `drizzle.config.ts`는 `./src/shared/db/tables/*.table.ts` Glob 패턴으로 모든 테이블 정의를 자동 탐색하여 중앙 수집합니다.
+1. **중앙 집중식 물리 테이블 DDL (`src/shared/tables/*.table.ts`)**:
+   - RDBMS 외래키 참조 및 물리 삭제 시의 CASCADE 제약조건을 온전히 보장하기 위해 물리적 테이블 구조는 `src/shared/tables/*.table.ts`에 독립적으로 작성합니다.
+   - `drizzle.config.ts`는 `./src/shared/tables/*.table.ts` Glob 패턴으로 모든 테이블 정의를 자동 탐색하여 중앙 수집합니다.
 2. **코드 레벨 트랜잭션 (No Logic Fragmentation)**:
    - DB 트리거나 Stored Procedure로 비즈니스 로직을 파편화하지 않고, `entities/*/server/` 파일 안에서 `db.transaction(async (tx) => ...)` 블록으로 원자성을 투명하게 통제합니다.
 3. **무중단 마이그레이션 파이프라인 (Expand & Contract)**:

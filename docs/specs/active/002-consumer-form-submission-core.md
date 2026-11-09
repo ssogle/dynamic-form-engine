@@ -69,10 +69,9 @@
 ```text
 src/
 ├── shared/
-│   └── db/
-│       └── tables/                            # [중앙화] 물리 DB 테이블 DDL 정의 (외래키 및 CASCADE 무결성)
-│           ├── forms.table.ts
-│           └── form-submissions.table.ts
+│   └── tables/                                # [중앙화] 물리 DB 테이블 DDL 정의 (외래키 및 CASCADE 무결성)
+│       ├── forms.table.ts
+│       └── form-submissions.table.ts
 ├── entities/
 │   ├── form/                                  # [수정] findPublishedForms, extractActiveFields, 동적 스키마 빌더 추가
 │   │   ├── schema/
@@ -162,7 +161,7 @@ src/
             └── route.ts                       # POST (mode: "builder" | "consumer" 분기 처리)
 ```
 
-### 2) 데이터베이스 DDL 명세 (`src/shared/db/tables/form-submissions.table.ts`)
+### 2) 데이터베이스 DDL 명세 (`src/shared/tables/form-submissions.table.ts`)
 
 ```typescript
 export const formSubmissions = pgTable(
