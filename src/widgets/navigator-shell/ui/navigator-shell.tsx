@@ -55,6 +55,7 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
   const [inputValue, setInputValue] = React.useState("");
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
 
   // 4. 단일 통합 AI 통신 훅
   const { mutateAsync: executeAction, isPending } = useNavigatorMutation();
@@ -63,6 +64,13 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
   }, [messages, isBusy]);
+
+  // AI 응답 완료 및 disabled 해제 시 입력창으로 포커스 자동 복원
+  React.useEffect(() => {
+    if (!isBusy) {
+      inputRef.current?.focus();
+    }
+  }, [isBusy]);
 
   /**
    * AI 응답 액션을 해석하여 브라우저 화면 조작 디스패치
@@ -273,6 +281,7 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
       <footer className="border-border/60 bg-background/80 shrink-0 border-t p-3 backdrop-blur-sm">
         <form onSubmit={handleSubmit} className="flex items-center gap-2">
           <Input
+            ref={inputRef}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder={config.inputPlaceholder}

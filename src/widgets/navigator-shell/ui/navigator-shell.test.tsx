@@ -70,7 +70,7 @@ describe("NavigatorShell (widgets/navigator-shell)", () => {
 
     renderWithClient(<NavigatorShell mode="builder" />);
 
-    const input = screen.getByPlaceholderText(/고객 만족도 조사 폼 만들어줘/);
+    const input = screen.getByRole("textbox");
     const submitBtn = screen.getByRole("button", { name: "전송" });
 
     fireEvent.change(input, { target: { value: "설문지로 가줘" } });
@@ -83,5 +83,6 @@ describe("NavigatorShell (widgets/navigator-shell)", () => {
     });
 
     expect(mockPush).toHaveBeenCalledWith("/builder/forms/customer-survey");
+    expect(document.activeElement).toBe(input);
   });
 });
