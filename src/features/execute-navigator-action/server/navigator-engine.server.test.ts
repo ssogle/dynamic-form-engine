@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { runNavigatorEngine } from "./navigator-engine.server";
+import { findActiveForms, findPublishedForms } from "@/entities/form/server";
 
 // 1. Entities DB 함수 모킹
 vi.mock("@/entities/form/server", () => ({
@@ -26,8 +27,11 @@ vi.mock("@/entities/form/server", () => ({
   findFormBySlug: vi.fn(),
   insertForm: vi.fn(),
   updateFormById: vi.fn(),
-  softDeleteFormById: vi.fn(),
   softDeleteFormsBySlugs: vi.fn(),
+}));
+
+vi.mock("@/entities/form-submission/server", () => ({
+  softDeleteSubmissionsByIds: vi.fn(),
 }));
 
 // 2. Vercel AI SDK generateText 모킹
@@ -35,6 +39,7 @@ const mockGenerateText = vi.fn();
 vi.mock("ai", () => ({
   generateText: (...args: unknown[]) => mockGenerateText(...args),
   tool: (config: unknown) => config,
+  stepCountIs: (count: number) => ({ type: "stepCount", count }),
 }));
 
 // 3. AI Model 모킹
@@ -47,13 +52,57 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
     vi.clearAllMocks();
   });
 
-  it("빌더 모드에서 navigate 도구 호출 시 NAVIGATE 액션을 올바르게 반환해야 한다", async () => {
+  it("사전 전량 조회를 제거하여 턴 시작 시 findActiveForms/findPublishedForms를 호출하지 않아야 한다", async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: "안녕하세요! 무엇을 도와드릴까요?",
+      toolResults: [],
+    });
+
+    await runNavigatorEngine({
+      mode: "consumer",
+      prompt: "안녕",
+    });
+
+    // 사전 전량 조회 호출이 발생하지 않아야 함
+    expect(findPublishedForms).not.toHaveBeenCalled();
+    expect(findActiveForms).not.toHaveBeenCalled();
+  });
+
+  it("generateText 호출 시 stopWhen(stepCountIs: 5)와 queryTools가 주입되어야 한다", async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: "답변입니다.",
+      toolResults: [],
+    });
+
+    await runNavigatorEngine({
+      mode: "consumer",
+      prompt: "테스트",
+    });
+
+    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+    const callArgs = mockGenerateText.mock.calls[0]?.[0];
+    expect(callArgs).toBeDefined();
+    expect(callArgs?.stopWhen).toEqual({ type: "stepCount", count: 5 });
+    expect(callArgs?.tools).toHaveProperty("searchForms");
+    expect(callArgs?.tools).toHaveProperty("getFormDetails");
+  });
+
+  it("빌더 모드에서 navigate 도구 호출 시 output.clientAction을 올바르게 반환해야 한다", async () => {
     mockGenerateText.mockResolvedValueOnce({
       text: "폼 목록 화면으로 이동합니다.",
       toolResults: [
         {
           toolName: "navigate",
           input: { targetPath: "/builder/forms", reason: "폼 목록 조회" },
+          output: {
+            success: true,
+            targetPath: "/builder/forms",
+            clientAction: {
+              type: "NAVIGATE",
+              targetPath: "/builder/forms",
+              message: "폼 목록 화면으로 이동합니다.",
+            },
+          },
         },
       ],
     });
@@ -69,7 +118,7 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
     }
   });
 
-  it("컨슈머 모드에서 fillFields 도구 호출 시 FILL_FIELDS 액션을 올바르게 반환해야 한다", async () => {
+  it("컨슈머 모드에서 fillFields 도구 호출 시 output.clientAction을 올바르게 반환해야 한다", async () => {
     mockGenerateText.mockResolvedValueOnce({
       text: "지원자 이름을 입력했습니다.",
       toolResults: [
@@ -79,6 +128,16 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
             formSlug: "developer-hire",
             fields: { applicantName: "홍길동" },
             message: "지원자 이름을 입력했습니다.",
+          },
+          output: {
+            success: true,
+            formSlug: "developer-hire",
+            clientAction: {
+              type: "FILL_FIELDS",
+              formSlug: "developer-hire",
+              fields: { applicantName: "홍길동" },
+              message: "지원자 이름을 입력했습니다.",
+            },
           },
         },
       ],
@@ -98,7 +157,7 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
     }
   });
 
-  it("컨슈머 모드에서 submitForm 도구 호출 시 SUBMIT_FORM 액션을 올바르게 반환해야 한다", async () => {
+  it("컨슈머 모드에서 submitForm 도구 호출 시 output.clientAction을 올바르게 반환해야 한다", async () => {
     mockGenerateText.mockResolvedValueOnce({
       text: "폼을 제출합니다.",
       toolResults: [
@@ -107,6 +166,15 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
           input: {
             formSlug: "developer-hire",
             confirmationMessage: "폼을 제출합니다.",
+          },
+          output: {
+            success: true,
+            formSlug: "developer-hire",
+            clientAction: {
+              type: "SUBMIT_FORM",
+              formSlug: "developer-hire",
+              message: "폼을 제출합니다.",
+            },
           },
         },
       ],
@@ -121,5 +189,83 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
     });
 
     expect(result.action?.type).toBe("SUBMIT_FORM");
+  });
+
+  it("다단계 실행으로 navigate와 fillFields 복합 액션이 발생할 때 actions 배열을 올바르게 반환해야 한다", async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: "프로젝트 폼으로 이동하여 필드를 입력합니다.",
+      toolResults: [
+        {
+          toolName: "navigate",
+          input: { targetPath: "/consumer/forms/project" },
+          output: {
+            success: true,
+            clientAction: {
+              type: "NAVIGATE",
+              targetPath: "/consumer/forms/project",
+            },
+          },
+        },
+        {
+          toolName: "fillFields",
+          input: {
+            formSlug: "project",
+            fields: { title: "새 프로젝트" },
+          },
+          output: {
+            success: true,
+            clientAction: {
+              type: "FILL_FIELDS",
+              formSlug: "project",
+              fields: { title: "새 프로젝트" },
+            },
+          },
+        },
+      ],
+    });
+
+    const result = await runNavigatorEngine({
+      mode: "consumer",
+      prompt: "프로젝트 추가할 건데 제목은 새 프로젝트야",
+    });
+
+    expect(result.actions).toHaveLength(2);
+    expect(result.actions?.[0]?.type).toBe("NAVIGATE");
+    expect(result.actions?.[1]?.type).toBe("FILL_FIELDS");
+    expect(result.action?.type).toBe("NAVIGATE");
+  });
+
+  it("컨슈머 모드에서 deleteSubmissions 도구 호출 시 DELETE_SUBMISSIONS 액션을 올바르게 반환해야 한다", async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: "선택한 응답들을 삭제했습니다.",
+      toolResults: [
+        {
+          toolName: "deleteSubmissions",
+          input: { submissionIds: ["sub-1", "sub-2"] },
+          output: {
+            success: true,
+            deletedIds: ["sub-1", "sub-2"],
+            clientAction: {
+              type: "DELETE_SUBMISSIONS",
+              deletedIds: ["sub-1", "sub-2"],
+              message: "선택한 응답들을 삭제했습니다.",
+            },
+          },
+        },
+      ],
+    });
+
+    const result = await runNavigatorEngine({
+      mode: "consumer",
+      prompt: "1번, 2번 응답 삭제해줘",
+      currentContext: {
+        currentPath: "/consumer/forms/developer-hire/submissions",
+      },
+    });
+
+    expect(result.action?.type).toBe("DELETE_SUBMISSIONS");
+    if (result.action?.type === "DELETE_SUBMISSIONS") {
+      expect(result.action.deletedIds).toEqual(["sub-1", "sub-2"]);
+    }
   });
 });

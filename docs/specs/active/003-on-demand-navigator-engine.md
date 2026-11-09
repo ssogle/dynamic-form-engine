@@ -150,7 +150,7 @@ export const searchFormsTool = tool({
       .describe("검색할 폼 제목이나 설명 키워드 (생략 시 최신 폼 목록의 식별 정보 반환)"),
   }),
   execute: async ({ keyword }) => {
-    // 무거운 필드 스키마 없이 상위 5개의 [{ id, slug, title, description }] 배열만 반환
+    // 무거운 필드 스키마 없이 [{ id, slug, title, description }] 배열 반환
   },
 });
 
@@ -158,6 +158,25 @@ export const searchFormsTool = tool({
 export const getFormDetailsTool = tool({
   description:
     "특정 폼의 전체 필드 스펙(라벨, name, 타입, 필수 여부, 선택지)을 정밀 조회합니다. 필드 값을 매핑하거나 스키마를 확인할 때 호출합니다.",
+  parameters: z.object({
+    formSlug: z.string().describe("필드 스펙을 조회할 대상 폼의 슬러그"),
+  }),
+  execute: async ({ formSlug }) => {
+    // 대상 폼 1개의 필드 스키마 배열 반환
+  },
+});
+
+// 3. 기제출 응답 배열 다건 소프트 삭제 도구 (Consumer)
+export const deleteSubmissionsTool = tool({
+  description:
+    "선택된 응답(submissions)을 데이터베이스에서 소프트 삭제 처리합니다. 단건 또는 다건 ID 배열을 받아 한 번에 삭제합니다.",
+  parameters: z.object({
+    submissionIds: z.array(z.string().uuid()).describe("삭제할 응답 ID 배열"),
+  }),
+  execute: async ({ submissionIds }) => {
+    // softDeleteSubmissionsByIds(submissionIds) 호출 및 클라이언트 DELETE_SUBMISSIONS 액션 동봉
+  },
+});
   parameters: z.object({
     formSlug: z.string().describe("필드 스펙을 조회할 대상 폼의 슬러그"),
   }),

@@ -73,7 +73,14 @@ export interface SubmitFormAction {
   message?: string | undefined;
 }
 
-export type NavigatorConsumerAction = NavigateAction | FillFieldsAction | SubmitFormAction;
+export interface DeleteSubmissionsAction {
+  type: "DELETE_SUBMISSIONS";
+  deletedIds: string[];
+  message?: string | undefined;
+}
+
+export type NavigatorConsumerAction =
+  NavigateAction | FillFieldsAction | SubmitFormAction | DeleteSubmissionsAction;
 
 // ==========================================
 // 3. 통합 액션 규격 (Unified Action)
@@ -87,6 +94,22 @@ export type NavigatorAction = NavigatorBuilderAction | NavigatorConsumerAction;
 export interface NavigatorChatMessageDto {
   role: "user" | "assistant" | "system";
   content: string;
+}
+
+/**
+ * 화면 테이블/목록에 렌더링된 항목의 경량 요약 정보 (React Query 캐시 연동)
+ */
+export interface VisibleItemSummary {
+  /** 레코드 고유 ID */
+  id: string;
+  /** 항목 제목 (폼 제목 또는 응답자 요약) */
+  title: string;
+  /** 폼 슬러그 (폼 목록일 때) */
+  slug?: string | undefined;
+  /** 생성 일시 (UTC) */
+  createdAt?: string | undefined;
+  /** 보조 요약 문구 (예: '홍길동 (경력 5년)') */
+  summary?: string | undefined;
 }
 
 /**
@@ -106,6 +129,8 @@ export interface NavigatorClientContext {
         fields: CoreFormField[];
       }
     | undefined;
+  /** [신규] 빌더 폼 목록 테이블의 렌더링 캐시 목록 */
+  visibleForms?: VisibleItemSummary[] | undefined;
 
   // Consumer Context
   /** 컨슈머 화면에서 열려있는 폼 슬러그 */
@@ -125,6 +150,8 @@ export interface NavigatorClientContext {
     | undefined;
   /** 현재 응답자가 작성 중인 임시 필드값 (draftValues) */
   currentDraftValues?: Record<string, unknown> | undefined;
+  /** [신규] 컨슈머 응답 목록 테이블의 렌더링 캐시 목록 */
+  visibleSubmissions?: VisibleItemSummary[] | undefined;
 }
 
 /**
@@ -149,6 +176,8 @@ export interface NavigatorExecutionResponse {
   reply: string;
   /** 화면을 제어하기 위해 클라이언트가 수행해야 할 단일 액션 (없는 경우 null) */
   action: NavigatorAction | null;
+  /** [신규] 순차 실행할 클라이언트 복합 액션 배열 (예: [NAVIGATE, FILL_FIELDS]) */
+  actions?: NavigatorAction[] | undefined;
   /** 서버에서 갱신/생성된 폼 데이터 (존재하는 경우) */
   updatedForm?: ActiveForm | Form | null | undefined;
   /** 호환용 메시지 필드 */

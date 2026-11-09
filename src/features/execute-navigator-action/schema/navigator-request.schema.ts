@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+const visibleItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  slug: z.string().optional(),
+  createdAt: z.string().optional(),
+  summary: z.string().optional(),
+});
+
 /**
  * 네비게이터 HTTP 요청 페이로드 검증 스키마
  */
@@ -26,6 +34,7 @@ export const navigatorRequestSchema = z.object({
           fields: z.array(z.any()).default([]),
         })
         .optional(),
+      visibleForms: z.array(visibleItemSchema).optional(),
       // Consumer Context
       currentFormSlug: z.string().optional(),
       currentFormTitle: z.string().optional(),
@@ -42,6 +51,7 @@ export const navigatorRequestSchema = z.object({
         )
         .optional(),
       currentDraftValues: z.record(z.string(), z.unknown()).optional(),
+      visibleSubmissions: z.array(visibleItemSchema).optional(),
     })
     .optional(),
 });

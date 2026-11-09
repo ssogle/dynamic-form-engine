@@ -63,10 +63,13 @@ export const useConsumerFormDraftStore = create<ConsumerFormDraftState>((set) =>
   applyDraftFields: (slug, fields) =>
     set((state) => ({
       currentSlug: slug,
-      draftValues: {
-        ...state.draftValues,
-        ...fields,
-      },
+      draftValues:
+        state.currentSlug === slug
+          ? {
+              ...state.draftValues,
+              ...fields,
+            }
+          : { ...fields },
     })),
 
   triggerSubmit: (slug) =>

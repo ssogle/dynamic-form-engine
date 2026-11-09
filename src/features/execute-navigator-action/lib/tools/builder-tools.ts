@@ -7,6 +7,7 @@ import {
   type InsertForm,
   type UpdateForm,
 } from "@/entities/form";
+import type { NavigatorBuilderAction, SchemaOperation } from "../../types/navigator-action.types";
 import { nowUtcIso } from "@/shared/lib/date";
 
 export const slugRegex = /^[a-z0-9-]+$/;
@@ -57,14 +58,12 @@ function matchesTargetField(field: CoreFormField, targetIdentifier?: string): bo
 }
 
 /**
- * 도구 카탈로그에서 사용할 DB 저장소 의존성 인터페이스
+ * 빌더 변경/제어 도구 카탈로그에서 사용할 DB 저장소 의존성 인터페이스
  */
 export interface BuilderToolsDependencies {
-  findActiveForms: () => Promise<Form[]>;
   findFormBySlug: (slug: string) => Promise<Form | undefined>;
   insertForm: (input: InsertForm) => Promise<Form>;
   updateFormById: (id: string, updates: UpdateForm) => Promise<Form | undefined>;
-  softDeleteFormById: (id: string) => Promise<Form | undefined>;
   softDeleteFormsBySlugs: (slugs: string[]) => Promise<Form[]>;
 }
 
@@ -76,10 +75,7 @@ export const navigateInputSchema = z.object({
   reason: z.string().optional().describe("이동 사유 또는 목적"),
 });
 
-// 2. listForms 입력 스키마
-export const listFormsInputSchema = z.object({});
-
-// 3. createForm 입력 스키마
+// 2. createForm 입력 스키마
 export const createFormInputSchema = z.object({
   slug: z
     .string()
@@ -93,7 +89,7 @@ export const createFormInputSchema = z.object({
     .describe("생성할 초기 필드 배열 (text, textarea, number, select)"),
 });
 
-// 4. updateSchema 입력 스키마
+// 3. updateSchema 입력 스키마
 export const updateSchemaInputSchema = z.object({
   formSlug: z.string().min(1).describe("수정할 대상 폼의 슬러그"),
   operation: z
@@ -112,13 +108,13 @@ export const updateSchemaInputSchema = z.object({
   formTitle: z.string().optional().describe("변경할 폼 제목"),
 });
 
-// 5. publishForm 입력 스키마
+// 4. publishForm 입력 스키마
 export const publishFormInputSchema = z.object({
   formSlug: z.string().min(1).describe("발행 상태를 변경할 대상 폼의 슬러그"),
   isPublished: z.boolean().describe("발행 여부 (true: 공개 발행, false: 비발행/초안 회수)"),
 });
 
-// 6. deleteForms 입력 스키마
+// 5. deleteForms 입력 스키마
 export const deleteFormsInputSchema = z.object({
   formSlugs: z
     .array(z.string().min(1))
@@ -129,6 +125,9 @@ export const deleteFormsInputSchema = z.object({
 
 /**
  * AI Builder Navigator Vercel AI SDK 도구 카탈로그 생성 팩토리 함수
+ *
+ * 폼 조회(searchForms, getFormDetails)는 공통 queryTools가 전담하므로,
+ * 본 도구 모음은 화면 이동 및 폼 생성/수정/삭제/발행 액션만 담당합니다.
  */
 export function createBuilderTools(deps: BuilderToolsDependencies) {
   const navigateTool = tool({
@@ -136,31 +135,16 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
       "애플리케이션 내의 다른 화면으로 이동합니다. 폼 목록(/builder/forms), 라이브 캔버스(/builder/forms/[slug]), 뷰 목록(/builder/views) 등으로 이동할 때 호출합니다.",
     inputSchema: navigateInputSchema,
     execute: async ({ targetPath, reason }: z.infer<typeof navigateInputSchema>) => {
+      const action: NavigatorBuilderAction = {
+        type: "NAVIGATE",
+        targetPath,
+        message: reason ?? "해당 화면으로 이동합니다.",
+      };
       return {
         success: true,
         targetPath,
         reason: reason ?? "화면 이동",
-      };
-    },
-  });
-
-  const listFormsTool = tool({
-    description:
-      "현재 시스템에 등록된 모든 활성 폼 목록과 각 폼의 필드 정보를 조회합니다. 사용자가 어떤 폼이 있는지 묻거나 폼의 내용을 확인하고자 할 때 호출합니다.",
-    inputSchema: listFormsInputSchema,
-    execute: async () => {
-      const forms = await deps.findActiveForms();
-      return {
-        success: true,
-        totalCount: forms.length,
-        forms: forms.map((f) => ({
-          id: f.id,
-          slug: f.slug,
-          title: f.title,
-          description: f.description,
-          fieldsCount: extractFieldsFromForm(f).length,
-          isPublished: !!f.publishedAt,
-        })),
+        clientAction: action,
       };
     },
   });
@@ -193,10 +177,20 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
         publishedAt: null,
       });
 
+      const action: NavigatorBuilderAction = {
+        type: "CREATE_FORM",
+        slug: created.slug,
+        title: created.title,
+        description: created.description ?? undefined,
+        fields: extractFieldsFromForm(created),
+        message: `새로운 폼 '${created.title}'을 생성했습니다.`,
+      };
+
       return {
         success: true,
         form: created,
         targetPath: `/builder/forms/${created.slug}`,
+        clientAction: action,
       };
     },
   });
@@ -286,11 +280,28 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
 
       const updated = await deps.updateFormById(existing.id, updatePayload);
 
+      const rawOp = operation as string;
+      const op: SchemaOperation =
+        rawOp === "UPDATE_INFO" || rawOp === "MODIFY_FIELD"
+          ? "UPDATE_FIELD"
+          : (rawOp as SchemaOperation);
+
+      const action: NavigatorBuilderAction = {
+        type: "UPDATE_SCHEMA",
+        operation: op,
+        field: fieldData as CoreFormField | undefined,
+        fields: newFieldsList,
+        title: formTitle,
+        slug: newSlug,
+        message: "폼 스키마가 성공적으로 변경되었습니다.",
+      };
+
       return {
         success: true,
         operation,
         updatedForm: updated,
         fieldsCount: updatedFields.length,
+        clientAction: action,
       };
     },
   });
@@ -311,11 +322,21 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
         publishedAt: isPublished ? (nowUtcIso() as unknown as Date) : null,
       });
 
+      const action: NavigatorBuilderAction = {
+        type: "PUBLISH_FORM",
+        slug: formSlug,
+        isPublished,
+        message: isPublished
+          ? "폼이 공식 발행되었습니다. 응답자가 작성할 수 있습니다."
+          : "폼 발행이 취소되어 초안 상태로 회수되었습니다.",
+      };
+
       return {
         success: true,
         formSlug,
         isPublished,
         form: updated,
+        clientAction: action,
       };
     },
   });
@@ -327,19 +348,25 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
       const sanitizedSlugs = formSlugs.map(sanitizeSlug);
       const deleted = await deps.softDeleteFormsBySlugs(sanitizedSlugs);
 
+      const action: NavigatorBuilderAction = {
+        type: "DELETE_FORMS",
+        deletedSlugs: deleted.map((f) => f.slug),
+        message: "선택한 폼을 성공적으로 삭제했습니다.",
+      };
+
       return {
         success: true,
         deletedSlugs: deleted.map((f) => f.slug),
         deletedCount: deleted.length,
         reason: reason ?? "사용자 요청에 의한 삭제",
         targetPath: "/builder/forms",
+        clientAction: action,
       };
     },
   });
 
   return {
     navigate: navigateTool,
-    listForms: listFormsTool,
     createForm: createFormTool,
     updateSchema: updateSchemaTool,
     publishForm: publishFormTool,
