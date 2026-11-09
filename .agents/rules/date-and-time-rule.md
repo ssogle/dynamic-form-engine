@@ -15,12 +15,12 @@
 
 ## 2. 계층별 3단계 시간 처리 책임 매핑
 
-| 계층                        | 대상 데이터                                              | 사용할 표준 도구                                                                  | 목적 및 동작 원리                                                                                         |
-| :-------------------------- | :------------------------------------------------------- | :-------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------- |
-| **1. DB 테이블 컬럼**       | `created_at`, `updated_at`, `published_at`, `deleted_at` | `sql\`now()\`` (Drizzle ORM)                                                      | 앱 서버의 시계 불일치(Clock Drift)를 배제하고 중앙 PostgreSQL 서버의 단일 UTC 시계를 기준으로 원자적 갱신 |
-| **2. JSONB & API 페이로드** | `CoreFormField.deletedAt`, DTO 시간 필드                 | `nowUtcIso()`, `toUtcIso()` (`@/shared/lib/utils`)                                | 날것의 `new Date().toISOString()` 호출 없이 항상 일관된 ISO-8601 UTC 표준 문자열(`Z` 종료) 보장           |
-| **3. 클라이언트 UI 렌더링** | 목록 카드, 헤더, 상세 뷰어                               | `formatDate()`, `formatDateTime()`, `formatRelativeTime()` (`@/shared/lib/utils`) | `null`/`undefined` 방어(Null-safe fallback) 및 한국어 로케일(`ko`) 기본 내장 포맷팅                       |
-| **4. 명시적 UTC 표현**      | 글로벌 감사 로그, UTC 고정 표기                          | `formatUtc()` (`@/shared/lib/utils`)                                              | 로컬 타임존에 영향받지 않고 순수 UTC 기준으로 "yyyy.MM.dd HH:mm UTC" 포맷 출력                            |
+| 계층                        | 대상 데이터                                              | 사용할 표준 도구                                                                 | 목적 및 동작 원리                                                                                         |
+| :-------------------------- | :------------------------------------------------------- | :------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------- |
+| **1. DB 테이블 컬럼**       | `created_at`, `updated_at`, `published_at`, `deleted_at` | `sql\`now()\`` (Drizzle ORM)                                                     | 앱 서버의 시계 불일치(Clock Drift)를 배제하고 중앙 PostgreSQL 서버의 단일 UTC 시계를 기준으로 원자적 갱신 |
+| **2. JSONB & API 페이로드** | `CoreFormField.deletedAt`, DTO 시간 필드                 | `nowUtcIso()`, `toUtcIso()` (`@/shared/lib/date`)                                | 날것의 `new Date().toISOString()` 호출 없이 항상 일관된 ISO-8601 UTC 표준 문자열(`Z` 종료) 보장           |
+| **3. 클라이언트 UI 렌더링** | 목록 카드, 헤더, 상세 뷰어                               | `formatDate()`, `formatDateTime()`, `formatRelativeTime()` (`@/shared/lib/date`) | `null`/`undefined` 방어(Null-safe fallback) 및 한국어 로케일(`ko`) 기본 내장 포맷팅                       |
+| **4. 명시적 UTC 표현**      | 글로벌 감사 로그, UTC 고정 표기                          | `formatUtc()` (`@/shared/lib/date`)                                              | 로컬 타임존에 영향받지 않고 순수 UTC 기준으로 "yyyy.MM.dd HH:mm UTC" 포맷 출력                            |
 
 ---
 
@@ -29,8 +29,8 @@
 외부 서드파티 라이브러리(`date-fns`)를 상위 레이어에서 직접 직통 import하는 것을 엄격히 금지합니다.
 
 - **차단 규칙**: `eslint.config.mjs`의 `no-restricted-imports` 규칙에 의해 `src/**` 전역에서 `date-fns` 및 `date-fns/*` import가 차단됩니다.
-- **유일한 예외**: `src/shared/lib/utils/date.util.ts` 단 한 파일에서만 서드파티 라이브러리를 캡슐화하여 사용합니다.
-- **모든 소비자**: 시간 처리가 필요할 때는 반드시 `@/shared/lib/utils`로부터 공통 함수를 import합니다.
+- **유일한 예외**: `src/shared/lib/date/date.ts` 단 한 파일에서만 서드파티 라이브러리를 캡슐화하여 사용합니다.
+- **모든 소비자**: 시간 처리가 필요할 때는 반드시 `@/shared/lib/date`로부터 공통 함수를 import합니다.
 
 ---
 
@@ -61,7 +61,7 @@ await db.update(forms).set({
 field.deletedAt = new Date().toISOString();
 
 // [Good] 공통 유틸리티의 표준 UTC ISO 함수 사용
-import { nowUtcIso } from "@/shared/lib/utils";
+import { nowUtcIso } from "@/shared/lib/date";
 
 field.deletedAt = nowUtcIso();
 ```
@@ -76,7 +76,7 @@ import { ko } from "date-fns/locale";
 const text = format(form.publishedAt, "yyyy.MM.dd", { locale: ko }); // null 방어 부재
 
 // [Good] 공통 유틸리티 사용 (Null-safe, 한국어 기본 내장)
-import { formatDate, formatRelativeTime } from "@/shared/lib/utils";
+import { formatDate, formatRelativeTime } from "@/shared/lib/date";
 
 const text = formatDate(form.publishedAt); // null이면 자동으로 "-" 반환
 const relative = formatRelativeTime(form.createdAt); // "3분 전", "방금 전"

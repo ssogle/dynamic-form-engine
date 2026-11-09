@@ -13,6 +13,7 @@ export {
   findActiveForms,
   findFormById,
   findFormBySlug,
+  findFormByIdOrSlug,
   findPublishedForms,
   findPublishedFormBySlug,
   insertForm,

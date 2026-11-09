@@ -3,8 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NavigatorBuilderShell } from "@/widgets/navigator-builder-shell";
-import { cn } from "@/shared/lib/utils";
+import { NavigatorShell } from "@/widgets/navigator-shell";
+import { cn } from "@/shared/lib/cn";
 
 /**
  * 빌더 작업 공간 레이아웃
@@ -23,7 +23,7 @@ export default function BuilderLayout({ children }: { children: React.ReactNode 
     <div className="bg-background flex h-screen w-full overflow-hidden">
       {/* 좌측 상주형 AI Navigator 관제탑 패널 */}
       <div className="border-border/80 h-full w-80 shrink-0 border-r lg:w-96">
-        <NavigatorBuilderShell />
+        <NavigatorShell mode="builder" />
       </div>
 
       {/* 우측 메인 영역 */}

@@ -1,15 +1,14 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import type { Form } from "@/entities/form";
 import { extractActiveFields } from "@/entities/form";
-import type { FormSubmission } from "@/entities/form-submission";
 import { useFormSubmissionsQuery, useDeleteSubmissionMutation } from "@/entities/form-submission";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 import { Skeleton } from "@/shared/ui/skeleton";
-import { formatDateTime } from "@/shared/lib/utils";
-import { EditSubmissionDialog } from "./edit-submission-dialog";
+import { formatDateTime } from "@/shared/lib/date";
 
 export interface SubmissionListTableProps {
   form: Form;
@@ -22,7 +21,6 @@ export function SubmissionListTable({ form }: SubmissionListTableProps) {
   const { data: submissions, isLoading, isError, error } = useFormSubmissionsQuery(form.id);
   const { mutateAsync: deleteSubmission } = useDeleteSubmissionMutation(form.id);
 
-  const [editingSubmission, setEditingSubmission] = React.useState<FormSubmission | null>(null);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
 
   const activeFields = extractActiveFields(form);
@@ -121,13 +119,10 @@ export function SubmissionListTable({ form }: SubmissionListTableProps) {
                   </td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <div className="flex items-center justify-end gap-1.5">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 px-2 text-xs"
-                        onClick={() => setEditingSubmission(sub)}
-                      >
-                        수정
+                      <Button asChild variant="outline" size="sm" className="h-7 px-2 text-xs">
+                        <Link href={`/consumer/forms/${form.slug}/submissions/${sub.id}/edit`}>
+                          수정
+                        </Link>
                       </Button>
                       <Button
                         variant="ghost"
@@ -146,14 +141,6 @@ export function SubmissionListTable({ form }: SubmissionListTableProps) {
           </table>
         </div>
       </div>
-
-      {/* 수정 다이얼로그 */}
-      <EditSubmissionDialog
-        form={form}
-        submission={editingSubmission}
-        isOpen={Boolean(editingSubmission)}
-        onClose={() => setEditingSubmission(null)}
-      />
     </>
   );
 }

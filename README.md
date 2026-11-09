@@ -164,7 +164,7 @@ src/
 
 ### 7. 중앙 DB 시계 권한 및 UTC 단일 진실 원천 (vs 분산 환경 시계 오차)
 
-- **결정**: DB 레코드 타임스탬프(`updatedAt`, `deletedAt`, `publishedAt`)는 Drizzle의 `sql`now()``를 사용하여 PostgreSQL 중앙 시계에 위임하고, 비-DB 계층(JSONB 직렬화 등)은 `@/shared/lib/utils`의 `nowUtcIso()`로 표준화. UI 표시 시점에만 브라우저 로컬 시간대로 변환("Store in UTC, Display in Local").
+- **결정**: DB 레코드 타임스탬프(`updatedAt`, `deletedAt`, `publishedAt`)는 Drizzle의 `sql`now()``를 사용하여 PostgreSQL 중앙 시계에 위임하고, 비-DB 계층(JSONB 직렬화 등)은 `@/shared/lib/date`의 `nowUtcIso()`로 표준화. UI 표시 시점에만 브라우저 로컬 시간대로 변환("Store in UTC, Display in Local").
 - **이유**: 분산 서버/컨테이너 환경에서 각 인스턴스 런타임의 `new Date()` 호출 시 발생할 수 있는 Clock Drift(시계 불일치) 및 타임존 오차를 원천 방지하고, ESLint `no-restricted-imports` 가드레일로 서드파티 라이브러리(`date-fns`) 직접 참조를 차단하여 날짜 연산 로직을 단일 진실 원천(SSOT)으로 캡슐화하기 위함.
 
 ---

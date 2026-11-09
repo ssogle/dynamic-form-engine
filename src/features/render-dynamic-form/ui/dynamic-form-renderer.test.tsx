@@ -146,5 +146,42 @@ describe("DynamicFormRenderer (features/render-dynamic-form/ui)", () => {
       expect(submitButton).toBeDefined();
       expect(submitButton.hasAttribute("disabled")).toBe(true);
     });
+
+    it("submitTriggerCount가 증가하면 외부 신호로 폼 제출이 자동 발동되어야 한다", async () => {
+      const handleSubmit = vi.fn();
+      const validValues = {
+        applicantName: "홍길동",
+        targetPosition: "Frontend",
+      };
+
+      const { rerender } = renderWithClient(
+        <DynamicFormRenderer
+          form={mockForm}
+          mode="submission"
+          values={validValues}
+          onSubmit={handleSubmit}
+          submitTriggerCount={0}
+        />
+      );
+
+      expect(handleSubmit).not.toHaveBeenCalled();
+
+      // submitTriggerCount 증가 (AI Navigator 제출 신호 모사)
+      rerender(
+        <QueryClientProvider client={createTestQueryClient()}>
+          <DynamicFormRenderer
+            form={mockForm}
+            mode="submission"
+            values={validValues}
+            onSubmit={handleSubmit}
+            submitTriggerCount={1}
+          />
+        </QueryClientProvider>
+      );
+
+      await waitFor(() => {
+        expect(handleSubmit).toHaveBeenCalledTimes(1);
+      });
+    });
   });
 });

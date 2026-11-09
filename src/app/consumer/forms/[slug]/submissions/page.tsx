@@ -1,7 +1,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { Button } from "@/shared/ui/button";
-import { ConsumerFormSubmissionsView } from "./consumer-form-submissions-view";
+import { ManageFormSubmissions } from "@/features/manage-form-submissions";
 
 interface ConsumerFormSubmissionsPageProps {
   params: Promise<{
@@ -11,6 +11,9 @@ interface ConsumerFormSubmissionsPageProps {
 
 /**
  * 특정 폼의 제출된 응답 데이터 관리 화면 (/consumer/forms/[slug]/submissions)
+ *
+ * App Router 비동기 파라미터 규격을 준수하여 slug를 추출하고
+ * 응답 목록 열람 및 삭제 기능을 수행하는 피처 컴포넌트를 조립하는 Thin 라우트 페이지입니다.
  */
 export default async function ConsumerFormSubmissionsPage({
   params,
@@ -31,7 +34,7 @@ export default async function ConsumerFormSubmissionsPage({
         </Button>
       </div>
 
-      <ConsumerFormSubmissionsView slug={slug} />
+      <ManageFormSubmissions slug={slug} />
     </div>
   );
 }

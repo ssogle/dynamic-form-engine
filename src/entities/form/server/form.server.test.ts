@@ -3,6 +3,7 @@ import {
   findActiveForms,
   findFormById,
   findFormBySlug,
+  findFormByIdOrSlug,
   findPublishedForms,
   findPublishedFormBySlug,
   insertForm,
@@ -103,12 +104,39 @@ describe("Form Server Repository (entities/form/server)", () => {
       expect(result).toEqual(sampleForm);
     });
 
+    it("UUID 형식이 아닌 ID로 조회 시 DB 쿼리를 타지 않고 undefined를 즉시 반환해야 한다", async () => {
+      const result = await findFormById("non-uuid-slug");
+
+      expect(mockSelect).not.toHaveBeenCalled();
+      expect(result).toBeUndefined();
+    });
+
     it("일치하는 폼이 없으면 undefined를 반환해야 한다", async () => {
       mockLimit.mockResolvedValueOnce([]);
 
-      const result = await findFormById("non-existent-id");
+      const result = await findFormById("00000000-0000-0000-0000-000000000000");
 
       expect(result).toBeUndefined();
+    });
+  });
+
+  describe("findFormByIdOrSlug", () => {
+    it("UUID 형식 입력 시 findFormById 로직을 통해 폼을 조회해야 한다", async () => {
+      mockLimit.mockResolvedValueOnce([sampleForm]);
+
+      const result = await findFormByIdOrSlug("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11");
+
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(sampleForm);
+    });
+
+    it("슬러그 형식 입력 시 findFormBySlug 로직을 통해 폼을 조회해야 한다", async () => {
+      mockLimit.mockResolvedValueOnce([sampleForm]);
+
+      const result = await findFormByIdOrSlug("daily-task-report");
+
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(sampleForm);
     });
   });
 

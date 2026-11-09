@@ -28,6 +28,16 @@ export interface DynamicFormRendererProps {
   onSubmit?: ((data: Record<string, unknown>) => Promise<void> | void) | undefined;
 
   /**
+   * 외부 또는 AI Navigator로부터 주입되는 제어 입력값 맵
+   */
+  values?: Record<string, unknown> | undefined;
+
+  /**
+   * AI Navigator 등 외부에서 제출을 프로그래밍 방식으로 트리거하기 위한 증분 카운터
+   */
+  submitTriggerCount?: number | undefined;
+
+  /**
    * 프리뷰 모드: 현재 AI 네비게이터 또는 사용자가 선택/집중하고 있는 필드 ID
    */
   selectedFieldId?: string | undefined;

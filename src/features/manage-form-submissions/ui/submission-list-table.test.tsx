@@ -1,6 +1,6 @@
 import * as React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Form } from "@/entities/form";
 import type { FormSubmission } from "@/entities/form-submission";
@@ -109,7 +109,7 @@ describe("SubmissionListTable (features/manage-form-submissions/ui)", () => {
     });
   });
 
-  it("수정 버튼을 누르면 수정 다이얼로그가 열려야 한다", async () => {
+  it("수정 버튼이 해당 응답의 수정 전용 페이지 링크로 렌더링되어야 한다", async () => {
     const mockFetch = vi.fn().mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -127,8 +127,9 @@ describe("SubmissionListTable (features/manage-form-submissions/ui)", () => {
       expect(screen.getByText("수정")).toBeDefined();
     });
 
-    fireEvent.click(screen.getByText("수정"));
-
-    expect(screen.getByText("제출된 응답 수정")).toBeDefined();
+    const editLink = screen.getByRole("link", { name: "수정" });
+    expect(editLink.getAttribute("href")).toBe(
+      "/consumer/forms/job-application/submissions/sub-1/edit"
+    );
   });
 });

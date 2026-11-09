@@ -16,13 +16,20 @@ export const findActiveForms = async (): Promise<Form[]> => {
     .orderBy(desc(forms.createdAt));
 };
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * 특정 ID를 가진 활성 폼(소프트 삭제되지 않은 폼) 1건을 조회합니다.
+ * ID가 올바른 UUID 형식이 아닌 경우 데이터베이스 쿼리를 실행하지 않고 즉시 undefined를 반환합니다.
  *
  * @param id 조회할 폼 고유 식별자(UUID)
  * @returns 일치하는 Form 객체 또는 undefined
  */
 export const findFormById = async (id: string): Promise<Form | undefined> => {
+  if (!UUID_REGEX.test(id)) {
+    return undefined;
+  }
+
   const [form] = await db
     .select()
     .from(forms)
@@ -49,6 +56,19 @@ export const findFormBySlug = async (slug: string): Promise<Form | undefined> =>
     .limit(1);
 
   return form;
+};
+
+/**
+ * UUID 식별자 또는 슬러그를 기반으로 활성 폼 1건을 지능적으로 조회합니다.
+ *
+ * @param idOrSlug 폼 고유 UUID 식별자 또는 URL 슬러그
+ * @returns 일치하는 Form 객체 또는 undefined
+ */
+export const findFormByIdOrSlug = async (idOrSlug: string): Promise<Form | undefined> => {
+  if (UUID_REGEX.test(idOrSlug)) {
+    return await findFormById(idOrSlug);
+  }
+  return await findFormBySlug(idOrSlug);
 };
 
 /**

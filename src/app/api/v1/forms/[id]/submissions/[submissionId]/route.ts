@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { findFormById } from "@/entities/form/server";
+import { findFormByIdOrSlug } from "@/entities/form/server";
 import { extractActiveFields, validateSubmissionData } from "@/entities/form";
 import {
   findSubmissionById,
@@ -27,9 +27,17 @@ interface RouteContext {
 export const GET = withErrorHandler(async (_req: NextRequest, context: RouteContext) => {
   const { id, submissionId } = await context.params;
 
-  // 1. 단건 응답 조회
-  const submission = await findSubmissionById(submissionId);
-  if (!submission || submission.formId !== id) {
+  // 1. 대상 폼 및 단건 응답 조회 (id는 UUID 또는 slug 모두 수용)
+  const [form, submission] = await Promise.all([
+    findFormByIdOrSlug(id),
+    findSubmissionById(submissionId),
+  ]);
+
+  if (!form) {
+    throw notFound("존재하지 않거나 삭제된 폼입니다.");
+  }
+
+  if (!submission || submission.formId !== form.id) {
     throw notFound("존재하지 않거나 삭제된 응답입니다.");
   }
 
@@ -49,9 +57,9 @@ export const GET = withErrorHandler(async (_req: NextRequest, context: RouteCont
 export const PATCH = withErrorHandler(async (req: NextRequest, context: RouteContext) => {
   const { id, submissionId } = await context.params;
 
-  // 1. 대상 폼 및 기존 응답 존재 여부 확인
+  // 1. 대상 폼 및 기존 응답 존재 여부 확인 (id는 UUID 또는 slug 모두 수용)
   const [form, existingSubmission] = await Promise.all([
-    findFormById(id),
+    findFormByIdOrSlug(id),
     findSubmissionById(submissionId),
   ]);
 
@@ -59,7 +67,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest, context: RouteCon
     throw notFound("존재하지 않거나 삭제된 폼입니다.");
   }
 
-  if (!existingSubmission || existingSubmission.formId !== id) {
+  if (!existingSubmission || existingSubmission.formId !== form.id) {
     throw notFound("존재하지 않거나 삭제된 응답입니다.");
   }
 
@@ -107,9 +115,17 @@ export const PATCH = withErrorHandler(async (req: NextRequest, context: RouteCon
 export const DELETE = withErrorHandler(async (_req: NextRequest, context: RouteContext) => {
   const { id, submissionId } = await context.params;
 
-  // 1. 기존 응답 존재 및 폼 일치 검증
-  const existingSubmission = await findSubmissionById(submissionId);
-  if (!existingSubmission || existingSubmission.formId !== id) {
+  // 1. 대상 폼 및 기존 응답 존재 및 폼 일치 검증 (id는 UUID 또는 slug 모두 수용)
+  const [form, existingSubmission] = await Promise.all([
+    findFormByIdOrSlug(id),
+    findSubmissionById(submissionId),
+  ]);
+
+  if (!form) {
+    throw notFound("존재하지 않거나 삭제된 폼입니다.");
+  }
+
+  if (!existingSubmission || existingSubmission.formId !== form.id) {
     throw notFound("존재하지 않거나 이미 삭제된 응답입니다.");
   }
 

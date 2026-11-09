@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Label } from "@/shared/ui/label";
-import { cn } from "@/shared/lib/utils";
+import { cn } from "@/shared/lib/cn";
 
 /**
  * 폼 필드 래퍼 프로퍼티 인터페이스

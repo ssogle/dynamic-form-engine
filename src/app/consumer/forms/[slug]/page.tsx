@@ -1,7 +1,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { Button } from "@/shared/ui/button";
-import { ConsumerFormSubmitView } from "./consumer-form-submit-view";
+import { ConsumerFormSubmitter } from "@/features/render-dynamic-form";
 
 interface ConsumerFormSlugPageProps {
   params: Promise<{
@@ -12,7 +12,7 @@ interface ConsumerFormSlugPageProps {
 /**
  * 컨슈머 개별 폼 입력 및 실시간 제출 페이지 (/consumer/forms/[slug])
  *
- * 공식 발행된 활성 폼을 불러와 엔드유저가 답변을 입력하고 서버로 안전하게 일괄 제출하는 화면입니다.
+ * 공식 발행된 활성 폼을 불러와 엔드유저가 답변을 입력하고 서버로 안전하게 일괄 제출하는 Thin 라우트 페이지입니다.
  */
 export default async function ConsumerFormSlugPage({ params }: ConsumerFormSlugPageProps) {
   const { slug } = await params;
@@ -31,7 +31,7 @@ export default async function ConsumerFormSlugPage({ params }: ConsumerFormSlugP
         </Button>
       </div>
 
-      <ConsumerFormSubmitView slug={slug} />
+      <ConsumerFormSubmitter slug={slug} />
     </div>
   );
 }

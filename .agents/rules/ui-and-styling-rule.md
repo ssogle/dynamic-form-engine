@@ -43,10 +43,10 @@ UI 요소를 작성할 때는 새로운 기본 HTML 태그(`<button>`, `<input>`
 
 ### ② 클래스 병합 표준 (`cn` 유틸리티)
 
-조건부 스타일링, 변형(Variants), 외부에서 주입받는 `className` 병합 시 반드시 `@/shared/lib/utils`의 **`cn()`** 유틸리티를 사용합니다:
+조건부 스타일링, 변형(Variants), 외부에서 주입받는 `className` 병합 시 반드시 `@/shared/lib/cn`의 **`cn()`** 유틸리티를 사용합니다:
 
 ```tsx
-import { cn } from "@/shared/lib/utils";
+import { cn } from "@/shared/lib/cn";
 
 export function CustomCard({ className, isActive, children }: CustomCardProps) {
   return (

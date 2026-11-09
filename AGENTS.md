@@ -48,10 +48,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - 새로운 태그나 임의의 UI를 바로 작성하지 말고, 반드시 `@/shared/ui` 디렉터리에 이미 존재하는 컴포넌트(shadcn/ui 기반)를 최우선으로 재사용하세요.
 - 필요한 컴포넌트(예: Slider, Popover 등)가 없다면 임의로 만들지 말고, 사용자에게 `npx shadcn@latest add [컴포넌트명]` 실행을 먼저 제안하세요.
 
-### 6) FSD 단방향 의존성 및 Public API 준수
+### 6) FSD 기능 우선(Feature-First) 및 진화적 라이프사이클 준수
 
-- 상위 레이어는 하위 레이어만 참조하며, 동일 레이어 간 교차 참조는 금지됩니다.
-- `widgets`, `features`, `entities`의 세부 내부 구현 파일을 직통 import하지 말고, 슬라이스 루트의 `index.ts`를 통해서만 참조하세요.
+- **기능 우선 출발**: 모든 신규 요구사항은 `features`에서 사용자 유스케이스 단위로 구현하여 페이지(`app`)에 직접 조립합니다. 외형(크기/테이블)만 보고 1개 페이지를 1개 위젯으로 단순 치환하는 "위젯 모놀리스"를 엄격히 금지합니다.
+- **공유 시 하향 추출**: 피처 간 수평 참조는 금지되며, 공통 공유가 필요할 경우 도메인 의미가 있으면 `entities`로, 도메인 무관 순수 도구면 `shared`로 하향합니다.
+- **복합 구획 조립 시 상향 승격**: 2개 이상의 독립 피처와 엔티티를 화면의 한 구획에서 유기적으로 결합해야 할 때만 `widgets`로 승격 조립합니다.
+- **Public API 준수**: 세부 내부 구현 파일을 직통 import하지 말고, 슬라이스 루트의 `index.ts`를 통해서만 참조하세요.
 
 ### 7) 공식 npm 스크립트 실행 준수 (Never Use npx for Defined Scripts)
 
@@ -79,9 +81,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ### 11) 날짜 및 시간 처리 가드레일 (Date & Time Single Source of Truth)
 
 - **Store in UTC, Display in Local 원칙**: 시스템에 저장/전송되는 모든 시간 데이터는 UTC 표준을 엄수하며, 사용자 화면 렌더링 시점에만 로컬 시간대로 변환합니다.
-- **서드파티 라이브러리 직접 import 원천 금지**: `date-fns` 등 외부 라이브러리를 `app`, `features`, `entities` 등에서 직접 import하는 것을 ESLint 규칙으로 전면 금지하며, 반드시 `@/shared/lib/utils` 공통 래퍼만 사용합니다.
+- **서드파티 라이브러리 직접 import 원천 금지**: `date-fns` 등 외부 라이브러리를 `app`, `features`, `entities` 등에서 직접 import하는 것을 ESLint 규칙으로 전면 금지하며, 반드시 `@/shared/lib/date` 공통 래퍼만 사용합니다.
 - **중앙 DB 시계 권한 (Central Clock Authority)**: Drizzle ORM 및 DB 갱신 쿼리에서는 애플리케이션 서버의 `new Date()` 대신 PostgreSQL 중앙 시계인 `sql`now()``를 사용하여 분산 컨테이너 환경의 Clock Drift를 원천 방지합니다.
-- **Null-safe 공통 유틸리티 사용**: UI 포맷팅(`formatDate`, `formatDateTime`, `formatRelativeTime`, `formatUtc`) 및 직렬화(`nowUtcIso`, `toUtcIso`)는 `@/shared/lib/utils`에 정의된 함수를 통해서만 수행합니다.
+- **Null-safe 공통 유틸리티 사용**: UI 포맷팅(`formatDate`, `formatDateTime`, `formatRelativeTime`, `formatUtc`) 및 직렬화(`nowUtcIso`, `toUtcIso`)는 `@/shared/lib/date`에 정의된 함수를 통해서만 수행합니다.
 
 ### 12) 데이터 정의 파일 거버넌스 (Tables vs Schema vs Types)
 

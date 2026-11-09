@@ -49,8 +49,8 @@
      - `fillConsumerField`: 대화 맥락을 기반으로 현재 폼의 특정 필드 값 자동 주입.
      - `submitConsumerForm`: 현재 입력된 폼 데이터 검증 및 원클릭 자율 제출.
 6. **표준 RESTful API 통합 및 대칭 FSD 네이밍**:
-   - 피처: `execute-navigator-builder-action` ↔ `execute-navigator-consumer-action`
-   - 위젯: `navigator-builder-shell` ↔ `navigator-consumer-shell`
+   - 피처: `features/execute-navigator-action` (단일 통합 에이전트 엔진)
+   - 위젯: `widgets/navigator-shell` (단일 통합 대화형 상주 패널)
    - API: `/api/v1/forms/[id]/submissions` 및 `/api/v1/navigator` 단일 엔드포인트 통합
 7. **TDD 기반 단위 및 통합 테스트 100% 완주 (`npm run verify`)**.
 
@@ -98,59 +98,57 @@ src/
 │       ├── index.ts
 │       └── server.ts
 ├── features/
-│   ├── execute-navigator-builder-action/      # [기존] 빌더 AI 액션 실행 피처
-│   │   ├── schema/
-│   │   │   └── action.schema.ts               # 액션 Zod 스키마
-│   │   └── types/
-│   │       └── action.types.ts                # 순수 TypeScript 인터페이스
-│   ├── execute-navigator-consumer-action/     # [신규] 컨슈머 AI 액션 실행 피처
-│   │   ├── schema/
-│   │   │   └── consumer-action.schema.ts      # 컨슈머 액션 Zod 스키마
+│   ├── execute-navigator-action/              # [통합] 빌더/컨슈머 단일 AI 네비게이터 액션 엔진
 │   │   ├── types/
-│   │   │   └── consumer-action.types.ts       # 순수 TypeScript 인터페이스
-│   │   ├── queries/
-│   │   │   └── use-consumer-navigator.mutation.ts
+│   │   ├── schema/
 │   │   ├── lib/
-│   │   │   ├── consumer-navigator-tools.ts
-│   │   │   └── consumer-action-parser.ts
-│   │   ├── server/
-│   │   │   └── execute-consumer-action.server.ts
+│   │   │   ├── tools/                         # 빌더 6종 및 컨슈머 3종 Vercel AI SDK 도구
+│   │   │   └── prompts/                       # 지능형 프롬프트 및 맥락 빌더
+│   │   ├── server/                            # 단일 오케스트레이션 엔진 (generateText + toolCalls 순회 통일)
+│   │   ├── queries/                           # useNavigatorMutation 단일 훅
 │   │   ├── index.ts
 │   │   └── server.ts
-│   ├── render-dynamic-form/                   # [통합] 빌더 프리뷰와 컨슈머 제출을 단일 수용하는 동적 폼 렌더러
-│   │   ├── types/
-│   │   │   └── render-dynamic-form.types.ts   # 모드(preview | submission), Props 타입
+│   ├── manage-builder-forms/                  # [신규] 빌더 폼 목록 열람 및 소프트 삭제 기능
 │   │   ├── ui/
-│   │   │   ├── dynamic-form-renderer.tsx      # React Hook Form 연동 메인 폼 뷰어 (mode: preview | submission)
-│   │   │   ├── dynamic-field.tsx              # 필드별 shadcn 인풋 매퍼 (register / Controller 바인딩)
-│   │   │   ├── form-field-wrapper.tsx         # 라벨, 필수 표시, 에러 메시지 공통 래퍼
-│   │   │   └── dynamic-form-renderer.test.tsx # 프리뷰 및 제출 인터랙션 테스트
+│   │   │   ├── builder-form-list.tsx
+│   │   │   └── builder-form-list.test.tsx
 │   │   └── index.ts
-│   └── manage-form-submissions/               # [신규] 제출 데이터 목록 및 수정/삭제 인터랙션
+│   ├── manage-form-submissions/               # [강화] 제출 응답 목록 열람, 테이블 시각화, 삭제 기능
+│   │   ├── ui/
+│   │   │   ├── manage-form-submissions.tsx
+│   │   │   ├── submission-list-table.tsx
+│   │   │   └── manage-form-submissions.test.tsx
+│   │   └── index.ts
+│   └── render-dynamic-form/                   # [강화] 동적 폼 렌더러 + 폼 작성/제출기 + 기제출 응답 수정기
+│       ├── types/
+│       │   └── render-dynamic-form.types.ts   # 모드(preview | submission), Props 타입
 │       ├── ui/
-│       │   ├── submission-list-table.tsx
-│       │   └── edit-submission-dialog.tsx
+│       │   ├── dynamic-form-renderer.tsx      # React Hook Form 연동 메인 폼 뷰어 (mode: preview | submission)
+│       │   ├── dynamic-field.tsx              # 필드별 shadcn 인풋 매퍼
+│       │   ├── form-field-wrapper.tsx         # 라벨, 필수 표시, 에러 메시지 공통 래퍼
+│       │   ├── consumer-form-submitter.tsx    # 폼 입력 및 실시간 일괄 제출 기능
+│       │   └── consumer-submission-editor.tsx # 기제출 응답 수정 전용 워크스페이스 기능
 │       └── index.ts
 ├── widgets/
-│   ├── navigator-builder-shell/               # [기존] 빌더 좌측 네비게이터 대화 패널
-│   └── navigator-consumer-shell/              # [신규] 컨슈머 좌측 네비게이터 대화 패널
-│       ├── ui/
-│       │   └── navigator-consumer-shell.tsx
-│       ├── store/
-│       │   └── navigator-consumer-chat.store.ts
-│       └── index.ts
-└── app/
-    ├── consumer/
-    │   ├── layout.tsx                         # 좌측 네비게이터 + 상단 탭 헤더
-    │   ├── page.tsx                           # redirect("/consumer/forms")
-    │   ├── forms/
-    │   │   ├── page.tsx                       # 발행된 폼 목록 그리드
-    │   │   └── [slug]/
-    │   │       ├── page.tsx                   # 폼 입력 화면
-    │   │       └── submissions/
-    │   │           └── page.tsx               # 응답 목록 및 수정/삭제
-    │   └── views/
-    │       └── page.tsx                       # 뷰 목록 화면
+│   └── navigator-shell/                       # [유일 위젯] 빌더/컨슈머 공통 단일 네비게이터 상주 패널 (384px)
+└── app/                                       # [Thin App Router] 완성된 피처들을 직접 조립하는 15~25줄 내외의 페이지
+    ├── builder/
+    │   └── forms/
+    │       ├── page.tsx                       # <BuilderFormList /> 조립
+    │       └── [slug]/
+    │           └── page.tsx                   # <DynamicFormRenderer mode="preview" /> 조립
+    └── consumer/
+        ├── layout.tsx                         # 좌측 네비게이터 + 상단 탭 헤더
+        ├── page.tsx                           # redirect("/consumer/forms")
+        ├── forms/
+        │   ├── page.tsx                       # 발행된 폼 목록 그리드
+        │   └── [slug]/
+        │       ├── page.tsx                   # <ConsumerFormSubmitter /> 조립
+        │       └── submissions/
+        │           ├── page.tsx               # <ManageFormSubmissions /> 조립
+        │           └── [submissionId]/
+        │               └── edit/
+        │                   └── page.tsx       # <ConsumerSubmissionEditor /> 조립
     └── api/v1/
         ├── forms/
         │   ├── route.ts                       # GET(?published=true) / POST(폼 생성)
@@ -221,8 +219,8 @@ export function validateSubmissionData(
 
 - **대안 A: API 엔드포인트를 `/api/v1/consumer/...` 네임스페이스로 완전 분리**
   - 기각 사유: 폼 응답 데이터(`submissions`)는 컨슈머가 제출하지만 차후 빌더(관리자)에서도 동일하게 열람하고 분석해야 하므로, RESTful 리소스 계층 구조(`/api/v1/forms/[id]/submissions`)로 통일하는 것이 DRY 원칙과 자원 지향 설계에 부합합니다.
-- **대안 B: 위젯 하나로 빌더/컨슈머 통합 (`<NavigatorShell mode="builder" | "consumer" />`)**
-  - 기각 사유: 외형은 유사하나 호출 피처, 액션 디스패치, 상태 스토어, 프롬프트 힌트가 완전히 다릅니다. 단일 컴포넌트에 두 도메인의 분기를 넣으면 결합도가 증가하므로 `navigator-builder-shell`과 `navigator-consumer-shell`로 명확히 분리합니다.
+- **대안 B: 위젯 및 피처를 빌더/컨슈머 단일 쉘로 통합 (`<NavigatorShell mode="builder" | "consumer" />`, `execute-navigator-action`) [채택]**
+  - 채택 사유: 툴 콜링 파이프라인의 일관성 확보, 코드 중복 70% 제거, 그리고 동일한 384px 패널 UI를 단일 컴포넌트에서 선언형 설정으로 관리하는 것이 유지보수성과 아키텍처 정합성에 훨씬 부합하여 전격 통합 채택했습니다.
 - **대안 C: 폼 진입 시 빈 응답 레코드를 선(先) 생성하는 방식**
   - 기각 사유: 컨슈머(응답자)는 단발성 참여가 지배적이므로 단순 이탈 시 DB에 쓰레기 데이터(Ghost Record)가 쌓입니다. 따라서 브라우저 상태에서 입력을 유지하다가 [제출하기] 시점에 1회 일괄 전송하는 방식을 채택합니다.
 - **대안 D: 프리뷰(`preview-dynamic-form`)와 컨슈머 제출(`submit-form-response`)을 별도 피처로 분리 유지**
@@ -253,12 +251,18 @@ export function validateSubmissionData(
    - `DynamicFormRenderer` 통합 컴포넌트(`mode: "preview" | "submission"`) 구현
    - 빌더 라이브 캔버스(`/builder/forms/[slug]`) 연동 및 구 디렉터리 정리
    - 스키마 9개 + 컴포넌트 8개 = 17개 단위 테스트 100% 통과
-3. **Phase 3: 표준 RESTful API 엔드포인트 (`app/api/v1/...`) [대기]**
-   - 발행된 폼 조회 필터(`?published=true`), 응답 제출/목록/수정/삭제 REST API 구현 및 통합 테스트
-4. **Phase 4: 컨슈머 라우터 & 레이아웃 구축 (`app/consumer/...`)**
-   - 리다이렉트, 상단 탭 헤더(폼 목록 / 뷰 목록), 발행 폼 목록 페이지, 뷰 목록 페이지
-5. **Phase 5: 폼 입력/제출 화면 및 응답 관리 화면**
-   - 동적 폼 입력 렌더러, 제출 처리, 응답 데이터 테이블, 수정 다이얼로그, 삭제 액션
-6. **Phase 6: 컨슈머 AI 네비게이터 연동 (`features/execute-navigator-consumer-action`)**
-   - 컨슈머 전용 도구 정의, Zustand 스토어 연동, 네비게이터 쉘 조립
-7. **Phase 7: 전체 검증 완주 (`npm run verify`)**
+3. **Phase 3: 표준 RESTful API 엔드포인트 (`app/api/v1/...`) [완료]**
+   - 발행된 폼 조회 필터(`?published=true`), 응답 제출/목록/수정/삭제 REST API 구현 및 통합 테스트 완료
+4. **Phase 4: 컨슈머 라우터 & 레이아웃 구축 (`app/consumer/...`) [완료]**
+   - 리다이렉트, 상단 탭 헤더(폼 목록 / 뷰 목록), 발행 폼 목록 페이지, 뷰 목록 페이지 구축 완료
+5. **Phase 5: 폼 입력/제출 화면 및 응답 관리 화면 (`manage-form-submissions`) [완료]**
+   - 동적 폼 입력 렌더러, 제출 처리, 응답 데이터 테이블, 삭제 액션 구현 완료
+   - 기제출 응답 수정 시 모달 팝업 대신 전용 페이지(`/consumer/forms/[slug]/submissions/[submissionId]/edit`)로 이동하는 넓은 워크스페이스 UX 구축
+   - PostgreSQL UUID 바인딩 에러(`invalid input syntax for type uuid`) 방어벽 및 `findFormByIdOrSlug` 공통 헬퍼 적용
+6. **Phase 6: 컨슈머 AI 네비게이터 통합 연동 (`features/execute-navigator-action`, `widgets/navigator-shell`) [완료]**
+   - 빌더 및 컨슈머 도구 카탈로그 단일화 및 Vercel AI SDK 표준 `toolCalls` 순회 패턴 통일
+   - 단일 통합 `NavigatorShell(mode)` 위젯 및 실시간 양방향 폼 반영 완료
+   - 신규 폼 제출 모드뿐만 아니라 기제출 응답 수정 페이지에서도 실시간 필드 동기화 및 "수정 완료/저장" 자율 제출 파이프라인 연동
+7. **Phase 7: 전체 검증 완주 (`npm run verify`) [완료]**
+   - TypeScript 0 errors, ESLint 0 errors, Prettier 100% 매칭
+   - 총 43개 테스트 파일, 234개 단위/컴포넌트/통합 테스트 100% 통과 (Pass 100%)

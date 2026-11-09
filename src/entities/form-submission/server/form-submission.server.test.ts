@@ -40,8 +40,8 @@ describe("Form Submission Server Repository (entities/form-submission/server)", 
   const sampleDate = new Date("2026-01-01T00:00:00Z");
 
   const sampleSubmission = {
-    id: "sub-1234-uuid",
-    formId: "form-5678-uuid",
+    id: "00000000-0000-0000-0000-000000000001",
+    formId: "00000000-0000-0000-0000-000000000002",
     data: { name: "홍길동", score: 5 },
     createdAt: sampleDate,
     updatedAt: sampleDate,
@@ -71,14 +71,14 @@ describe("Form Submission Server Repository (entities/form-submission/server)", 
       mockReturning.mockResolvedValueOnce([sampleSubmission]);
 
       const result = await insertSubmission({
-        formId: "form-5678-uuid",
+        formId: "00000000-0000-0000-0000-000000000002",
         data: { name: "홍길동", score: 5 },
       });
 
       expect(mockInsert).toHaveBeenCalledTimes(1);
       expect(mockValues).toHaveBeenCalledWith(
         expect.objectContaining({
-          formId: "form-5678-uuid",
+          formId: "00000000-0000-0000-0000-000000000002",
           data: { name: "홍길동", score: 5 },
         })
       );
@@ -90,7 +90,7 @@ describe("Form Submission Server Repository (entities/form-submission/server)", 
 
       await expect(
         insertSubmission({
-          formId: "form-5678-uuid",
+          formId: "00000000-0000-0000-0000-000000000002",
           data: {},
         })
       ).rejects.toThrow("응답 데이터베이스 삽입 결과가 반환되지 않았습니다.");
@@ -98,10 +98,17 @@ describe("Form Submission Server Repository (entities/form-submission/server)", 
   });
 
   describe("findSubmissionsByFormId", () => {
+    it("유효하지 않은 UUID 폼 ID인 경우 DB 쿼리를 타지 않고 빈 배열을 즉시 반환해야 한다", async () => {
+      const result = await findSubmissionsByFormId("purchase-list");
+
+      expect(mockSelect).not.toHaveBeenCalled();
+      expect(result).toEqual([]);
+    });
+
     it("특정 폼의 소프트 삭제되지 않은 응답 목록을 생성일 내림차순으로 반환해야 한다", async () => {
       mockOrderBy.mockResolvedValueOnce([sampleSubmission]);
 
-      const result = await findSubmissionsByFormId("form-5678-uuid");
+      const result = await findSubmissionsByFormId("00000000-0000-0000-0000-000000000002");
 
       expect(mockSelect).toHaveBeenCalledTimes(1);
       expect(mockWhere).toHaveBeenCalled();
@@ -110,10 +117,17 @@ describe("Form Submission Server Repository (entities/form-submission/server)", 
   });
 
   describe("findSubmissionById", () => {
+    it("유효하지 않은 UUID 응답 ID인 경우 DB 쿼리를 타지 않고 undefined를 즉시 반환해야 한다", async () => {
+      const result = await findSubmissionById("non-uuid-id");
+
+      expect(mockSelect).not.toHaveBeenCalled();
+      expect(result).toBeUndefined();
+    });
+
     it("특정 ID의 활성 응답 1건을 조회하여 반환해야 한다", async () => {
       mockLimit.mockResolvedValueOnce([sampleSubmission]);
 
-      const result = await findSubmissionById("sub-1234-uuid");
+      const result = await findSubmissionById("00000000-0000-0000-0000-000000000001");
 
       expect(mockSelect).toHaveBeenCalledTimes(1);
       expect(mockLimit).toHaveBeenCalledWith(1);
@@ -123,7 +137,7 @@ describe("Form Submission Server Repository (entities/form-submission/server)", 
     it("일치하는 응답이 없으면 undefined를 반환해야 한다", async () => {
       mockLimit.mockResolvedValueOnce([]);
 
-      const result = await findSubmissionById("not-found-id");
+      const result = await findSubmissionById("00000000-0000-0000-0000-000000000099");
 
       expect(result).toBeUndefined();
     });
@@ -138,7 +152,7 @@ describe("Form Submission Server Repository (entities/form-submission/server)", 
       };
       mockReturning.mockResolvedValueOnce([updatedSubmission]);
 
-      const result = await updateSubmissionById("sub-1234-uuid", {
+      const result = await updateSubmissionById("00000000-0000-0000-0000-000000000001", {
         data: { name: "홍길동", score: 4 },
       });
 
@@ -161,7 +175,7 @@ describe("Form Submission Server Repository (entities/form-submission/server)", 
       };
       mockReturning.mockResolvedValueOnce([deletedSubmission]);
 
-      const result = await softDeleteSubmissionById("sub-1234-uuid");
+      const result = await softDeleteSubmissionById("00000000-0000-0000-0000-000000000001");
 
       expect(mockUpdate).toHaveBeenCalledTimes(1);
       expect(mockSet).toHaveBeenCalledWith(

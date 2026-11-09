@@ -14,7 +14,7 @@ import {
 import { Button } from "@/shared/ui/button";
 import { Badge } from "@/shared/ui/badge";
 import { Skeleton } from "@/shared/ui/skeleton";
-import { formatDate } from "@/shared/lib/utils";
+import { formatDate } from "@/shared/lib/date";
 
 /**
  * 컨슈머 발행된 폼 목록 화면 (/consumer/forms)

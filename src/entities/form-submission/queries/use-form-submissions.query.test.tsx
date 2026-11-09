@@ -2,7 +2,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getFormSubmissions, useFormSubmissionsQuery } from "./use-form-submissions.query";
+import {
+  getFormSubmissions,
+  getFormSubmissionDetail,
+  useFormSubmissionsQuery,
+  useFormSubmissionDetailQuery,
+} from "./use-form-submissions.query";
 
 const createTestQueryClient = () =>
   new QueryClient({
@@ -81,5 +86,52 @@ describe("useFormSubmissionsQuery (특정 폼의 응답 목록 조회 훅)", () 
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(mockSubmissions);
+  });
+
+  it("getFormSubmissionDetail 함수가 올바른 URL로 단건 조회를 수행해야 한다", async () => {
+    const mockSingle = mockSubmissions[0];
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({
+        success: true,
+        data: mockSingle,
+      }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const data = await getFormSubmissionDetail("daily-report", "sub-1");
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/v1/forms/daily-report/submissions/sub-1",
+      expect.objectContaining({ method: "GET" })
+    );
+    expect(data).toEqual(mockSingle);
+  });
+
+  it("useFormSubmissionDetailQuery가 단건 응답 상세 데이터를 정상 로드해야 한다", async () => {
+    const mockSingle = mockSubmissions[0];
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({
+        success: true,
+        data: mockSingle,
+      }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const { result } = renderHook(() => useFormSubmissionDetailQuery("daily-report", "sub-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual(mockSingle);
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/v1/forms/daily-report/submissions/sub-1",
+      expect.objectContaining({ method: "GET" })
+    );
   });
 });

@@ -9,7 +9,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/sha
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Skeleton } from "@/shared/ui/skeleton";
-import { cn } from "@/shared/lib/utils";
+import { cn } from "@/shared/lib/cn";
 import type { DynamicFormRendererProps } from "../types/render-dynamic-form.types";
 import { DynamicField } from "./dynamic-field";
 
@@ -41,6 +41,8 @@ export function DynamicFormRenderer({
   slug,
   mode = "submission",
   onSubmit,
+  values,
+  submitTriggerCount,
   selectedFieldId,
   onFieldClick,
   isSubmitting = false,
@@ -78,11 +80,35 @@ export function DynamicFormRenderer({
     mode: "onBlur",
   });
 
+  // 외부 또는 AI Navigator로부터 주입된 필드값 동기화
+  React.useEffect(() => {
+    if (values && Object.keys(values).length > 0) {
+      for (const [key, val] of Object.entries(values)) {
+        if (val !== undefined) {
+          methods.setValue(key, val, { shouldValidate: true, shouldDirty: true });
+        }
+      }
+    }
+  }, [values, methods]);
+
   // 폼 제출 이벤트 핸들러
   const handleFormSubmit = methods.handleSubmit(async (data) => {
     if (mode === "preview" || !onSubmit) return;
     await onSubmit(data);
   });
+
+  // AI Navigator 또는 외부 신호에 의한 프로그래밍 방식 폼 제출 트리거
+  const prevSubmitTriggerRef = React.useRef(submitTriggerCount);
+  React.useEffect(() => {
+    if (
+      typeof submitTriggerCount === "number" &&
+      submitTriggerCount > 0 &&
+      submitTriggerCount !== prevSubmitTriggerRef.current
+    ) {
+      prevSubmitTriggerRef.current = submitTriggerCount;
+      handleFormSubmit();
+    }
+  }, [submitTriggerCount, handleFormSubmit]);
 
   /**
    * 1. 쿼리 로딩 상태 스켈레톤 렌더링
