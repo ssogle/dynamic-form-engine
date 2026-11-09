@@ -1,46 +1,58 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { formKeys } from "@/entities/form";
 import { httpClient } from "@/shared/lib/http";
+import { formKeys } from "@/entities/form";
 import type {
-  ExecuteNavigatorActionPayload,
+  ExecuteNavigatorPayload,
   NavigatorExecutionResponse,
-} from "../types/action.types";
+} from "../types/navigator-action.types";
 
 /**
- * AI Navigator 액션 추론 및 실행 API 호출 순수 함수
+ * 네비게이터 서버 액션 실행 API 호출 순수 함수
  *
- * @param payload 사용자 프롬프트 및 현재 화면 컨텍스트
- * @returns 액션 추론 결과 및 갱신된 폼 정보
+ * @param payload 실행 요청 페이로드 (mode, prompt, messages, currentContext)
+ * @returns AI 답변 및 브라우저 제어 액션
  */
 export async function executeNavigatorAction(
-  payload: ExecuteNavigatorActionPayload
+  payload: ExecuteNavigatorPayload
 ): Promise<NavigatorExecutionResponse> {
-  const response = await httpClient.post<NavigatorExecutionResponse>("/api/v1/navigator", payload);
-
-  return response;
+  return httpClient.post<NavigatorExecutionResponse>("/api/v1/navigator", payload);
 }
 
 /**
- * AI Navigator 액션 실행 React Query 뮤테이션 훅
+ * AI Navigator 액션 실행 전용 TanStack Mutation 훅
  *
- * 액션 실행 성공 시:
- * 1. 응답에 updatedForm이 있는 경우 즉시 해당 슬러그의 상세 캐시를 동기화하여
- *    프리뷰 캔버스가 리렌더링되도록 합니다.
- * 2. 폼 목록 쿼리 캐시를 무효화하여 최신 상태를 유지합니다.
+ * 스키마 조작이나 폼 생성, 발행 등의 액션이 서버에서 수행되면
+ * 관련 TanStack Query 캐시(forms 목록, 상세)를 자동으로 무효화합니다.
  */
-export function useNavigatorActionMutation() {
+export function useNavigatorMutation() {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutation<NavigatorExecutionResponse, Error, ExecuteNavigatorPayload>({
     mutationFn: executeNavigatorAction,
     onSuccess: (data) => {
-      // 1. 갱신/생성된 폼 캐시 즉각 주입
-      if (data.updatedForm?.slug) {
-        queryClient.setQueryData(formKeys.detail(data.updatedForm.slug), data.updatedForm);
-      }
+      if (data.action) {
+        switch (data.action.type) {
+          case "CREATE_FORM":
+          case "DELETE_FORMS":
+          case "PUBLISH_FORM":
+            // 폼 목록 쿼리 캐시 무효화
+            queryClient.invalidateQueries({ queryKey: formKeys.all });
+            break;
 
-      // 2. 폼 목록 캐시 무효화
-      queryClient.invalidateQueries({ queryKey: formKeys.all });
+          case "UPDATE_SCHEMA":
+            // 폼 목록 및 해당 폼 상세 캐시 무효화
+            queryClient.invalidateQueries({ queryKey: formKeys.all });
+            if (data.action.slug) {
+              queryClient.invalidateQueries({
+                queryKey: formKeys.detail(data.action.slug),
+              });
+            }
+            break;
+
+          default:
+            break;
+        }
+      }
     },
   });
 }

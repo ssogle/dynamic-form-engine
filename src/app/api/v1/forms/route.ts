@@ -1,18 +1,22 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { insertFormSchema } from "@/entities/form";
-import { findActiveForms, insertForm } from "@/entities/form/server";
+import { findActiveForms, findPublishedForms, insertForm } from "@/entities/form/server";
 import { apiResponse, badRequest, withErrorHandler } from "@/shared/lib/http";
 
 /**
  * GET /api/v1/forms
  *
- * 등록된 활성 폼(소프트 삭제되지 않은 폼) 목록을 생성 일시 최신순으로 조회하여 반환합니다.
+ * 등록된 폼 목록을 생성 일시 최신순으로 조회하여 반환합니다.
+ * 쿼리 파라미터 `published=true` 전달 시 공식 발행된 활성 폼만 필터링하여 반환합니다.
  *
+ * @param req NextRequest 객체 (쿼리 파라미터 파싱용)
  * @returns 200 OK와 함께 Form[] 배열 반환
  */
-export const GET = withErrorHandler(async () => {
-  const formList = await findActiveForms();
+export const GET = withErrorHandler(async (req: NextRequest) => {
+  const isPublishedOnly = req.nextUrl.searchParams.get("published") === "true";
+
+  const formList = isPublishedOnly ? await findPublishedForms() : await findActiveForms();
   return apiResponse.ok(formList);
 });
 

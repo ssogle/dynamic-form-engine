@@ -7,5 +7,6 @@
 export const formKeys = {
   all: ["forms"] as const,
   lists: () => [...formKeys.all, "list"] as const,
+  publishedLists: () => [...formKeys.all, "list", "published"] as const,
   detail: (identifier: string) => [...formKeys.all, "detail", identifier] as const,
 };

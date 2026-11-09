@@ -4,53 +4,73 @@ import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  useNavigatorActionMutation,
+  useNavigatorMutation,
   type NavigatorAction,
+  type NavigatorClientContext,
 } from "@/features/execute-navigator-action";
-import { formKeys, type Form, type CoreFormField } from "@/entities/form";
+import { formKeys, type Form, extractActiveFields } from "@/entities/form";
+import { useConsumerFormDraftStore } from "@/entities/form-submission";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { cn } from "@/shared/lib/utils";
+import { Input } from "@/shared/ui/input";
+import { cn } from "@/shared/lib/cn";
 import { useNavigatorChatStore } from "../store/navigator-chat.store";
+import { NAVIGATOR_SHELL_CONFIGS } from "../lib/navigator-shell-config";
+import type { NavigatorShellProps } from "../types/navigator-shell.types";
 
 /**
- * 네비게이터 쉘 프로퍼티 인터페이스
- */
-export interface NavigatorShellProps {
-  /**
-   * 외부 커스텀 스타일 클래스
-   */
-  className?: string | undefined;
-}
-
-/**
- * AI Navigator 상주 패널 위젯 (Persistent Shell)
+ * AI Navigator 통합 상주 패널 위젯 (Persistent Shell)
  *
- * 화면 전체의 자율주행 관제탑 역할을 수행하며, 사용자의 자연어 발화를 실시간 액션으로 변환하고
- * 화면 라우팅 이동 및 스키마 변경을 총괄 지휘합니다.
+ * Builder 및 Consumer 두 모드를 단일 쉘로 수용하며,
+ * 자연어 대화를 통해 화면 라우팅, 스키마 편집, 폼 필드 입력 및 제출을 자율주행합니다.
  */
-export function NavigatorShell({ className }: NavigatorShellProps) {
+export function NavigatorShell({ mode, className }: NavigatorShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const queryClient = useQueryClient();
 
+  const config = NAVIGATOR_SHELL_CONFIGS[mode];
+
+  // 1. 대화 스토어 구독 및 모드 동기화
+  const currentMode = useNavigatorChatStore((state) => state.currentMode);
+  const setMode = useNavigatorChatStore((state) => state.setMode);
   const messages = useNavigatorChatStore((state) => state.messages);
   const isGenerating = useNavigatorChatStore((state) => state.isGenerating);
   const addMessage = useNavigatorChatStore((state) => state.addMessage);
   const setIsGenerating = useNavigatorChatStore((state) => state.setIsGenerating);
-  const clearMessages = useNavigatorChatStore((state) => state.clearMessages);
 
+  React.useEffect(() => {
+    if (currentMode !== mode) {
+      setMode(mode);
+    }
+  }, [mode, currentMode, setMode]);
+
+  // 2. 컨슈머 전용 초안 스토어 훅 바인딩
+  const applyDraftFields = useConsumerFormDraftStore((state) => state.applyDraftFields);
+  const triggerSubmit = useConsumerFormDraftStore((state) => state.triggerSubmit);
+  const currentDraftSlug = useConsumerFormDraftStore((state) => state.currentSlug);
+  const currentDraftValues = useConsumerFormDraftStore((state) => state.draftValues);
+
+  // 3. UI 로컬 상태
   const [inputValue, setInputValue] = React.useState("");
+
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
 
-  const { mutateAsync: executeAction, isPending } = useNavigatorActionMutation();
-
+  // 4. 단일 통합 AI 통신 훅
+  const { mutateAsync: executeAction, isPending } = useNavigatorMutation();
   const isBusy = isGenerating || isPending;
 
-  // 새 메시지 수신 시 스크롤을 맨 아래로 이동
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
   }, [messages, isBusy]);
+
+  // AI 응답 완료 및 disabled 해제 시 입력창으로 포커스 자동 복원
+  React.useEffect(() => {
+    if (!isBusy) {
+      inputRef.current?.focus();
+    }
+  }, [isBusy]);
 
   /**
    * AI 응답 액션을 해석하여 브라우저 화면 조작 디스패치
@@ -59,33 +79,102 @@ export function NavigatorShell({ className }: NavigatorShellProps) {
     (action: NavigatorAction) => {
       switch (action.type) {
         case "NAVIGATE":
-          router.push(action.targetPath);
+          if (action.targetPath && action.targetPath !== pathname) {
+            router.push(action.targetPath);
+          }
           break;
 
         case "CREATE_FORM":
-          router.push(`/builder/forms/${action.slug}`);
+          if (action.slug) {
+            router.push(`/builder/forms/${action.slug}`);
+          }
           break;
 
-        case "UPDATE_SCHEMA":
-          if (!pathname.includes(`/builder/forms/${action.formSlug}`)) {
-            router.push(`/builder/forms/${action.formSlug}`);
+        case "DELETE_FORMS":
+          router.push("/builder/forms");
+          break;
+
+        case "FILL_FIELDS": {
+          const formSlugMatch = pathname.match(/^\/consumer\/forms\/([^/]+)/);
+          const targetSlug = action.formSlug || formSlugMatch?.[1] || currentDraftSlug || "";
+          if (targetSlug && action.fields) {
+            applyDraftFields(targetSlug, action.fields);
           }
+          break;
+        }
+
+        case "SUBMIT_FORM": {
+          const formSlugMatch = pathname.match(/^\/consumer\/forms\/([^/]+)/);
+          const targetSlug = action.formSlug || formSlugMatch?.[1] || currentDraftSlug || "";
+          if (targetSlug) {
+            triggerSubmit(targetSlug);
+          }
+          break;
+        }
+
+        default:
           break;
       }
     },
-    [router, pathname]
+    [pathname, router, currentDraftSlug, applyDraftFields, triggerSubmit]
   );
 
   /**
-   * 사용자 메시지 전송 및 AI 액션 오케스트레이션 핸들러
+   * 현재 화면 맥락(Context)을 모드에 맞게 추출
    */
-  const handleSendMessage = async (e?: React.SyntheticEvent) => {
-    e?.preventDefault();
+  const resolveCurrentContext = React.useCallback((): NavigatorClientContext => {
+    const context: NavigatorClientContext = {
+      currentPath: pathname,
+    };
 
-    const trimmed = inputValue.trim();
+    if (mode === "builder") {
+      const match = pathname.match(/\/builder\/forms\/([^/]+)/);
+      if (match && match[1]) {
+        const slug = match[1];
+        const cachedForm = queryClient.getQueryData<Form>(formKeys.detail(slug));
+        if (cachedForm) {
+          const fields = extractActiveFields(cachedForm);
+          context.currentForm = {
+            slug: cachedForm.slug,
+            title: cachedForm.title,
+            description: cachedForm.description ?? undefined,
+            fields,
+          };
+        }
+      }
+    } else if (mode === "consumer") {
+      const match = pathname.match(/^\/consumer\/forms\/([^/]+)/);
+      const activeSlug = match ? match[1] : (currentDraftSlug ?? undefined);
+
+      if (activeSlug) {
+        context.currentFormSlug = activeSlug;
+        const cachedForm = queryClient.getQueryData<Form>(formKeys.detail(activeSlug));
+        if (cachedForm) {
+          context.currentFormTitle = cachedForm.title;
+          const activeFields = extractActiveFields(cachedForm);
+          context.availableFields = activeFields.map((f) => ({
+            id: f.id,
+            name: f.name,
+            label: f.label,
+            type: f.type,
+            required: f.required ?? false,
+            options: f.options ?? undefined,
+          }));
+        }
+      }
+      context.currentDraftValues = currentDraftValues;
+    }
+
+    return context;
+  }, [mode, pathname, queryClient, currentDraftSlug, currentDraftValues]);
+
+  /**
+   * 사용자 명령 실행 핸들러
+   */
+  const handleExecutePrompt = async (promptText: string) => {
+    const trimmed = promptText.trim();
     if (!trimmed || isBusy) return;
 
-    // 1. 사용자 메시지 스토어에 추가
     addMessage({
       role: "user",
       content: trimmed,
@@ -94,209 +183,119 @@ export function NavigatorShell({ className }: NavigatorShellProps) {
     setIsGenerating(true);
 
     try {
-      // 현재 화면 URL로부터 활성 폼 슬러그 및 캐시 스키마 추출
-      const activeSlugMatch = pathname.match(/\/builder\/forms\/([a-z0-9-]+)/);
-      const activeSlug = activeSlugMatch?.[1];
+      const historyMessages = messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
 
-      let currentFormContext = undefined;
-      if (activeSlug) {
-        const cached = queryClient.getQueryData<
-          Form | { slug: string; title: string; description?: string; fields: CoreFormField[] }
-        >(formKeys.detail(activeSlug));
-        if (cached) {
-          const rawFields =
-            "fields" in cached && Array.isArray(cached.fields)
-              ? cached.fields
-              : "schemaDefinition" in cached &&
-                  cached.schemaDefinition !== null &&
-                  typeof cached.schemaDefinition === "object" &&
-                  Array.isArray((cached.schemaDefinition as { fields?: unknown }).fields)
-                ? (cached.schemaDefinition as { fields: CoreFormField[] }).fields
-                : [];
-
-          currentFormContext = {
-            slug: cached.slug,
-            title: cached.title,
-            description: cached.description ?? undefined,
-            fields: rawFields,
-          };
-        }
-      }
-
-      // 2. 백엔드 AI 액션 API 호출 (이전 대화 히스토리 및 현재 폼 스키마 컨텍스트 동봉)
-      // 시스템 안내 문구 및 웰컴 메시지를 제외한 실제 사용자/어시스턴트 대화 내역 추출
-      const historyMessages = messages
-        .filter(
-          (m): m is typeof m & { role: "user" | "assistant" } =>
-            m.id !== "msg_welcome" && (m.role === "user" || m.role === "assistant")
-        )
-        .map((m) => ({
-          role: m.role,
-          content: m.content,
-        }));
+      const currentContext = resolveCurrentContext();
 
       const response = await executeAction({
+        mode,
         prompt: trimmed,
-        messages: historyMessages.length > 0 ? historyMessages : undefined,
-        currentContext: {
-          currentPath: pathname,
-          currentForm: currentFormContext,
-        },
+        messages: historyMessages,
+        currentContext,
       });
 
-      // 3. AI 응답 메시지 스토어에 추가
-      const replyContent =
-        response.reply || response.action?.message || "요청하신 작업을 완료했습니다.";
+      const replyText =
+        response.reply || response.message || response.action?.message || "요청을 처리했습니다.";
       addMessage({
         role: "assistant",
-        content: replyContent,
+        content: replyText,
         action: response.action ?? undefined,
       });
 
-      // 4. 액션에 따른 화면 제어 디스패치
       if (response.action) {
         dispatchAction(response.action);
       }
-    } catch (error) {
+    } catch (err) {
+      console.error("AI Navigator 통신 오류:", err);
       addMessage({
-        role: "system",
-        content:
-          error instanceof Error
-            ? `명령 처리 중 오류가 발생했습니다: ${error.message}`
-            : "명령 처리 중 알 수 없는 오류가 발생했습니다.",
+        role: "assistant",
+        content: "죄송합니다. 요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
       });
     } finally {
       setIsGenerating(false);
     }
   };
 
-  /**
-   * Enter 키 입력 시 즉시 전송 (Shift+Enter는 줄바꿈)
-   */
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      void handleSendMessage();
-    }
+  const handleSubmit = (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    handleExecutePrompt(inputValue);
   };
 
   return (
     <aside
-      aria-label="AI Navigator 패널"
-      className={cn(
-        "border-border/80 bg-background/95 flex size-full flex-col border-r backdrop-blur-sm",
-        className
-      )}
+      aria-label={`${config.badgeLabel} AI Navigator`}
+      className={cn("bg-card border-border/80 flex h-full flex-col border-r shadow-xs", className)}
     >
-      {/* 패널 상단 관제탑 헤더 */}
-      <header className="border-border/60 flex h-14 shrink-0 items-center justify-between border-b px-4">
+      {/* 상단 헤더 */}
+      <header className="border-border/60 bg-muted/20 flex h-14 shrink-0 items-center justify-between border-b px-4">
         <div className="flex items-center gap-2">
-          <span className="font-heading text-foreground text-sm font-semibold tracking-tight">
-            AI Navigator
-          </span>
-          <Badge variant="secondary" className="text-[10px] tracking-wide uppercase">
-            Autonomous
+          <span className="bg-primary size-2 animate-pulse rounded-full" />
+          <h2 className="text-foreground text-sm font-semibold tracking-tight">AI Navigator</h2>
+          <Badge variant="secondary" className="text-[10px] font-normal">
+            {config.badgeLabel}
           </Badge>
         </div>
-
-        <Button
-          type="button"
-          variant="ghost"
-          size="xs"
-          onClick={clearMessages}
-          className="text-muted-foreground hover:text-foreground text-xs"
-        >
-          대화 비우기
-        </Button>
       </header>
 
-      {/* 메시지 스트림 목록 영역 */}
-      <div className="flex-1 space-y-4 overflow-y-auto p-4">
-        {messages.map((message) => {
-          const isUser = message.role === "user";
-          const isSystem = message.role === "system";
-
-          if (isSystem) {
-            return (
-              <div
-                key={message.id}
-                className="bg-destructive/10 text-destructive mx-auto my-2 max-w-[90%] rounded-md p-2.5 text-center text-xs"
-              >
-                {message.content}
-              </div>
-            );
-          }
-
-          return (
+      {/* 대화 메시지 목록 영역 */}
+      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+        {messages.map((msg) => (
+          <div
+            key={msg.id}
+            className={cn(
+              "flex flex-col gap-1 text-xs/relaxed",
+              msg.role === "user" ? "items-end" : "items-start"
+            )}
+          >
             <div
-              key={message.id}
-              className={cn("flex flex-col gap-1 text-sm", isUser ? "items-end" : "items-start")}
-            >
-              <div
-                className={cn(
-                  "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm/relaxed whitespace-pre-wrap",
-                  isUser
-                    ? "bg-primary text-primary-foreground rounded-br-xs"
-                    : "bg-muted/80 text-foreground border-border/40 rounded-bl-xs border shadow-2xs"
-                )}
-              >
-                {message.content}
-              </div>
-
-              {/* AI 액션 실행 배지 안내 */}
-              {message.action && (
-                <div className="text-muted-foreground flex items-center gap-1.5 px-1 text-[11px]">
-                  <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
-                    {message.action.type}
-                  </Badge>
-                  {message.action.type === "NAVIGATE" && <span>{message.action.targetPath}</span>}
-                  {message.action.type === "CREATE_FORM" && <span>{message.action.slug}</span>}
-                  {message.action.type === "UPDATE_SCHEMA" && (
-                    <span>{message.action.operation}</span>
-                  )}
-                </div>
+              className={cn(
+                "max-w-[88%] rounded-lg px-3 py-2 text-xs",
+                msg.role === "user"
+                  ? "bg-primary text-primary-foreground font-medium"
+                  : "bg-muted/70 text-foreground border-border/40 border"
               )}
+            >
+              {msg.content}
             </div>
-          );
-        })}
+          </div>
+        ))}
 
-        {/* AI 작업 중 로딩 인디케이터 */}
         {isBusy && (
-          <div className="bg-muted/50 text-muted-foreground border-border/40 flex max-w-[80%] animate-pulse items-center gap-2 rounded-2xl border p-3 text-xs">
-            <span className="bg-primary size-2 animate-ping rounded-full" />
-            <span>화면을 조작하고 있습니다...</span>
+          <div className="flex items-start">
+            <div className="bg-muted/50 text-muted-foreground border-border/40 flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs">
+              <span className="size-1.5 animate-bounce rounded-full bg-current" />
+              <span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:0.2s]" />
+              <span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:0.4s]" />
+              <span className="ml-1 text-[11px]">생각 중...</span>
+            </div>
           </div>
         )}
 
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 발화 입력 푸터 */}
-      <footer className="border-border/60 bg-muted/20 border-t p-3">
-        <form onSubmit={handleSendMessage} className="flex flex-col gap-2">
-          <textarea
+      {/* 하단 입력 폼 영역 */}
+      <footer className="border-border/60 bg-background/80 shrink-0 border-t p-3 backdrop-blur-sm">
+        <form onSubmit={handleSubmit} className="flex items-center gap-2">
+          <Input
+            ref={inputRef}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="AI Navigator에게 명령하세요 (예: 설문 폼 만들어줘, 이메일 필드 추가해줘)... 무엇을 도와드릴까요?"
-            rows={2}
+            placeholder={config.inputPlaceholder}
             disabled={isBusy}
-            className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring w-full resize-none rounded-lg border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50"
+            className="focus-visible:ring-primary/30 h-9 flex-1 text-xs"
           />
-
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground text-[11px]">
-              Enter로 전송, Shift+Enter로 줄바꿈
-            </span>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={isBusy || !inputValue.trim()}
-              className="gap-1 font-medium"
-            >
-              전송
-            </Button>
-          </div>
+          <Button
+            type="submit"
+            size="sm"
+            disabled={isBusy || !inputValue.trim()}
+            className="h-9 px-3 text-xs"
+          >
+            전송
+          </Button>
         </form>
       </footer>
     </aside>

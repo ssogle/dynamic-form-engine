@@ -1,6 +1,7 @@
 /**
- * Database 인프라 Public API 진입점
+ * Database 인프라 클라이언트 안전 Public API 진입점
  *
- * FSD 원칙에 따라 외부 레이어는 `@/shared/db`를 통해 데이터베이스 인스턴스를 참조합니다.
+ * 브라우저 클라이언트 컴포넌트("use client") 및 엔티티 스키마가 참조할 수 있도록
+ * 물리 DDL 테이블 객체를 re-export합니다. (신규 코드는 @/shared/tables 직접 import 권장)
  */
-export { db } from "./connection";
+export * from "@/shared/tables";

@@ -117,6 +117,7 @@ const eslintConfig = defineConfig([
       "check-file/folder-match-with-fex": [
         "error",
         {
+          "*.table.{ts,tsx}": "**/tables/",
           "*.store.{ts,tsx}": "**/store/",
           "*.schema.{ts,tsx}": "**/schema/",
           "*.server.{ts,tsx}": "**/server/",
@@ -135,6 +136,9 @@ const eslintConfig = defineConfig([
           // 슬라이스 내부 비표준 세그먼트 폴더 차단 (7대 표준 세그먼트만 허용, 슬라이스 루트 index.{ts,tsx}는 허용)
           "src/{widgets,features,entities}/*/!(ui|queries|server|store|schema|types|lib|index.ts|index.tsx)/**":
             "src/**/{ui,queries,server,store,schema,types,lib}/**",
+
+          // tables 폴더 내 파일은 반드시 .table.ts 접미사를 가져야 함 (테스트 및 index 제외)
+          "src/**/tables/**/!(*.table|*.table.test|index).{ts,tsx}": "*.table.ts",
 
           // store 폴더 내 파일은 반드시 .store.ts 접미사를 가져야 함 (테스트 및 index 제외)
           "src/**/store/**/!(*.store|*.store.test|index).{ts,tsx}": "*.store.ts",
@@ -211,10 +215,10 @@ const eslintConfig = defineConfig([
     },
   },
 
-  // 10. 서드파티 시간 라이브러리 직접 import 차단 및 @/shared/lib/utils 단일 창구 강제 가드레일
+  // 10. 서드파티 시간 라이브러리 직접 import 차단 및 @/shared/lib/date 단일 창구 강제 가드레일
   {
     files: ["**/*.ts", "**/*.tsx"],
-    ignores: ["src/shared/lib/utils/date.util.ts"],
+    ignores: ["src/shared/lib/date/date.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -223,19 +227,19 @@ const eslintConfig = defineConfig([
             {
               name: "date-fns",
               message:
-                "서드파티 시간 라이브러리 직접 import는 금지됩니다. 반드시 '@/shared/lib/utils'의 formatDate, formatRelativeTime 등을 사용하세요.",
+                "서드파티 시간 라이브러리 직접 import는 금지됩니다. 반드시 '@/shared/lib/date'의 formatDate, formatRelativeTime 등을 사용하세요.",
             },
             {
               name: "date-fns/locale",
               message:
-                "서드파티 로케일 직접 import는 금지됩니다. 반드시 '@/shared/lib/utils'의 날짜 함수를 사용하세요.",
+                "서드파티 로케일 직접 import는 금지됩니다. 반드시 '@/shared/lib/date'의 날짜 함수를 사용하세요.",
             },
           ],
           patterns: [
             {
               group: ["date-fns/*"],
               message:
-                "서드파티 시간 라이브러리 하위 모듈 직접 import는 금지됩니다. 반드시 '@/shared/lib/utils'를 사용하세요.",
+                "서드파티 시간 라이브러리 하위 모듈 직접 import는 금지됩니다. 반드시 '@/shared/lib/date'를 사용하세요.",
             },
           ],
         },

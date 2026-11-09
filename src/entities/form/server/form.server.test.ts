@@ -3,6 +3,9 @@ import {
   findActiveForms,
   findFormById,
   findFormBySlug,
+  findFormByIdOrSlug,
+  findPublishedForms,
+  findPublishedFormBySlug,
   insertForm,
   softDeleteFormById,
   softDeleteFormsBySlugs,
@@ -27,13 +30,17 @@ const mockSet = vi.fn();
 
 const mockReturning = vi.fn();
 
-vi.mock("@/shared/db", () => ({
-  db: {
-    select: () => mockSelect(),
-    insert: (table: unknown) => mockInsert(table),
-    update: (table: unknown) => mockUpdate(table),
-  },
-}));
+vi.mock("@/shared/db/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/shared/db/server")>();
+  return {
+    ...actual,
+    db: {
+      select: () => mockSelect(),
+      insert: (table: unknown) => mockInsert(table),
+      update: (table: unknown) => mockUpdate(table),
+    },
+  };
+});
 
 describe("Form Server Repository (entities/form/server)", () => {
   const sampleDate = new Date("2026-01-01T00:00:00Z");
@@ -97,12 +104,39 @@ describe("Form Server Repository (entities/form/server)", () => {
       expect(result).toEqual(sampleForm);
     });
 
+    it("UUID 형식이 아닌 ID로 조회 시 DB 쿼리를 타지 않고 undefined를 즉시 반환해야 한다", async () => {
+      const result = await findFormById("non-uuid-slug");
+
+      expect(mockSelect).not.toHaveBeenCalled();
+      expect(result).toBeUndefined();
+    });
+
     it("일치하는 폼이 없으면 undefined를 반환해야 한다", async () => {
       mockLimit.mockResolvedValueOnce([]);
 
-      const result = await findFormById("non-existent-id");
+      const result = await findFormById("00000000-0000-0000-0000-000000000000");
 
       expect(result).toBeUndefined();
+    });
+  });
+
+  describe("findFormByIdOrSlug", () => {
+    it("UUID 형식 입력 시 findFormById 로직을 통해 폼을 조회해야 한다", async () => {
+      mockLimit.mockResolvedValueOnce([sampleForm]);
+
+      const result = await findFormByIdOrSlug("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11");
+
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(sampleForm);
+    });
+
+    it("슬러그 형식 입력 시 findFormBySlug 로직을 통해 폼을 조회해야 한다", async () => {
+      mockLimit.mockResolvedValueOnce([sampleForm]);
+
+      const result = await findFormByIdOrSlug("daily-task-report");
+
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(sampleForm);
     });
   });
 
@@ -153,7 +187,7 @@ describe("Form Server Repository (entities/form/server)", () => {
         insertForm({
           slug: "broken-insert",
           title: "깨진 삽입",
-          schemaDefinition: {},
+          schemaDefinition: { fields: [] },
         })
       ).rejects.toThrow("폼 데이터베이스 삽입 결과가 반환되지 않았습니다.");
     });
@@ -215,6 +249,41 @@ describe("Form Server Repository (entities/form/server)", () => {
       );
       expect(result).toHaveLength(2);
       expect(result[0]?.slug).toBe("form-1");
+    });
+  });
+
+  describe("findPublishedForms", () => {
+    it("발행된 활성 폼 목록을 반환해야 한다", async () => {
+      const publishedForm = { ...sampleForm, publishedAt: sampleDate };
+      mockOrderBy.mockResolvedValueOnce([publishedForm]);
+
+      const result = await findPublishedForms();
+
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+      expect(mockWhere).toHaveBeenCalled();
+      expect(result).toHaveLength(1);
+      expect(result[0]?.publishedAt).toEqual(sampleDate);
+    });
+  });
+
+  describe("findPublishedFormBySlug", () => {
+    it("발행된 폼 1건을 조회해야 한다", async () => {
+      const publishedForm = { ...sampleForm, publishedAt: sampleDate };
+      mockLimit.mockResolvedValueOnce([publishedForm]);
+
+      const result = await findPublishedFormBySlug("daily-task-report");
+
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+      expect(mockLimit).toHaveBeenCalledWith(1);
+      expect(result).toEqual(publishedForm);
+    });
+
+    it("일치하는 발행 폼이 없으면 undefined를 반환해야 한다", async () => {
+      mockLimit.mockResolvedValueOnce([]);
+
+      const result = await findPublishedFormBySlug("non-existent-form");
+
+      expect(result).toBeUndefined();
     });
   });
 });

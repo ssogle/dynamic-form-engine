@@ -1,6 +1,6 @@
 import * as React from "react";
 import Link from "next/link";
-import { FormPreviewCanvas } from "@/features/preview-dynamic-form";
+import { DynamicFormRenderer } from "@/features/render-dynamic-form";
 import { Button } from "@/shared/ui/button";
 
 /**
@@ -39,7 +39,7 @@ export default async function BuilderFormSlugPage({ params }: BuilderFormSlugPag
         </Button>
       </div>
 
-      <FormPreviewCanvas slug={slug} />
+      <DynamicFormRenderer slug={slug} mode="preview" />
     </div>
   );
 }

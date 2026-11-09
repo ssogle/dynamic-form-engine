@@ -1,6 +1,8 @@
-/**
- * features/execute-navigator-action 서버 전용 Public API
- *
- * 서버 컴포넌트, Route Handler, Server Action에서만 안전하게 import하여 사용할 수 있습니다.
- */
-export * from "./server/navigator-runner.server";
+// Server Public API (server-only)
+export { runNavigatorEngine } from "./server/navigator-engine.server";
+export { createBuilderTools, extractFieldsFromForm, sanitizeSlug } from "./lib/tools/builder-tools";
+export { createConsumerTools, normalizeConsumerPath } from "./lib/tools/consumer-tools";
+export {
+  navigatorRequestSchema,
+  type NavigatorRequestDto,
+} from "./schema/navigator-request.schema";

@@ -1,6 +1,5 @@
 import * as React from "react";
-import { FormList } from "@/features/list-forms";
-import { HealthIndicator } from "@/features/check-server-health";
+import { BuilderFormList } from "@/features/manage-builder-forms";
 
 /**
  * 빌더 내부 폼 목록 화면 (/builder/forms)
@@ -20,13 +19,8 @@ export default function BuilderFormsPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <div className="md:col-span-2">
-          <FormList />
-        </div>
-        <div>
-          <HealthIndicator />
-        </div>
+      <div className="w-full">
+        <BuilderFormList />
       </div>
     </div>
   );

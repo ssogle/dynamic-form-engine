@@ -14,12 +14,16 @@ const mockSet = vi.fn();
 const mockWhere = vi.fn();
 const mockReturning = vi.fn();
 
-vi.mock("@/shared/db", () => ({
-  db: {
-    select: () => mockSelect(),
-    update: (table: unknown) => mockUpdate(table),
-  },
-}));
+vi.mock("@/shared/db/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/shared/db/server")>();
+  return {
+    ...actual,
+    db: {
+      select: () => mockSelect(),
+      update: (table: unknown) => mockUpdate(table),
+    },
+  };
+});
 
 describe("Route Handler: /api/v1/forms/[id]", () => {
   const formId = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";

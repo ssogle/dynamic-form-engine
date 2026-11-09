@@ -4,9 +4,15 @@ import * as navigatorServer from "@/features/execute-navigator-action/server";
 import { POST } from "./route";
 
 // navigator engine 서비스 모킹
-vi.mock("@/features/execute-navigator-action/server", () => ({
-  runNavigatorEngine: vi.fn(),
-}));
+vi.mock("@/features/execute-navigator-action/server", async () => {
+  const actual = await vi.importActual<typeof navigatorServer>(
+    "@/features/execute-navigator-action/server"
+  );
+  return {
+    ...actual,
+    runNavigatorEngine: vi.fn(),
+  };
+});
 
 describe("POST /api/v1/navigator (AI Navigator Thin Route Handler)", () => {
   beforeEach(() => {
@@ -27,7 +33,7 @@ describe("POST /api/v1/navigator (AI Navigator Thin Route Handler)", () => {
     expect(json.error.code).toBe("BAD_REQUEST");
   });
 
-  it("올바른 페이로드가 전달되면 runNavigatorEngine을 호출하고 200 성공 응답을 반환해야 한다", async () => {
+  it("기본(builder) 모드로 요청 시 runNavigatorEngine을 호출하고 200 성공 응답을 반환해야 한다", async () => {
     const mockExecutionResponse = {
       reply: "테스트 설문 화면으로 이동합니다.",
       action: {
@@ -36,12 +42,6 @@ describe("POST /api/v1/navigator (AI Navigator Thin Route Handler)", () => {
         message: "테스트 설문 화면으로 이동합니다.",
       },
       updatedForm: null,
-      toolCalls: [
-        {
-          toolName: "navigate",
-          args: { targetPath: "/builder/forms/test-survey" },
-        },
-      ],
     };
 
     vi.spyOn(navigatorServer, "runNavigatorEngine").mockResolvedValueOnce(mockExecutionResponse);
@@ -50,12 +50,8 @@ describe("POST /api/v1/navigator (AI Navigator Thin Route Handler)", () => {
       method: "POST",
       body: JSON.stringify({
         prompt: "테스트 설문으로 이동해줘",
-        messages: [
-          {
-            role: "user",
-            content: "이전 발화",
-          },
-        ],
+        mode: "builder",
+        messages: [{ role: "user", content: "이전 발화" }],
         currentContext: {
           currentPath: "/builder/forms",
         },
@@ -68,18 +64,48 @@ describe("POST /api/v1/navigator (AI Navigator Thin Route Handler)", () => {
     expect(response.status).toBe(200);
     expect(json.success).toBe(true);
     expect(json.data).toEqual(mockExecutionResponse);
+    expect(navigatorServer.runNavigatorEngine).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: "builder",
+        prompt: "테스트 설문으로 이동해줘",
+      })
+    );
+  });
 
-    expect(navigatorServer.runNavigatorEngine).toHaveBeenCalledWith({
-      prompt: "테스트 설문으로 이동해줘",
-      messages: [
-        {
-          role: "user",
-          content: "이전 발화",
-        },
-      ],
-      currentContext: {
-        currentPath: "/builder/forms",
+  it("mode: 'consumer'로 요청 시 runNavigatorEngine에 mode: 'consumer'를 전달하고 200 성공 응답을 반환해야 한다", async () => {
+    const mockConsumerResponse = {
+      reply: "지원서 화면으로 이동합니다.",
+      action: {
+        type: "NAVIGATE" as const,
+        targetPath: "/consumer/forms/developer-hire",
+        message: "지원서 화면으로 이동합니다.",
       },
+    };
+
+    vi.spyOn(navigatorServer, "runNavigatorEngine").mockResolvedValueOnce(mockConsumerResponse);
+
+    const request = new NextRequest("http://localhost:3000/api/v1/navigator", {
+      method: "POST",
+      body: JSON.stringify({
+        mode: "consumer",
+        prompt: "채용 지원서 작성하러 갈래",
+        currentContext: {
+          currentPath: "/consumer/forms",
+        },
+      }),
     });
+
+    const response = await POST(request, {});
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.success).toBe(true);
+    expect(json.data).toEqual(mockConsumerResponse);
+    expect(navigatorServer.runNavigatorEngine).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: "consumer",
+        prompt: "채용 지원서 작성하러 갈래",
+      })
+    );
   });
 });
