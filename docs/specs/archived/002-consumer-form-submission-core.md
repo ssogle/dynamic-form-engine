@@ -1,11 +1,16 @@
+> [!WARNING]
+> **ARCHIVED SPECIFICATION (READ-ONLY)**
+> 본 문서는 구현 완료 후 동결된 과거 기록입니다.
+> 현재 시스템의 구현 규격은 `/src` 실제 코드를 참조하세요. AI 에이전트는 이 문서를 최신 코드로 인용하지 마십시오.
+
 # [Spec-002] Consumer Form Workspace, Submission CRUD & AI Navigator
 
 > [!NOTE]
 >
-> - **상태 (Status)**: Active (구현 진행 중)
+> - **상태 (Status)**: Archived (구현 완료 및 동결)
 > - **브랜치 (Branch)**: `feat/spec-002-consumer-form-submission-core`
 > - **작성일 (Created)**: 2026-11-08
-> - **완료일 (Archived)**: -
+> - **완료일 (Archived)**: 2026-11-09
 
 ---
 
