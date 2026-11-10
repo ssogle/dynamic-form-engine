@@ -192,5 +192,32 @@ describe("DynamicFormRenderer (features/render-dynamic-form/ui)", () => {
         expect(handleSubmit).toHaveBeenCalledTimes(1);
       });
     });
+
+    it("values prop이 undefined 또는 빈 객체로 변경되면 폼 입력값이 기본값으로 리셋되어야 한다", async () => {
+      const initialValues = {
+        f1: "홍길동",
+      };
+
+      const { rerender } = render(
+        <QueryClientProvider client={createTestQueryClient()}>
+          <DynamicFormRenderer form={mockForm} mode="submission" values={initialValues} />
+        </QueryClientProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue("홍길동")).toBeDefined();
+      });
+
+      // values를 빈 객체로 변경 (초기화)
+      rerender(
+        <QueryClientProvider client={createTestQueryClient()}>
+          <DynamicFormRenderer form={mockForm} mode="submission" values={{}} />
+        </QueryClientProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.queryByDisplayValue("홍길동")).toBeNull();
+      });
+    });
   });
 });

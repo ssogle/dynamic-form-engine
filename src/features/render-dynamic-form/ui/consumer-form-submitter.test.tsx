@@ -11,6 +11,7 @@ vi.mock("@/entities/form", () => ({
 }));
 
 const mockSubmitResponse = vi.fn();
+const mockResetDraft = vi.fn();
 vi.mock("@/entities/form-submission", () => ({
   useSubmitFormMutation: () => ({
     mutateAsync: mockSubmitResponse,
@@ -22,6 +23,7 @@ vi.mock("@/entities/form-submission", () => ({
       draftValues: { title: "테스트" },
       submitTriggerCount: 0,
       setCurrentFormId: vi.fn(),
+      resetDraft: mockResetDraft,
     }),
 }));
 
@@ -88,5 +90,24 @@ describe("ConsumerFormSubmitter (features/render-dynamic-form)", () => {
     render(<ConsumerFormSubmitter formId={formId} />);
     expect(screen.getByTestId("dynamic-form-renderer")).toBeDefined();
     expect(screen.getByText("입사 지원서 렌더러")).toBeDefined();
+  });
+
+  it("마운트 및 언마운트 시 resetDraft가 호출되어 이전 입력 잔여값을 비워야 한다", () => {
+    mockResetDraft.mockClear();
+    mockUseFormDetailQuery.mockReturnValue({
+      data: {
+        id: formId,
+        title: "입사 지원서",
+        publishedAt: "2026-11-08T00:00:00Z",
+      },
+      isLoading: false,
+      isError: false,
+    });
+
+    const { unmount } = render(<ConsumerFormSubmitter formId={formId} />);
+    expect(mockResetDraft).toHaveBeenCalledTimes(1);
+
+    unmount();
+    expect(mockResetDraft).toHaveBeenCalledTimes(2);
   });
 });
