@@ -12,12 +12,11 @@ import "server-only";
 export {
   findActiveForms,
   findFormById,
-  findFormBySlug,
-  findFormByIdOrSlug,
   findPublishedForms,
-  findPublishedFormBySlug,
+  findPublishedFormById,
   insertForm,
   updateFormById,
+  publishFormById,
   softDeleteFormById,
-  softDeleteFormsBySlugs,
+  softDeleteFormsByIds,
 } from "./server/form.server";

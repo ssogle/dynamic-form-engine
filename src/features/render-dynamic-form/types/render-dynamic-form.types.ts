@@ -12,11 +12,11 @@ export type DynamicFormMode = "preview" | "submission";
  * exactOptionalPropertyTypes 설정 호환을 위해 선택 속성에는 명시적으로 `| undefined`를 유니온으로 허용합니다.
  */
 export interface DynamicFormRendererProps {
-  /** 렌더링 대상 폼 엔티티 객체 (ActiveForm 또는 Form). 미전달 시 slug를 통해 쿼리로 자동 조회합니다. */
+  /** 렌더링 대상 폼 엔티티 객체 (ActiveForm 또는 Form). 미전달 시 formId를 통해 쿼리로 자동 조회합니다. */
   form?: (ActiveForm | Form | null) | undefined;
 
-  /** 폼 슬러그 또는 UUID (form이 전달되지 않은 경우 쿼리로 자동 조회) */
-  slug?: string | undefined;
+  /** 폼 고유 식별자 UUID (form이 전달되지 않은 경우 쿼리로 자동 조회) */
+  formId?: string | undefined;
 
   /** 동작 모드 (기본값: "submission") */
   mode?: DynamicFormMode | undefined;

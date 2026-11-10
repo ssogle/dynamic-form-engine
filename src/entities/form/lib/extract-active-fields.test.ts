@@ -6,7 +6,6 @@ import { extractActiveFields } from "./extract-active-fields";
 describe("extractActiveFields (entities/form/lib)", () => {
   const sampleField: CoreFormField = {
     id: "f1",
-    name: "title",
     label: "제목",
     type: "text",
     required: true,
@@ -14,7 +13,6 @@ describe("extractActiveFields (entities/form/lib)", () => {
 
   const deletedField: CoreFormField = {
     id: "f2",
-    name: "deprecated",
     label: "과거 필드",
     type: "text",
     required: false,
@@ -28,7 +26,7 @@ describe("extractActiveFields (entities/form/lib)", () => {
 
   it("ActiveForm 규격(fields 배열 소유)에서 소프트 삭제되지 않은 활성 필드만 추출해야 한다", () => {
     const activeForm: ActiveForm = {
-      slug: "sample-form",
+      id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
       title: "샘플 폼",
       fields: [sampleField, deletedField],
     };
@@ -36,13 +34,12 @@ describe("extractActiveFields (entities/form/lib)", () => {
     const result = extractActiveFields(activeForm);
 
     expect(result).toHaveLength(1);
-    expect(result[0]?.name).toBe("title");
+    expect(result[0]?.id).toBe("f1");
   });
 
   it("DB Form 모델(schemaDefinition.fields 소유)에서 소프트 삭제되지 않은 활성 필드만 추출해야 한다", () => {
     const dbForm: Form = {
       id: "form-uuid-1",
-      slug: "db-form",
       title: "DB 저장 폼",
       description: null,
       schemaDefinition: {
@@ -57,7 +54,7 @@ describe("extractActiveFields (entities/form/lib)", () => {
     const result = extractActiveFields(dbForm);
 
     expect(result).toHaveLength(1);
-    expect(result[0]?.name).toBe("title");
+    expect(result[0]?.id).toBe("f1");
   });
 
   it("schemaDefinition 내 fields가 배열이 아니거나 비어있는 경우 빈 배열을 반환해야 한다", () => {

@@ -22,7 +22,6 @@ describe("DynamicFormRenderer (features/render-dynamic-form/ui)", () => {
   const mockFields: CoreFormField[] = [
     {
       id: "f1",
-      name: "applicantName",
       label: "지원자 이름",
       type: "text",
       required: true,
@@ -30,7 +29,6 @@ describe("DynamicFormRenderer (features/render-dynamic-form/ui)", () => {
     },
     {
       id: "f2",
-      name: "yearsOfExperience",
       label: "경력 연수",
       type: "number",
       required: false,
@@ -38,7 +36,6 @@ describe("DynamicFormRenderer (features/render-dynamic-form/ui)", () => {
     },
     {
       id: "f3",
-      name: "targetPosition",
       label: "지원 직무",
       type: "select",
       required: true,
@@ -47,7 +44,6 @@ describe("DynamicFormRenderer (features/render-dynamic-form/ui)", () => {
   ];
 
   const mockForm: ActiveForm = {
-    slug: "job-application",
     title: "개발자 채용 지원서",
     description: "멋진 개발팀에 합류하세요.",
     publishedAt: new Date("2026-11-08T00:00:00.000Z"),
@@ -111,6 +107,19 @@ describe("DynamicFormRenderer (features/render-dynamic-form/ui)", () => {
       const fieldWrapper = screen.getByText("지원자 이름").closest("[data-field-id='f1']");
       expect(fieldWrapper?.className).toContain("ring-primary");
     });
+
+    it("미리보기 모드에서 formId가 주어지면 발행 상태 토글 버튼이 노출되어야 한다", () => {
+      renderWithClient(
+        <DynamicFormRenderer
+          form={mockForm}
+          formId="a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+          mode="preview"
+        />
+      );
+
+      // mockForm은 publishedAt이 설정되어 있으므로 '발행 취소' 버튼 노출
+      expect(screen.getByRole("button", { name: "발행 취소" })).toBeDefined();
+    });
   });
 
   describe("제출 모드 (mode='submission')", () => {
@@ -150,8 +159,8 @@ describe("DynamicFormRenderer (features/render-dynamic-form/ui)", () => {
     it("submitTriggerCount가 증가하면 외부 신호로 폼 제출이 자동 발동되어야 한다", async () => {
       const handleSubmit = vi.fn();
       const validValues = {
-        applicantName: "홍길동",
-        targetPosition: "Frontend",
+        f1: "홍길동",
+        f3: "Frontend",
       };
 
       const { rerender } = renderWithClient(

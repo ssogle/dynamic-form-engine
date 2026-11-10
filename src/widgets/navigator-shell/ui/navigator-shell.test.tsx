@@ -54,7 +54,7 @@ describe("NavigatorShell (widgets/navigator-shell)", () => {
       reply: "설문지 폼으로 이동합니다.",
       action: {
         type: "NAVIGATE" as const,
-        targetPath: "/builder/forms/customer-survey",
+        targetPath: "/builder/forms/form-123",
         message: "설문지 폼으로 이동합니다.",
       },
     };
@@ -84,7 +84,7 @@ describe("NavigatorShell (widgets/navigator-shell)", () => {
       expect(screen.getByText("설문지 폼으로 이동합니다.")).toBeDefined();
     });
 
-    expect(mockPush).toHaveBeenCalledWith("/builder/forms/customer-survey");
+    expect(mockPush).toHaveBeenCalledWith("/builder/forms/form-123");
     expect(document.activeElement).toBe(input);
   });
 
@@ -93,17 +93,17 @@ describe("NavigatorShell (widgets/navigator-shell)", () => {
       reply: "프로젝트 폼으로 이동하여 필드를 채웁니다.",
       action: {
         type: "NAVIGATE" as const,
-        targetPath: "/consumer/forms/project",
+        targetPath: "/consumer/forms/form-proj",
       },
       actions: [
         {
           type: "NAVIGATE" as const,
-          targetPath: "/consumer/forms/project",
+          targetPath: "/consumer/forms/form-proj",
         },
         {
           type: "FILL_FIELDS" as const,
-          formSlug: "project",
-          fields: { title: "새 프로젝트", dueDate: "2026-12-31" },
+          formId: "form-proj",
+          fields: { f_title: "새 프로젝트", f_dueDate: "2026-12-31" },
         },
       ],
     };
@@ -133,14 +133,14 @@ describe("NavigatorShell (widgets/navigator-shell)", () => {
 
     // 1. FILL_FIELDS가 선실행되어 Zustand 스토어에 상태가 보존되었는지 검증
     const draftStore = useConsumerFormDraftStore.getState();
-    expect(draftStore.currentSlug).toBe("project");
+    expect(draftStore.currentFormId).toBe("form-proj");
     expect(draftStore.draftValues).toEqual({
-      title: "새 프로젝트",
-      dueDate: "2026-12-31",
+      f_title: "새 프로젝트",
+      f_dueDate: "2026-12-31",
     });
 
     // 2. NAVIGATE가 호출되어 화면 이동을 수행했는지 검증
-    expect(mockPush).toHaveBeenCalledWith("/consumer/forms/project");
+    expect(mockPush).toHaveBeenCalledWith("/consumer/forms/form-proj");
   });
 
   it("빌더 모드에서 React Query 캐시에 있는 폼 목록을 visibleForms 컨텍스트로 전달해야 한다", async () => {
@@ -151,7 +151,6 @@ describe("NavigatorShell (widgets/navigator-shell)", () => {
         {
           id: "f-1",
           title: "고객 만족도 조사",
-          slug: "survey",
           description: "설명",
           createdAt: "2026-01-01T00:00:00.000Z",
         },
@@ -189,7 +188,7 @@ describe("NavigatorShell (widgets/navigator-shell)", () => {
     expect(callArg).toBeDefined();
     const requestBody = JSON.parse(callArg?.body as string);
     expect(requestBody.currentContext.visibleForms).toBeDefined();
-    expect(requestBody.currentContext.visibleForms[0].slug).toBe("survey");
+    expect(requestBody.currentContext.visibleForms[0].id).toBe("f-1");
   });
 
   it("컨슈머 모드에서 DELETE_SUBMISSIONS 액션 수신 시 캐시 무효화가 정상 호출되어야 한다", async () => {
@@ -235,6 +234,54 @@ describe("NavigatorShell (widgets/navigator-shell)", () => {
     expect(invalidateSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         queryKey: ["submissions"],
+      })
+    );
+  });
+
+  it("빌더 모드에서 PUBLISH_FORM 액션 수신 시 폼 캐시 무효화가 정상 호출되어야 한다", async () => {
+    const queryClient = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const mockResponse = {
+      reply: "폼이 공식 발행되었습니다.",
+      action: {
+        type: "PUBLISH_FORM" as const,
+        formId: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+        isPublished: true,
+        message: "폼이 공식 발행되었습니다.",
+      },
+    };
+
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({
+        success: true,
+        data: mockResponse,
+      }),
+    } as unknown as Response);
+    vi.stubGlobal("fetch", mockFetch);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <NavigatorShell mode="builder" />
+      </QueryClientProvider>
+    );
+
+    const input = screen.getByRole("textbox");
+    const submitBtn = screen.getByRole("button", { name: "전송" });
+
+    fireEvent.change(input, { target: { value: "이 폼 발행해줘" } });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText("폼이 공식 발행되었습니다.")).toBeDefined();
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: ["forms"],
       })
     );
   });

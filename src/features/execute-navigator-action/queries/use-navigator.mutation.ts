@@ -42,9 +42,9 @@ export function useNavigatorMutation() {
           case "UPDATE_SCHEMA":
             // 폼 목록 및 해당 폼 상세 캐시 무효화
             queryClient.invalidateQueries({ queryKey: formKeys.all });
-            if (data.action.slug) {
+            if (data.action.formId) {
               queryClient.invalidateQueries({
-                queryKey: formKeys.detail(data.action.slug),
+                queryKey: formKeys.detail(data.action.formId),
               });
             }
             break;

@@ -4,16 +4,12 @@ import { GET, PATCH, DELETE } from "./route";
 
 // Drizzle 서버 모킹
 const mockFindFormById = vi.fn();
-const mockFindFormBySlug = vi.fn();
-const mockFindFormByIdOrSlug = vi.fn();
 const mockFindSubmissionById = vi.fn();
 const mockUpdateSubmissionById = vi.fn();
 const mockSoftDeleteSubmissionById = vi.fn();
 
 vi.mock("@/entities/form/server", () => ({
   findFormById: (id: string) => mockFindFormById(id),
-  findFormBySlug: (slug: string) => mockFindFormBySlug(slug),
-  findFormByIdOrSlug: (idOrSlug: string) => mockFindFormByIdOrSlug(idOrSlug),
 }));
 
 vi.mock("@/entities/form-submission/server", () => ({
@@ -31,21 +27,18 @@ describe("Route Handler: /api/v1/forms/[id]/submissions/[submissionId]", () => {
 
   const mockForm = {
     id: formId,
-    slug: "job-application",
     title: "개발자 채용 지원서",
     publishedAt: new Date("2026-01-01T00:00:00Z"),
     schemaDefinition: {
       fields: [
         {
-          id: "f1",
-          name: "applicantName",
+          id: "applicantName",
           label: "지원자 이름",
           type: "text",
           required: true,
         },
         {
-          id: "f2",
-          name: "yearsOfExperience",
+          id: "yearsOfExperience",
           label: "경력 연수",
           type: "number",
           required: true,
@@ -66,8 +59,6 @@ describe("Route Handler: /api/v1/forms/[id]/submissions/[submissionId]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFindFormById.mockResolvedValue(mockForm);
-    mockFindFormBySlug.mockResolvedValue(mockForm);
-    mockFindFormByIdOrSlug.mockResolvedValue(mockForm);
   });
 
   describe("GET /api/v1/forms/[id]/submissions/[submissionId] (단건 응답 조회)", () => {

@@ -45,7 +45,6 @@ describe("Route Handler: /api/v1/forms", () => {
       const mockForms = [
         {
           id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-          slug: "daily-report",
           title: "일일 업무 보고",
           description: "일일 업무를 기록하는 폼",
           schemaDefinition: { fields: [] },
@@ -64,14 +63,13 @@ describe("Route Handler: /api/v1/forms", () => {
 
       expect(json.success).toBe(true);
       expect(json.data).toHaveLength(1);
-      expect(json.data[0].slug).toBe("daily-report");
+      expect(json.data[0].id).toBe("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11");
     });
 
     it("published=true 쿼리 파라미터 전달 시 발행된 폼 목록을 필터링하여 반환해야 한다", async () => {
       const mockPublishedForms = [
         {
           id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-          slug: "customer-feedback",
           title: "고객 피드백 설문",
           description: "발행된 설문",
           schemaDefinition: { fields: [] },
@@ -91,14 +89,13 @@ describe("Route Handler: /api/v1/forms", () => {
 
       expect(json.success).toBe(true);
       expect(json.data).toHaveLength(1);
-      expect(json.data[0].slug).toBe("customer-feedback");
+      expect(json.data[0].title).toBe("고객 피드백 설문");
     });
   });
 
   describe("POST /api/v1/forms (신규 폼 등록)", () => {
     it("유효한 폼 스키마 요청 시 201 Created와 함께 생성된 폼 데이터를 반환해야 한다", async () => {
       const validPayload = {
-        slug: "customer-feedback",
         title: "고객 만족도 조사",
         description: "고객 피드백 수집 목적",
         schemaDefinition: {
@@ -134,14 +131,13 @@ describe("Route Handler: /api/v1/forms", () => {
       const json = await response.json();
 
       expect(json.success).toBe(true);
-      expect(json.data.slug).toBe("customer-feedback");
+      expect(json.data.id).toBe("b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22");
       expect(json.data.title).toBe("고객 만족도 조사");
     });
 
-    it("유효하지 않은 요청 본문(slug 형식 오류 등)인 경우 400 Bad Request를 반환해야 한다", async () => {
+    it("유효하지 않은 요청 본문(title 누락 등)인 경우 400 Bad Request를 반환해야 한다", async () => {
       const invalidPayload = {
-        slug: "INVALID_SLUG_대문자",
-        title: "잘못된 폼",
+        title: "",
         schemaDefinition: {},
       };
 

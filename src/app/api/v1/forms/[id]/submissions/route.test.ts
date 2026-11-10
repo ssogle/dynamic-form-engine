@@ -4,13 +4,11 @@ import { GET, POST } from "./route";
 
 // Drizzle 서버 모킹
 const mockFindFormById = vi.fn();
-const mockFindFormByIdOrSlug = vi.fn();
 const mockFindSubmissionsByFormId = vi.fn();
 const mockInsertSubmission = vi.fn();
 
 vi.mock("@/entities/form/server", () => ({
   findFormById: (id: string) => mockFindFormById(id),
-  findFormByIdOrSlug: (idOrSlug: string) => mockFindFormByIdOrSlug(idOrSlug),
 }));
 
 vi.mock("@/entities/form-submission/server", () => ({
@@ -26,21 +24,18 @@ describe("Route Handler: /api/v1/forms/[id]/submissions", () => {
 
   const mockForm = {
     id: formId,
-    slug: "job-application",
     title: "개발자 채용 지원서",
     publishedAt: new Date("2026-01-01T00:00:00Z"),
     schemaDefinition: {
       fields: [
         {
-          id: "f1",
-          name: "applicantName",
+          id: "applicantName",
           label: "지원자 이름",
           type: "text",
           required: true,
         },
         {
-          id: "f2",
-          name: "yearsOfExperience",
+          id: "yearsOfExperience",
           label: "경력 연수",
           type: "number",
           required: true,
@@ -52,12 +47,11 @@ describe("Route Handler: /api/v1/forms/[id]/submissions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFindFormById.mockResolvedValue(mockForm);
-    mockFindFormByIdOrSlug.mockResolvedValue(mockForm);
   });
 
   describe("GET /api/v1/forms/[id]/submissions (응답 목록 조회)", () => {
     it("존재하지 않는 폼 ID로 조회 시 404 Not Found를 반환해야 한다", async () => {
-      mockFindFormByIdOrSlug.mockResolvedValueOnce(undefined);
+      mockFindFormById.mockResolvedValueOnce(undefined);
 
       const request = new NextRequest(`http://localhost:3000/api/v1/forms/${formId}/submissions`);
       const response = await GET(request, mockContext);
@@ -89,35 +83,11 @@ describe("Route Handler: /api/v1/forms/[id]/submissions", () => {
       expect(json.data).toHaveLength(1);
       expect(json.data[0].id).toBe("sub-1");
     });
-
-    it("경로 매개변수가 UUID가 아닌 슬러그(slug)인 경우에도 정상 조회되어야 한다", async () => {
-      const slugContext = {
-        params: Promise.resolve({ id: "purchase-list" }),
-      };
-      const mockSubmissions = [
-        {
-          id: "sub-1",
-          formId,
-          data: { applicantName: "홍길동" },
-          createdAt: new Date("2026-01-02T00:00:00Z"),
-        },
-      ];
-      mockFindSubmissionsByFormId.mockResolvedValueOnce(mockSubmissions);
-
-      const request = new NextRequest(
-        "http://localhost:3000/api/v1/forms/purchase-list/submissions"
-      );
-      const response = await GET(request, slugContext);
-
-      expect(response.status).toBe(200);
-      expect(mockFindFormByIdOrSlug).toHaveBeenCalledWith("purchase-list");
-      expect(mockFindSubmissionsByFormId).toHaveBeenCalledWith(formId);
-    });
   });
 
   describe("POST /api/v1/forms/[id]/submissions (신규 응답 제출)", () => {
     it("존재하지 않는 폼 ID인 경우 404 Not Found를 반환해야 한다", async () => {
-      mockFindFormByIdOrSlug.mockResolvedValueOnce(undefined);
+      mockFindFormById.mockResolvedValueOnce(undefined);
 
       const request = new NextRequest(`http://localhost:3000/api/v1/forms/${formId}/submissions`, {
         method: "POST",
@@ -130,7 +100,7 @@ describe("Route Handler: /api/v1/forms/[id]/submissions", () => {
     });
 
     it("아직 발행되지 않은(publishedAt IS NULL) 폼인 경우 400 Bad Request를 반환해야 한다", async () => {
-      mockFindFormByIdOrSlug.mockResolvedValueOnce({
+      mockFindFormById.mockResolvedValueOnce({
         ...mockForm,
         publishedAt: null,
       });
@@ -148,7 +118,7 @@ describe("Route Handler: /api/v1/forms/[id]/submissions", () => {
     });
 
     it("필수 입력 필드가 누락된 경우 400 Bad Request와 세부 필드 에러를 반환해야 한다", async () => {
-      mockFindFormByIdOrSlug.mockResolvedValueOnce(mockForm);
+      mockFindFormById.mockResolvedValueOnce(mockForm);
 
       const request = new NextRequest(`http://localhost:3000/api/v1/forms/${formId}/submissions`, {
         method: "POST",

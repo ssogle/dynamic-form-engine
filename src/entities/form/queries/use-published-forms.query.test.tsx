@@ -25,7 +25,6 @@ describe("usePublishedFormsQuery (발행된 폼 목록 조회 훅)", () => {
   const mockPublishedForms = [
     {
       id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-      slug: "published-form-1",
       title: "발행된 설문지 1",
       description: "응답 가능한 설문지입니다.",
       schemaDefinition: { fields: [] },
@@ -87,6 +86,6 @@ describe("usePublishedFormsQuery (발행된 폼 목록 조회 훅)", () => {
 
     expect(result.current.data).toEqual(mockPublishedForms);
     expect(result.current.data).toHaveLength(1);
-    expect(result.current.data?.[0]?.slug).toBe("published-form-1");
+    expect(result.current.data?.[0]?.id).toBe("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11");
   });
 });

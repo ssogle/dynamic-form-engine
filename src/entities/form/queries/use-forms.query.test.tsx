@@ -25,7 +25,6 @@ describe("useFormsQuery (엔티티 공용 폼 목록 조회 훅)", () => {
   const mockForms = [
     {
       id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-      slug: "sample-form-1",
       title: "샘플 폼 1",
       description: "설명 1",
       schemaDefinition: { fields: [] },
@@ -78,6 +77,6 @@ describe("useFormsQuery (엔티티 공용 폼 목록 조회 훅)", () => {
 
     expect(result.current.data).toEqual(mockForms);
     expect(result.current.data).toHaveLength(1);
-    expect(result.current.data?.[0]?.slug).toBe("sample-form-1");
+    expect(result.current.data?.[0]?.id).toBe("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11");
   });
 });

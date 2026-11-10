@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { findFormByIdOrSlug } from "@/entities/form/server";
+import { findFormById } from "@/entities/form/server";
 import { extractActiveFields, validateSubmissionData } from "@/entities/form";
 import {
   findSubmissionById,
@@ -27,9 +27,9 @@ interface RouteContext {
 export const GET = withErrorHandler(async (_req: NextRequest, context: RouteContext) => {
   const { id, submissionId } = await context.params;
 
-  // 1. 대상 폼 및 단건 응답 조회 (id는 UUID 또는 slug 모두 수용)
+  // 1. 대상 폼 및 단건 응답 조회 (id는 UUID)
   const [form, submission] = await Promise.all([
-    findFormByIdOrSlug(id),
+    findFormById(id),
     findSubmissionById(submissionId),
   ]);
 
@@ -57,9 +57,9 @@ export const GET = withErrorHandler(async (_req: NextRequest, context: RouteCont
 export const PATCH = withErrorHandler(async (req: NextRequest, context: RouteContext) => {
   const { id, submissionId } = await context.params;
 
-  // 1. 대상 폼 및 기존 응답 존재 여부 확인 (id는 UUID 또는 slug 모두 수용)
+  // 1. 대상 폼 및 기존 응답 존재 여부 확인 (id는 UUID)
   const [form, existingSubmission] = await Promise.all([
-    findFormByIdOrSlug(id),
+    findFormById(id),
     findSubmissionById(submissionId),
   ]);
 
@@ -115,9 +115,9 @@ export const PATCH = withErrorHandler(async (req: NextRequest, context: RouteCon
 export const DELETE = withErrorHandler(async (_req: NextRequest, context: RouteContext) => {
   const { id, submissionId } = await context.params;
 
-  // 1. 대상 폼 및 기존 응답 존재 및 폼 일치 검증 (id는 UUID 또는 slug 모두 수용)
+  // 1. 대상 폼 및 기존 응답 존재 및 폼 일치 검증 (id는 UUID)
   const [form, existingSubmission] = await Promise.all([
-    findFormByIdOrSlug(id),
+    findFormById(id),
     findSubmissionById(submissionId),
   ]);
 

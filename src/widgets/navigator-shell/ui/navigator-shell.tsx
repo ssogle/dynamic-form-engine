@@ -52,7 +52,7 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
   // 2. 컨슈머 전용 초안 스토어 훅 바인딩
   const applyDraftFields = useConsumerFormDraftStore((state) => state.applyDraftFields);
   const triggerSubmit = useConsumerFormDraftStore((state) => state.triggerSubmit);
-  const currentDraftSlug = useConsumerFormDraftStore((state) => state.currentSlug);
+  const currentDraftFormId = useConsumerFormDraftStore((state) => state.currentFormId);
   const currentDraftValues = useConsumerFormDraftStore((state) => state.draftValues);
 
   // 3. UI 로컬 상태
@@ -89,29 +89,34 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
           break;
 
         case "CREATE_FORM":
-          if (action.slug) {
-            router.push(`/builder/forms/${action.slug}`);
+          if (action.formId) {
+            router.push(`/builder/forms/${action.formId}`);
           }
           break;
 
         case "DELETE_FORMS":
+          queryClient.invalidateQueries({ queryKey: formKeys.all });
           router.push("/builder/forms");
           break;
 
+        case "PUBLISH_FORM":
+          queryClient.invalidateQueries({ queryKey: formKeys.all });
+          break;
+
         case "FILL_FIELDS": {
-          const formSlugMatch = pathname.match(/^\/consumer\/forms\/([^/]+)/);
-          const targetSlug = action.formSlug || formSlugMatch?.[1] || currentDraftSlug || "";
-          if (targetSlug && action.fields) {
-            applyDraftFields(targetSlug, action.fields);
+          const formIdMatch = pathname.match(/^\/consumer\/forms\/([^/]+)/);
+          const targetFormId = action.formId || formIdMatch?.[1] || currentDraftFormId || "";
+          if (targetFormId && action.fields) {
+            applyDraftFields(targetFormId, action.fields);
           }
           break;
         }
 
         case "SUBMIT_FORM": {
-          const formSlugMatch = pathname.match(/^\/consumer\/forms\/([^/]+)/);
-          const targetSlug = action.formSlug || formSlugMatch?.[1] || currentDraftSlug || "";
-          if (targetSlug) {
-            triggerSubmit(targetSlug);
+          const formIdMatch = pathname.match(/^\/consumer\/forms\/([^/]+)/);
+          const targetFormId = action.formId || formIdMatch?.[1] || currentDraftFormId || "";
+          if (targetFormId) {
+            triggerSubmit(targetFormId);
           }
           break;
         }
@@ -124,7 +129,7 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
           break;
       }
     },
-    [pathname, router, queryClient, currentDraftSlug, applyDraftFields, triggerSubmit]
+    [pathname, router, queryClient, currentDraftFormId, applyDraftFields, triggerSubmit]
   );
 
   /**
@@ -139,12 +144,12 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
       // 1. 개별 폼 상세 화면일 때
       const match = pathname.match(/\/builder\/forms\/([^/]+)/);
       if (match && match[1]) {
-        const slug = match[1];
-        const cachedForm = queryClient.getQueryData<Form>(formKeys.detail(slug));
+        const formId = match[1];
+        const cachedForm = queryClient.getQueryData<Form>(formKeys.detail(formId));
         if (cachedForm) {
           const fields = extractActiveFields(cachedForm);
           context.currentForm = {
-            slug: cachedForm.slug,
+            id: cachedForm.id,
             title: cachedForm.title,
             description: cachedForm.description ?? undefined,
             fields,
@@ -158,7 +163,6 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
         context.visibleForms = cachedForms.slice(0, 10).map((f) => ({
           id: f.id,
           title: f.title,
-          slug: f.slug,
           summary: f.description ?? undefined,
           createdAt: f.createdAt ? new Date(f.createdAt).toISOString() : undefined,
         }));
@@ -166,19 +170,16 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
     } else if (mode === "consumer") {
       // 1. 현재 열려있는 폼 파악
       const match = pathname.match(/^\/consumer\/forms\/([^/]+)/);
-      const activeSlug = match ? match[1] : (currentDraftSlug ?? undefined);
-      let activeFormId: string | undefined;
+      const activeFormId = match ? match[1] : (currentDraftFormId ?? undefined);
 
-      if (activeSlug) {
-        context.currentFormSlug = activeSlug;
-        const cachedForm = queryClient.getQueryData<Form>(formKeys.detail(activeSlug));
+      if (activeFormId) {
+        context.currentFormId = activeFormId;
+        const cachedForm = queryClient.getQueryData<Form>(formKeys.detail(activeFormId));
         if (cachedForm) {
-          activeFormId = cachedForm.id;
           context.currentFormTitle = cachedForm.title;
           const activeFields = extractActiveFields(cachedForm);
           context.availableFields = activeFields.map((f) => ({
             id: f.id,
-            name: f.name,
             label: f.label,
             type: f.type,
             required: f.required ?? false,
@@ -193,11 +194,6 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
       if (activeFormId) {
         cachedSubmissions = queryClient.getQueryData<FormSubmission[]>(
           formSubmissionsKeys.byForm(activeFormId)
-        );
-      }
-      if (!cachedSubmissions && activeSlug) {
-        cachedSubmissions = queryClient.getQueryData<FormSubmission[]>(
-          formSubmissionsKeys.byForm(activeSlug)
         );
       }
       if (!cachedSubmissions) {
@@ -232,7 +228,7 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
     }
 
     return context;
-  }, [mode, pathname, queryClient, currentDraftSlug, currentDraftValues]);
+  }, [mode, pathname, queryClient, currentDraftFormId, currentDraftValues]);
 
   /**
    * 사용자 명령 실행 핸들러

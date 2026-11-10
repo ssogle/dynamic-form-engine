@@ -14,21 +14,17 @@ export type CoreFieldType = z.infer<typeof coreFieldTypeSchema>;
 /**
  * 개별 폼 필드 정의 Zod 스키마
  *
- * AI Navigator가 생성하거나 사용자가 프리뷰하는 폼의 개별 질문/입력 항목의 최소 규격입니다.
+ * AI Navigator가 생성하거나 사용자가 프리뷰/응답하는 폼의 개별 질문/입력 항목의 최소 규격입니다.
+ * 필드 식별과 데이터 저장은 오직 불변 id 하나로만 수행되며, 별도의 name 변수명을 요구하지 않습니다.
  */
 export const coreFormFieldSchema = z.object({
   /**
-   * 필드 고유 식별자 (예: "field_project_name")
+   * 필드 고유 식별자이자 데이터 저장 키 (예: "f_project_title")
    */
   id: z.string().min(1, "필드 ID는 비어있을 수 없습니다."),
 
   /**
-   * 데이터 저장 및 바인딩 키값 (예: "projectName")
-   */
-  name: z.string().min(1, "필드 식별 키값은 필수입니다."),
-
-  /**
-   * 화면에 표시되는 필드 대표 라벨 (예: "프로젝트 명칭")
+   * 화면에 표시되는 필드 대표 라벨이자 엑셀 헤더 매핑 문구 (예: "프로젝트 명칭")
    */
   label: z.string().min(1, "필드 라벨을 입력해 주세요."),
 
@@ -70,12 +66,13 @@ export type CoreFormField = z.infer<typeof coreFormFieldSchema>;
  * 활성 폼(ActiveForm) 프리뷰 데이터 규격
  *
  * 프리뷰 캔버스에 실시간 렌더링되고 네비게이터가 조작하는 단일 폼의 전체 스냅샷 구조입니다.
+ * 슬러그를 배제하고 불변 id와 표시 title을 기준으로 동작합니다.
  */
 export const activeFormSchema = z.object({
-  slug: z
-    .string()
-    .min(2, "폼 슬러그는 최소 2글자 이상이어야 합니다.")
-    .regex(/^[a-z0-9-]+$/, "슬러그는 영문 소문자, 숫자, 하이픈만 허용됩니다."),
+  /**
+   * 폼 고유 식별자 (생성 완료 후 발급되는 불변 UUID)
+   */
+  id: z.uuid().optional(),
   title: z.string().min(1, "폼 제목을 입력해 주세요."),
   description: z.string().optional(),
   fields: z.array(coreFormFieldSchema).default([]),

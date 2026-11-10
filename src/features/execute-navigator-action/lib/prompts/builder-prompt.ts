@@ -11,15 +11,15 @@ export const BUILDER_NAVIGATOR_SYSTEM_PROMPT = `
 1. 상황 A: 현재 화면에 있는 대상 조작 (화면 우선 / In-View Mode)
    - 조건: 사용자가 현재 화면에 눈으로 보이는 대상(목록 테이블의 N번째 폼, 특정 폼 제목, 현재 열린 폼의 필드 등)을 지칭할 때
    - 행동: 불필요하게 폼 검색 도구를 호출하지 말고, 화면 맥락(visibleForms, currentForm)을 참조하여 즉시 제어하세요.
-     * "두 번째 폼 삭제해줘" (목록 화면) -> visibleForms의 2번 항목 slug를 찾아 'deleteForms' 즉시 호출
-     * "두 번째 폼 열어줘" (목록 화면) -> visibleForms의 2번 항목 slug를 찾아 'navigate' 호출 ('/builder/forms/[slug]')
+     * "두 번째 폼 삭제해줘" (목록 화면) -> visibleForms의 2번 항목 id를 찾아 'deleteForms({ formIds: [id] })' 즉시 호출
+     * "두 번째 폼 열어줘" (목록 화면) -> visibleForms의 2번 항목 id를 찾아 'navigate' 호출 ('/builder/forms/[id]')
      * 현재 열려있는 폼의 필드 추가/수정/삭제 -> 'updateSchema' 도구 호출
 
 2. 상황 B: 현재 화면에 없는 대상 조작 (원격 탐색 / Out-of-View Mode)
    - 조건: 사용자가 현재 열려있지 않은 다른 폼에 대한 작업이나 전체 폼 탐색을 요청할 때
    - 행동: 성급하게 화면을 이동하지 말고, 먼저 조회 도구를 호출하여 팩트(Fact)를 파악한 뒤 액션을 내리세요.
      * "~관련 폼 찾아줘", "등록된 폼 뭐 있어?" -> 'searchForms({ mode: "builder", keyword: "..." })' 호출 후 정리 답변
-     * 다른 특정 폼의 구조 확인 -> 'getFormDetails({ formSlug: "..." })' 호출
+     * 다른 특정 폼의 구조 확인 -> 'getFormDetails({ formId: "..." })' 호출
 
 3. 상황 C: 신규 폼 생성 의도 ("~폼 만들어줘", "~설문지 생성해줘")
    - 'createForm' 도구를 호출하여 DB에 생성하고 캔버스로 진입하세요.
@@ -48,8 +48,7 @@ export function formatBuilderContextPrompt(
   if (currentContext?.visibleForms && currentContext.visibleForms.length > 0) {
     visibleFormsSummary = currentContext.visibleForms
       .map(
-        (f, idx) =>
-          `  ${idx + 1}. [슬러그: ${f.slug ?? f.id}] ${f.title}${f.summary ? ` (${f.summary})` : ""}`
+        (f, idx) => `  ${idx + 1}. [ID: ${f.id}] ${f.title}${f.summary ? ` (${f.summary})` : ""}`
       )
       .join("\n");
   }

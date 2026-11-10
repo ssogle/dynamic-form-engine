@@ -9,7 +9,7 @@ import { extractFieldsFromForm } from "./builder-tools";
 export interface QueryToolsDependencies {
   findActiveForms: () => Promise<Form[]>;
   findPublishedForms: () => Promise<Form[]>;
-  findFormBySlug: (slug: string) => Promise<Form | undefined>;
+  findFormById: (id: string) => Promise<Form | undefined>;
 }
 
 // 1. searchForms 입력 스키마
@@ -17,7 +17,7 @@ export const searchFormsInputSchema = z.object({
   keyword: z
     .string()
     .optional()
-    .describe("검색할 폼 제목, 슬러그, 설명 키워드 (생략 시 전체 폼 목록 반환)"),
+    .describe("검색할 폼 제목이나 설명 키워드 (생략 시 전체 폼 목록 반환)"),
   mode: z
     .enum(["builder", "consumer"])
     .optional()
@@ -27,10 +27,9 @@ export const searchFormsInputSchema = z.object({
 
 // 2. getFormDetails 입력 스키마
 export const getFormDetailsInputSchema = z.object({
-  formSlug: z
-    .string()
-    .min(1, "조회할 폼 슬러그는 필수입니다.")
-    .describe("필드 스펙을 조회할 대상 폼의 슬러그 (예: 'project', 'developer-hire')"),
+  formId: z
+    .uuid("조회할 폼 ID(UUID)는 필수입니다.")
+    .describe("필드 스펙을 조회할 대상 폼의 고유 ID (UUID)"),
 });
 
 /**
@@ -48,7 +47,7 @@ export function createQueryTools(deps: QueryToolsDependencies) {
    */
   const searchFormsTool = tool({
     description:
-      "등록된 폼 목록을 키워드로 검색하여 폼 제목, 슬러그, 기본 설명 등의 가벼운 식별 메타데이터를 반환합니다. 무거운 필드 스키마는 포함하지 않습니다.",
+      "등록된 폼 목록을 키워드로 검색하여 폼 ID, 제목, 기본 설명 등의 가벼운 식별 메타데이터를 반환합니다. 무거운 필드 스키마는 포함하지 않습니다.",
     inputSchema: searchFormsInputSchema,
     execute: async ({ keyword, mode = "consumer" }: z.infer<typeof searchFormsInputSchema>) => {
       const forms =
@@ -58,16 +57,14 @@ export function createQueryTools(deps: QueryToolsDependencies) {
       const filtered = trimmed
         ? forms.filter((f) => {
             const inTitle = f.title.toLowerCase().includes(trimmed);
-            const inSlug = f.slug.toLowerCase().includes(trimmed);
             const inDesc = f.description ? f.description.toLowerCase().includes(trimmed) : false;
-            return inTitle || inSlug || inDesc;
+            return inTitle || inDesc;
           })
         : forms;
 
       // 가벼운 식별 메타데이터만 선별하여 일치하는 폼 전체 반환 (무거운 스키마 제외)
       return filtered.map((f) => ({
         id: f.id,
-        slug: f.slug,
         title: f.title,
         description: f.description ?? undefined,
         isPublished: Boolean(f.publishedAt),
@@ -80,14 +77,14 @@ export function createQueryTools(deps: QueryToolsDependencies) {
    */
   const getFormDetailsTool = tool({
     description:
-      "특정 폼의 전체 필드 스펙(라벨, name, 타입, 필수 여부, 선택지)을 정밀 조회합니다. 필드 값을 매핑하거나 스키마 구조를 확인할 때 호출합니다.",
+      "특정 폼의 전체 필드 스펙(라벨, 타입, 필수 여부, 선택지)을 정밀 조회합니다. 필드 값을 매핑하거나 스키마 구조를 확인할 때 호출합니다.",
     inputSchema: getFormDetailsInputSchema,
-    execute: async ({ formSlug }: z.infer<typeof getFormDetailsInputSchema>) => {
-      const form = await deps.findFormBySlug(formSlug);
+    execute: async ({ formId }: z.infer<typeof getFormDetailsInputSchema>) => {
+      const form = await deps.findFormById(formId);
       if (!form) {
         return {
           found: false,
-          message: `'${formSlug}' 슬러그를 가진 폼을 찾을 수 없습니다.`,
+          message: `'${formId}' ID를 가진 폼을 찾을 수 없습니다.`,
         };
       }
 
@@ -96,13 +93,11 @@ export function createQueryTools(deps: QueryToolsDependencies) {
       return {
         found: true,
         id: form.id,
-        slug: form.slug,
         title: form.title,
         description: form.description ?? undefined,
         isPublished: Boolean(form.publishedAt),
         fields: activeFields.map((f) => ({
           id: f.id,
-          name: f.name,
           label: f.label,
           type: f.type,
           required: Boolean(f.required),

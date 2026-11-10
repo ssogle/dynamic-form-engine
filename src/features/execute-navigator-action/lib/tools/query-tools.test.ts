@@ -5,14 +5,13 @@ import { createQueryTools } from "./query-tools";
 describe("createQueryTools (features/execute-navigator-action/lib/tools)", () => {
   const mockForms: Form[] = [
     {
-      id: "form-1",
-      slug: "daily-report",
+      id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
       title: "일일 업무 보고서",
       description: "매일 업무 내용을 등록합니다.",
       schemaDefinition: {
         fields: [
-          { id: "f1", name: "author", label: "작성자", type: "text", required: true },
-          { id: "f2", name: "tasks", label: "업무 내용", type: "textarea", required: true },
+          { id: "f1", label: "작성자", type: "text", required: true },
+          { id: "f2", label: "업무 내용", type: "textarea", required: true },
         ],
       },
       publishedAt: new Date("2026-11-01T00:00:00Z"),
@@ -21,14 +20,13 @@ describe("createQueryTools (features/execute-navigator-action/lib/tools)", () =>
       deletedAt: null,
     },
     {
-      id: "form-2",
-      slug: "project-hire",
+      id: "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22",
       title: "신규 프로젝트 채용",
       description: "프로젝트 투입 인원 모집",
       schemaDefinition: {
         fields: [
-          { id: "f3", name: "applicant", label: "지원자명", type: "text", required: true },
-          { id: "f4", name: "years", label: "경력", type: "number", required: false },
+          { id: "f3", label: "지원자명", type: "text", required: true },
+          { id: "f4", label: "경력", type: "number", required: false },
         ],
       },
       publishedAt: null, // 미발행
@@ -41,8 +39,8 @@ describe("createQueryTools (features/execute-navigator-action/lib/tools)", () =>
   const dependencies = {
     findActiveForms: vi.fn().mockResolvedValue(mockForms),
     findPublishedForms: vi.fn().mockResolvedValue([mockForms[0]]),
-    findFormBySlug: vi.fn().mockImplementation(async (slug: string) => {
-      return mockForms.find((f) => f.slug === slug);
+    findFormById: vi.fn().mockImplementation(async (id: string) => {
+      return mockForms.find((f) => f.id === id);
     }),
   };
 
@@ -61,7 +59,6 @@ describe("createQueryTools (features/execute-navigator-action/lib/tools)", () =>
       mockExecutionOptions
     )) as Array<{
       id: string;
-      slug: string;
       title: string;
       description?: string;
       isPublished: boolean;
@@ -69,8 +66,7 @@ describe("createQueryTools (features/execute-navigator-action/lib/tools)", () =>
 
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({
-      id: "form-1",
-      slug: "daily-report",
+      id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
       title: "일일 업무 보고서",
       description: "매일 업무 내용을 등록합니다.",
       isPublished: true,
@@ -86,50 +82,51 @@ describe("createQueryTools (features/execute-navigator-action/lib/tools)", () =>
       mockExecutionOptions
     )) as Array<{
       id: string;
-      slug: string;
       title: string;
       description?: string;
       isPublished: boolean;
     }>;
 
     expect(result).toHaveLength(2);
-    expect(result.map((r) => r.slug)).toEqual(["daily-report", "project-hire"]);
+    expect(result.map((r) => r.id)).toEqual([
+      "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+      "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22",
+    ]);
   });
 
-  it("searchForms: 키워드 전달 시 제목/슬러그/설명에서 대소문자 무시하고 필터링해야 한다", async () => {
+  it("searchForms: 키워드 전달 시 제목/설명에서 대소문자 무시하고 필터링해야 한다", async () => {
     const tools = createQueryTools(dependencies);
     const result = (await tools.searchForms.execute!(
       { keyword: "채용", mode: "builder" },
       mockExecutionOptions
     )) as Array<{
       id: string;
-      slug: string;
       title: string;
       description?: string;
       isPublished: boolean;
     }>;
 
     expect(result).toHaveLength(1);
-    expect(result[0]?.slug).toBe("project-hire");
+    expect(result[0]?.id).toBe("b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22");
   });
 
-  it("getFormDetails: 존재하는 슬러그 조회 시 세부 필드 규격을 반환해야 한다", async () => {
+  it("getFormDetails: 존재하는 ID 조회 시 세부 필드 규격을 반환해야 한다", async () => {
     const tools = createQueryTools(dependencies);
     const result = (await tools.getFormDetails.execute!(
-      { formSlug: "daily-report" },
+      { formId: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11" },
       mockExecutionOptions
     )) as {
       found: boolean;
-      slug?: string;
-      fields?: Array<{ id: string; name: string; label: string; type: string; required: boolean }>;
+      id?: string;
+      title?: string;
+      fields?: Array<{ id: string; label: string; type: string; required: boolean }>;
     };
 
     expect(result.found).toBe(true);
-    expect(result.slug).toBe("daily-report");
+    expect(result.id).toBe("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11");
     expect(result.fields).toHaveLength(2);
     expect(result.fields?.[0]).toEqual({
       id: "f1",
-      name: "author",
       label: "작성자",
       type: "text",
       required: true,
@@ -137,14 +134,14 @@ describe("createQueryTools (features/execute-navigator-action/lib/tools)", () =>
     });
   });
 
-  it("getFormDetails: 존재하지 않는 슬러그 조회 시 found: false를 반환해야 한다", async () => {
+  it("getFormDetails: 존재하지 않는 ID 조회 시 found: false를 반환해야 한다", async () => {
     const tools = createQueryTools(dependencies);
     const result = (await tools.getFormDetails.execute!(
-      { formSlug: "unknown-slug" },
+      { formId: "00000000-0000-0000-0000-000000000000" },
       mockExecutionOptions
     )) as { found: boolean; message?: string };
 
     expect(result.found).toBe(false);
-    expect(result.message).toContain("unknown-slug");
+    expect(result.message).toContain("00000000-0000-0000-0000-000000000000");
   });
 });

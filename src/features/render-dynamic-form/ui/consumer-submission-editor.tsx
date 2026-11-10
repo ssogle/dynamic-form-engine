@@ -24,9 +24,9 @@ import { DynamicFormRenderer } from "./dynamic-form-renderer";
 
 export interface ConsumerSubmissionEditorProps {
   /**
-   * 폼 식별자 (슬러그)
+   * 폼 식별자 (UUID)
    */
-  slug: string;
+  formId: string;
   /**
    * 수정 대상 제출 응답 ID (UUID)
    */
@@ -39,7 +39,7 @@ export interface ConsumerSubmissionEditorProps {
  * 모달 팝업 대신 전체 화면 워크스페이스에서 기존 제출 데이터를 시각적으로 확인하고,
  * AI Navigator 실시간 필드 동기화 및 동적 유효성 검사를 거쳐 데이터를 수정/저장하는 독립적 기능 컴포넌트입니다.
  */
-export function ConsumerSubmissionEditor({ slug, submissionId }: ConsumerSubmissionEditorProps) {
+export function ConsumerSubmissionEditor({ formId, submissionId }: ConsumerSubmissionEditorProps) {
   const [isSuccessUpdated, setIsSuccessUpdated] = React.useState(false);
 
   // 1. 폼 스키마 및 기존 단건 제출 데이터 비동기 조회
@@ -48,32 +48,32 @@ export function ConsumerSubmissionEditor({ slug, submissionId }: ConsumerSubmiss
     isLoading: isFormLoading,
     isError: isFormError,
     error: formError,
-  } = useFormDetailQuery(slug);
+  } = useFormDetailQuery(formId);
 
   const {
     data: submission,
     isLoading: isSubmissionLoading,
     isError: isSubmissionError,
     error: submissionError,
-  } = useFormSubmissionDetailQuery(slug, submissionId);
+  } = useFormSubmissionDetailQuery(formId, submissionId);
 
   // 2. 응답 데이터 갱신 뮤테이션 훅
   const { mutateAsync: updateSubmission, isPending: isUpdating } = useUpdateSubmissionMutation(
-    form?.id ?? slug
+    form?.id ?? formId
   );
 
   // 3. AI Navigator 초안 스토어 및 실시간 필드 동기화 바인딩
-  const currentDraftSlug = useConsumerFormDraftStore((state) => state.currentSlug);
+  const currentDraftFormId = useConsumerFormDraftStore((state) => state.currentFormId);
   const draftValues = useConsumerFormDraftStore((state) => state.draftValues);
   const submitTriggerCount = useConsumerFormDraftStore((state) => state.submitTriggerCount);
-  const setCurrentSlug = useConsumerFormDraftStore((state) => state.setCurrentSlug);
+  const setCurrentFormId = useConsumerFormDraftStore((state) => state.setCurrentFormId);
 
   React.useEffect(() => {
-    setCurrentSlug(slug);
-  }, [slug, setCurrentSlug]);
+    setCurrentFormId(formId);
+  }, [formId, setCurrentFormId]);
 
-  const activeDraftValues = currentDraftSlug === slug ? draftValues : undefined;
-  const activeSubmitTriggerCount = currentDraftSlug === slug ? submitTriggerCount : undefined;
+  const activeDraftValues = currentDraftFormId === formId ? draftValues : undefined;
+  const activeSubmitTriggerCount = currentDraftFormId === formId ? submitTriggerCount : undefined;
 
   // 기존 제출된 응답 데이터와 AI Navigator가 수정한 임시 필드값을 안전하게 병합
   const submissionData = submission?.data;
@@ -112,8 +112,8 @@ export function ConsumerSubmissionEditor({ slug, submissionId }: ConsumerSubmiss
     }
   };
 
-  // 1. 로딩 스켈레톤
-  if (isLoading) {
+  // 1. 서버 SSR 및 클라이언트 초기 하이드레이션, 데이터 로딩 단계 스켈레톤
+  if (isLoading || ((!form || !submission) && !isError)) {
     return (
       <div className="mx-auto w-full max-w-3xl space-y-6">
         <div className="space-y-2">
@@ -136,7 +136,7 @@ export function ConsumerSubmissionEditor({ slug, submissionId }: ConsumerSubmiss
     );
   }
 
-  // 2. 조회 실패 에러 상태
+  // 2. 조회 실패 에러 상태 (에러 확정 또는 로딩 완료 후에도 데이터 부재)
   if (isError || !form || !submission) {
     return (
       <div className="mx-auto w-full max-w-3xl">
@@ -151,7 +151,7 @@ export function ConsumerSubmissionEditor({ slug, submissionId }: ConsumerSubmiss
           </CardHeader>
           <CardFooter className="gap-2">
             <Button asChild variant="outline" size="sm">
-              <Link href={`/consumer/forms/${slug}/submissions`}>제출 목록으로 돌아가기</Link>
+              <Link href={`/consumer/forms/${formId}/submissions`}>제출 목록으로 돌아가기</Link>
             </Button>
             <Button asChild variant="ghost" size="sm">
               <Link href="/consumer/forms">폼 전체 목록</Link>
@@ -180,7 +180,9 @@ export function ConsumerSubmissionEditor({ slug, submissionId }: ConsumerSubmiss
           </CardHeader>
           <CardFooter className="flex justify-center gap-3 pt-4">
             <Button asChild size="sm">
-              <Link href={`/consumer/forms/${slug}/submissions`}>제출 내역 목록으로 돌아가기</Link>
+              <Link href={`/consumer/forms/${formId}/submissions`}>
+                제출 내역 목록으로 돌아가기
+              </Link>
             </Button>
             <Button variant="outline" size="sm" onClick={() => setIsSuccessUpdated(false)}>
               계속 수정하기
@@ -202,7 +204,9 @@ export function ConsumerSubmissionEditor({ slug, submissionId }: ConsumerSubmiss
             size="sm"
             className="text-muted-foreground hover:text-foreground h-7 px-2 text-xs"
           >
-            <Link href={`/consumer/forms/${slug}/submissions`}>&larr; 제출 목록으로 돌아가기</Link>
+            <Link href={`/consumer/forms/${formId}/submissions`}>
+              &larr; 제출 목록으로 돌아가기
+            </Link>
           </Button>
           <span className="text-muted-foreground text-xs">/</span>
           <span className="text-muted-foreground max-w-48 truncate font-mono text-xs">

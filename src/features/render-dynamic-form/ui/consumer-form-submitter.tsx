@@ -18,9 +18,9 @@ import { DynamicFormRenderer } from "./dynamic-form-renderer";
 
 export interface ConsumerFormSubmitterProps {
   /**
-   * 대상 폼 식별자 (슬러그)
+   * 대상 폼 식별자 (UUID)
    */
-  slug: string;
+  formId: string;
 }
 
 /**
@@ -29,25 +29,25 @@ export interface ConsumerFormSubmitterProps {
  * 공식 발행된 활성 폼을 불러와 엔드유저가 실시간 유효성 검증과 함께
  * 답변을 작성하고 서버로 일괄 제출(Batch Submission)하는 독립적 기능 컴포넌트입니다.
  */
-export function ConsumerFormSubmitter({ slug }: ConsumerFormSubmitterProps) {
-  const { data: form, isLoading, isError, error } = useFormDetailQuery(slug);
+export function ConsumerFormSubmitter({ formId }: ConsumerFormSubmitterProps) {
+  const { data: form, isLoading, isError, error } = useFormDetailQuery(formId);
   const [isSuccessSubmitted, setIsSuccessSubmitted] = React.useState(false);
 
   const { mutateAsync: submitResponse, isPending: isSubmitting } = useSubmitFormMutation(
-    form?.id ?? slug
+    form?.id ?? formId
   );
 
-  const currentDraftSlug = useConsumerFormDraftStore((state) => state.currentSlug);
+  const currentDraftFormId = useConsumerFormDraftStore((state) => state.currentFormId);
   const draftValues = useConsumerFormDraftStore((state) => state.draftValues);
   const submitTriggerCount = useConsumerFormDraftStore((state) => state.submitTriggerCount);
-  const setCurrentSlug = useConsumerFormDraftStore((state) => state.setCurrentSlug);
+  const setCurrentFormId = useConsumerFormDraftStore((state) => state.setCurrentFormId);
 
   React.useEffect(() => {
-    setCurrentSlug(slug);
-  }, [slug, setCurrentSlug]);
+    setCurrentFormId(formId);
+  }, [formId, setCurrentFormId]);
 
-  const activeDraftValues = currentDraftSlug === slug ? draftValues : undefined;
-  const activeSubmitTriggerCount = currentDraftSlug === slug ? submitTriggerCount : undefined;
+  const activeDraftValues = currentDraftFormId === formId ? draftValues : undefined;
+  const activeSubmitTriggerCount = currentDraftFormId === formId ? submitTriggerCount : undefined;
 
   /**
    * 폼 유효성 검사를 통과한 정제 데이터를 서버로 제출
@@ -61,8 +61,8 @@ export function ConsumerFormSubmitter({ slug }: ConsumerFormSubmitterProps) {
     }
   };
 
-  // 1. 로딩 스켈레톤
-  if (isLoading) {
+  // 1. 서버 SSR 및 클라이언트 초기 하이드레이션, 데이터 로딩 단계 스켈레톤
+  if (isLoading || (!form && !isError)) {
     return (
       <div className="mx-auto w-full max-w-3xl space-y-6">
         <Card className="border-border/60 shadow-xs">
@@ -80,7 +80,7 @@ export function ConsumerFormSubmitter({ slug }: ConsumerFormSubmitterProps) {
     );
   }
 
-  // 2. 조회 에러 상태
+  // 2. 조회 에러 상태 (에러 확정 또는 로딩 완료 후에도 폼 부재)
   if (isError || !form) {
     return (
       <div className="mx-auto w-full max-w-3xl">
@@ -142,7 +142,7 @@ export function ConsumerFormSubmitter({ slug }: ConsumerFormSubmitterProps) {
               새로운 응답 작성하기
             </Button>
             <Button asChild size="sm">
-              <Link href={`/consumer/forms/${slug}/submissions`}>제출된 내역 확인하기</Link>
+              <Link href={`/consumer/forms/${formId}/submissions`}>제출된 내역 확인하기</Link>
             </Button>
           </CardFooter>
         </Card>

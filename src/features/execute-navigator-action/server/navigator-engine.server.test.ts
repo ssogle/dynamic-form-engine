@@ -7,7 +7,6 @@ vi.mock("@/entities/form/server", () => ({
   findActiveForms: vi.fn().mockResolvedValue([
     {
       id: "form-uuid-1",
-      slug: "survey-1",
       title: "고객 만족도 조사",
       schemaDefinition: { fields: [] },
       publishedAt: null,
@@ -16,18 +15,18 @@ vi.mock("@/entities/form/server", () => ({
   findPublishedForms: vi.fn().mockResolvedValue([
     {
       id: "form-uuid-2",
-      slug: "developer-hire",
       title: "개발자 채용 지원서",
       schemaDefinition: {
-        fields: [{ id: "f1", name: "applicantName", label: "이름", type: "text" }],
+        fields: [{ id: "f1", label: "이름", type: "text" }],
       },
-      publishedAt: "2026-01-01T00:00:00Z",
+      publishedAt: new Date("2026-01-01T00:00:00Z"),
     },
   ]),
-  findFormBySlug: vi.fn(),
+  findFormById: vi.fn(),
   insertForm: vi.fn(),
   updateFormById: vi.fn(),
-  softDeleteFormsBySlugs: vi.fn(),
+  publishFormById: vi.fn(),
+  softDeleteFormsByIds: vi.fn(),
 }));
 
 vi.mock("@/entities/form-submission/server", () => ({
@@ -125,17 +124,17 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
         {
           toolName: "fillFields",
           input: {
-            formSlug: "developer-hire",
-            fields: { applicantName: "홍길동" },
+            formId: "developer-hire",
+            fields: { f1: "홍길동" },
             message: "지원자 이름을 입력했습니다.",
           },
           output: {
             success: true,
-            formSlug: "developer-hire",
+            formId: "developer-hire",
             clientAction: {
               type: "FILL_FIELDS",
-              formSlug: "developer-hire",
-              fields: { applicantName: "홍길동" },
+              formId: "developer-hire",
+              fields: { f1: "홍길동" },
               message: "지원자 이름을 입력했습니다.",
             },
           },
@@ -147,13 +146,13 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
       mode: "consumer",
       prompt: "내 이름은 홍길동이야",
       currentContext: {
-        currentFormSlug: "developer-hire",
+        currentFormId: "developer-hire",
       },
     });
 
     expect(result.action?.type).toBe("FILL_FIELDS");
     if (result.action?.type === "FILL_FIELDS") {
-      expect(result.action.fields).toEqual({ applicantName: "홍길동" });
+      expect(result.action.fields).toEqual({ f1: "홍길동" });
     }
   });
 
@@ -164,15 +163,15 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
         {
           toolName: "submitForm",
           input: {
-            formSlug: "developer-hire",
+            formId: "developer-hire",
             confirmationMessage: "폼을 제출합니다.",
           },
           output: {
             success: true,
-            formSlug: "developer-hire",
+            formId: "developer-hire",
             clientAction: {
               type: "SUBMIT_FORM",
-              formSlug: "developer-hire",
+              formId: "developer-hire",
               message: "폼을 제출합니다.",
             },
           },
@@ -184,7 +183,7 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
       mode: "consumer",
       prompt: "제출해줘",
       currentContext: {
-        currentFormSlug: "developer-hire",
+        currentFormId: "developer-hire",
       },
     });
 
@@ -209,15 +208,15 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
         {
           toolName: "fillFields",
           input: {
-            formSlug: "project",
-            fields: { title: "새 프로젝트" },
+            formId: "project",
+            fields: { f1: "새 프로젝트" },
           },
           output: {
             success: true,
             clientAction: {
               type: "FILL_FIELDS",
-              formSlug: "project",
-              fields: { title: "새 프로젝트" },
+              formId: "project",
+              fields: { f1: "새 프로젝트" },
             },
           },
         },

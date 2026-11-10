@@ -11,8 +11,8 @@ const mockSubmissions: FormSubmission[] = [
     id: "sub-1",
     formId: "form-uuid-1",
     data: {
-      applicantName: "홍길동",
-      yearsOfExperience: 5,
+      f1: "홍길동",
+      f2: 5,
     },
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     updatedAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -22,7 +22,6 @@ const mockSubmissions: FormSubmission[] = [
 
 const mockForm: Form = {
   id: "form-uuid-1",
-  slug: "job-application",
   title: "개발자 채용 지원서",
   description: "멋진 개발팀에 합류하세요.",
   publishedAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -30,14 +29,12 @@ const mockForm: Form = {
     fields: [
       {
         id: "f1",
-        name: "applicantName",
         label: "지원자 이름",
         type: "text",
         required: true,
       },
       {
         id: "f2",
-        name: "yearsOfExperience",
         label: "경력 연수",
         type: "number",
         required: true,
@@ -129,7 +126,7 @@ describe("SubmissionListTable (features/manage-form-submissions/ui)", () => {
 
     const editLink = screen.getByRole("link", { name: "수정" });
     expect(editLink.getAttribute("href")).toBe(
-      "/consumer/forms/job-application/submissions/sub-1/edit"
+      `/consumer/forms/${mockForm.id}/submissions/sub-1/edit`
     );
   });
 });

@@ -3,10 +3,11 @@ import { generateText, stepCountIs } from "ai";
 import {
   findActiveForms,
   findPublishedForms,
-  findFormBySlug,
+  findFormById,
   insertForm,
   updateFormById,
-  softDeleteFormsBySlugs,
+  publishFormById,
+  softDeleteFormsByIds,
 } from "@/entities/form/server";
 import { softDeleteSubmissionsByIds } from "@/entities/form-submission/server";
 import type { Form } from "@/entities/form";
@@ -49,7 +50,7 @@ export async function runNavigatorEngine(
   const queryTools = createQueryTools({
     findActiveForms,
     findPublishedForms,
-    findFormBySlug,
+    findFormById,
   });
 
   if (mode === "consumer") {
@@ -110,10 +111,11 @@ export async function runNavigatorEngine(
   // ==========================================
   const builderTools = {
     ...createBuilderTools({
-      findFormBySlug,
+      findFormById,
       insertForm,
       updateFormById,
-      softDeleteFormsBySlugs,
+      publishFormById,
+      softDeleteFormsByIds,
     }),
     ...queryTools,
   };

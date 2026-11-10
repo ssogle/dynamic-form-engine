@@ -4,7 +4,12 @@ import * as React from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { CoreFormField } from "@/entities/form";
-import { useFormDetailQuery, extractActiveFields, buildDynamicFormSchema } from "@/entities/form";
+import {
+  useFormDetailQuery,
+  usePublishFormMutation,
+  extractActiveFields,
+  buildDynamicFormSchema,
+} from "@/entities/form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -20,9 +25,9 @@ function buildDefaultValues(fields: CoreFormField[]): Record<string, unknown> {
   const defaults: Record<string, unknown> = {};
   for (const field of fields) {
     if (field.type === "number") {
-      defaults[field.name] = undefined;
+      defaults[field.id] = undefined;
     } else {
-      defaults[field.name] = "";
+      defaults[field.id] = "";
     }
   }
   return defaults;
@@ -32,13 +37,13 @@ function buildDefaultValues(fields: CoreFormField[]): Record<string, unknown> {
  * 동적 폼 렌더러 통합 컴포넌트 (DynamicFormRenderer)
  *
  * 폼 빌더 미리보기(Preview)와 컨슈머 응답 제출(Submission)을 모두 수용하는 통합 런타임 뷰어입니다.
- * - props.form이 직접 주어지면 즉시 렌더링하고, props.slug만 주어지면 자동으로 React Query 조회를 수행합니다.
+ * - props.form이 직접 주어지면 즉시 렌더링하고, props.formId가 주어지면 자동으로 React Query 조회를 수행합니다.
  * - Preview 모드: 마우스 클릭으로 AI 네비게이터 대화 컨텍스트와 상호작용하며 필드 하이라이트를 지원합니다.
  * - Submission 모드: React Hook Form과 동적 Zod 스키마를 결합하여 실시간 유효성 검사 및 안전한 제출을 수행합니다.
  */
 export function DynamicFormRenderer({
   form: propForm,
-  slug,
+  formId,
   mode = "submission",
   onSubmit,
   values,
@@ -49,14 +54,15 @@ export function DynamicFormRenderer({
   disabled = false,
   className,
 }: DynamicFormRendererProps) {
-  // props.slug가 존재하고 propForm이 없는 경우 TanStack Query로 폼 상세 정보 자동 조회
-  const shouldFetch = Boolean(slug && !propForm);
+  // props.formId가 존재하고 propForm이 없는 경우 TanStack Query로 폼 상세 정보 자동 조회
+  const shouldFetch = Boolean(formId && !propForm);
+  const publishFormMutation = usePublishFormMutation();
   const {
     data: fetchedForm,
     isLoading,
     isError,
     error,
-  } = useFormDetailQuery(slug ?? "", { enabled: shouldFetch });
+  } = useFormDetailQuery(formId ?? "", { enabled: shouldFetch });
 
   // 최종 렌더링 대상 폼 데이터 결정
   const activeForm = propForm ?? fetchedForm;
@@ -198,7 +204,29 @@ export function DynamicFormRenderer({
                   </Badge>
                 )}
               </div>
-              <span className="text-muted-foreground font-mono text-xs">/{activeForm.slug}</span>
+              <div className="flex items-center gap-2">
+                {mode === "preview" && formId && (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant={isPublished ? "outline" : "default"}
+                    onClick={() =>
+                      publishFormMutation.mutate({
+                        id: formId,
+                        isPublished: !isPublished,
+                      })
+                    }
+                    disabled={publishFormMutation.isPending}
+                  >
+                    {isPublished ? "발행 취소" : "발행하기"}
+                  </Button>
+                )}
+                {formId ? (
+                  <span className="text-muted-foreground font-mono text-xs">
+                    ID: {formId.slice(0, 8)}...
+                  </span>
+                ) : null}
+              </div>
             </div>
 
             <CardTitle className="text-2xl font-bold tracking-tight">{activeForm.title}</CardTitle>

@@ -40,35 +40,24 @@ export const findFormById = async (id: string): Promise<Form | undefined> => {
 };
 
 /**
- * 특정 슬러그(slug)를 가진 활성 폼(소프트 삭제되지 않은 폼) 1건을 조회합니다.
+ * 특정 ID를 가진 발행된 활성 폼 1건을 조회합니다.
+ * 미발행 초안 상태이거나 소프트 삭제된 폼은 undefined를 반환하여 컨슈머 접근을 원천 차단합니다.
  *
- * URL 경로(/builder/[slug])를 통한 폼 프리뷰 및 네비게이터 자율주행 시
- * 읽기 친화적 슬러그로 폼 데이터를 빠르게 특정할 때 사용됩니다.
- *
- * @param slug 조회할 폼 URL 고유 식별 슬러그 (예: "project-info")
- * @returns 일치하는 Form 객체 또는 undefined
+ * @param id 조회할 폼의 고유 식별자(UUID)
+ * @returns 발행된 Form 객체 또는 undefined
  */
-export const findFormBySlug = async (slug: string): Promise<Form | undefined> => {
+export const findPublishedFormById = async (id: string): Promise<Form | undefined> => {
+  if (!UUID_REGEX.test(id)) {
+    return undefined;
+  }
+
   const [form] = await db
     .select()
     .from(forms)
-    .where(and(eq(forms.slug, slug), isNull(forms.deletedAt)))
+    .where(and(eq(forms.id, id), isNotNull(forms.publishedAt), isNull(forms.deletedAt)))
     .limit(1);
 
   return form;
-};
-
-/**
- * UUID 식별자 또는 슬러그를 기반으로 활성 폼 1건을 지능적으로 조회합니다.
- *
- * @param idOrSlug 폼 고유 UUID 식별자 또는 URL 슬러그
- * @returns 일치하는 Form 객체 또는 undefined
- */
-export const findFormByIdOrSlug = async (idOrSlug: string): Promise<Form | undefined> => {
-  if (UUID_REGEX.test(idOrSlug)) {
-    return await findFormById(idOrSlug);
-  }
-  return await findFormBySlug(idOrSlug);
 };
 
 /**
@@ -127,13 +116,14 @@ export const softDeleteFormById = async (id: string): Promise<Form | undefined> 
 };
 
 /**
- * 지정된 슬러그(slug) 목록에 해당하는 활성 폼들을 단일 쿼리로 일괄 소프트 삭제합니다.
+ * 지정된 ID 목록에 해당하는 활성 폼들을 단일 쿼리로 일괄 소프트 삭제합니다.
  *
- * @param slugs 소프트 삭제할 폼 고유 슬러그 배열
+ * @param ids 소프트 삭제할 폼 고유 식별자(UUID) 배열
  * @returns 성공적으로 소프트 삭제 처리된 Form 객체 목록
  */
-export const softDeleteFormsBySlugs = async (slugs: string[]): Promise<Form[]> => {
-  if (slugs.length === 0) return [];
+export const softDeleteFormsByIds = async (ids: string[]): Promise<Form[]> => {
+  const validIds = ids.filter((id) => UUID_REGEX.test(id));
+  if (validIds.length === 0) return [];
 
   return await db
     .update(forms)
@@ -141,8 +131,37 @@ export const softDeleteFormsBySlugs = async (slugs: string[]): Promise<Form[]> =
       deletedAt: sql`now()`,
       updatedAt: sql`now()`,
     })
-    .where(and(inArray(forms.slug, slugs), isNull(forms.deletedAt)))
+    .where(and(inArray(forms.id, validIds), isNull(forms.deletedAt)))
     .returning();
+};
+
+/**
+ * 특정 ID의 폼을 공식 발행하거나 초안 상태로 회수(비발행)합니다.
+ *
+ * 발행 시간(publishedAt)은 클라이언트의 시간을 일체 신뢰하지 않고,
+ * PostgreSQL 중앙 시계인 sql`now()`를 사용하여 원천적으로 정합성을 보장합니다.
+ * 초안 회수 시에는 publishedAt 컬럼을 null로 초기화합니다.
+ *
+ * @param id 발행 상태를 변경할 폼 고유 식별자(UUID)
+ * @param isPublished true: 공식 공개 발행, false: 미발행 초안 회수
+ * @returns 갱신된 Form 객체 또는 대상 폼이 없을 경우 undefined
+ */
+export const publishFormById = async (
+  id: string,
+  isPublished: boolean
+): Promise<Form | undefined> => {
+  if (!UUID_REGEX.test(id)) return undefined;
+
+  const [updatedForm] = await db
+    .update(forms)
+    .set({
+      publishedAt: isPublished ? sql`now()` : null,
+      updatedAt: sql`now()`,
+    })
+    .where(and(eq(forms.id, id), isNull(forms.deletedAt)))
+    .returning();
+
+  return updatedForm;
 };
 
 /**
@@ -157,21 +176,4 @@ export const findPublishedForms = async (): Promise<Form[]> => {
     .from(forms)
     .where(and(isNotNull(forms.publishedAt), isNull(forms.deletedAt)))
     .orderBy(desc(forms.createdAt));
-};
-
-/**
- * 특정 슬러그를 가진 발행된 활성 폼 1건을 조회합니다.
- * 미발행 초안 상태이거나 소프트 삭제된 폼은 undefined를 반환하여 컨슈머 접근을 원천 차단합니다.
- *
- * @param slug 조회할 폼의 고유 식별 슬러그
- * @returns 발행된 Form 객체 또는 undefined
- */
-export const findPublishedFormBySlug = async (slug: string): Promise<Form | undefined> => {
-  const [form] = await db
-    .select()
-    .from(forms)
-    .where(and(eq(forms.slug, slug), isNotNull(forms.publishedAt), isNull(forms.deletedAt)))
-    .limit(1);
-
-  return form;
 };

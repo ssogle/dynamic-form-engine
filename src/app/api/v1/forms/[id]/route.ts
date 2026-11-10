@@ -1,25 +1,17 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { updateFormSchema } from "@/entities/form";
-import {
-  findFormById,
-  findFormBySlug,
-  softDeleteFormById,
-  updateFormById,
-} from "@/entities/form/server";
+import { findFormById, softDeleteFormById, updateFormById } from "@/entities/form/server";
 import { apiResponse, badRequest, notFound, withErrorHandler } from "@/shared/lib/http";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /**
  * GET /api/v1/forms/[id]
  *
- * 지정된 식별자(UUID id 또는 slug)를 가진 활성 폼 1건의 상세 정보를 조회합니다.
- * UUID 형식이면 id로 조회하고, 그 외에는 슬러그(slug)로 자동 판별하여 조회합니다.
+ * 지정된 식별자(UUID id)를 가진 활성 폼 1건의 상세 정보를 조회합니다.
  *
  * @param _req NextRequest 요청 객체
  * @param context URL 경로 매개변수 (Promise<{ id: string }>)
@@ -27,9 +19,7 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
  */
 export const GET = withErrorHandler<RouteContext>(async (_req: NextRequest, context) => {
   const { id } = await context.params;
-
-  const isUuid = UUID_REGEX.test(id);
-  const form = isUuid ? await findFormById(id) : await findFormBySlug(id);
+  const form = await findFormById(id);
 
   if (!form) {
     throw notFound("요청하신 폼이 존재하지 않거나 삭제되었습니다.");

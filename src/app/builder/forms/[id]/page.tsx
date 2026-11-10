@@ -8,19 +8,19 @@ import { Button } from "@/shared/ui/button";
  *
  * Next.js 16.4.4 규격에 따라 params는 Promise 타입으로 선언합니다.
  */
-interface BuilderFormSlugPageProps {
+interface BuilderFormIdPageProps {
   params: Promise<{
-    slug: string;
+    id: string;
   }>;
 }
 
 /**
- * 실시간 동적 폼 라이브 캔버스 (/builder/forms/[slug])
+ * 실시간 동적 폼 라이브 캔버스 (/builder/forms/[id])
  *
  * 좌측 AI Navigator와의 실시간 대화 명령에 따라 폼 스키마가 결정론적으로 실시간 갱신되는 뷰어입니다.
  */
-export default async function BuilderFormSlugPage({ params }: BuilderFormSlugPageProps) {
-  const { slug } = await params;
+export default async function BuilderFormIdPage({ params }: BuilderFormIdPageProps) {
+  const { id } = await params;
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6">
@@ -30,7 +30,7 @@ export default async function BuilderFormSlugPage({ params }: BuilderFormSlugPag
             실시간 폼 라이브 캔버스
           </h1>
           <p className="text-muted-foreground text-xs">
-            URL 식별자: <span className="text-primary font-mono font-medium">{slug}</span>
+            폼 ID: <span className="text-primary font-mono font-medium">{id}</span>
           </p>
         </div>
 
@@ -39,7 +39,7 @@ export default async function BuilderFormSlugPage({ params }: BuilderFormSlugPag
         </Button>
       </div>
 
-      <DynamicFormRenderer slug={slug} mode="preview" />
+      <DynamicFormRenderer formId={id} mode="preview" />
     </div>
   );
 }

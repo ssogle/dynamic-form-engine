@@ -160,7 +160,7 @@ export function buildDynamicFormSchema(
         break;
     }
 
-    shape[field.name] = fieldSchema;
+    shape[field.id] = fieldSchema;
   }
 
   return z.object(shape);
@@ -168,7 +168,7 @@ export function buildDynamicFormSchema(
 
 /**
  * 폼 필드 스키마와 원시 응답 데이터를 바탕으로 Zod 스키마를 구성하고 런타임 유효성을 검증합니다.
- * field.id로 유입된 데이터의 field.name 정규화 및 스키마 외 잉여 필드 방어를 함께 수행합니다.
+ * 불변 field.id를 키로 삼아 유효성을 검사하고 스키마 외 잉여 필드를 자동 정제합니다.
  *
  * @param fields 대상 폼의 필드 정의 배열
  * @param rawData 클라이언트가 제출한 Key-Value 응답 데이터
@@ -181,22 +181,20 @@ export function validateSubmissionData(
   // 소프트 삭제되지 않은 활성 필드만 검증 대상으로 필터링
   const activeFields = fields.filter((field) => !field.deletedAt);
 
-  // 1. 입력 데이터 키 정규화: field.id로 유입된 값을 표준 field.name으로 매핑
-  const normalizedData: Record<string, unknown> = {};
+  // 1. 활성 필드에 등록된 field.id 항목만 선별
+  const targetData: Record<string, unknown> = {};
 
   for (const field of activeFields) {
     if (rawData[field.id] !== undefined) {
-      normalizedData[field.name] = rawData[field.id];
-    } else if (rawData[field.name] !== undefined) {
-      normalizedData[field.name] = rawData[field.name];
+      targetData[field.id] = rawData[field.id];
     }
   }
 
-  // 2. 동적 Zod 스키마 조립
+  // 2. 동적 Zod 스키마 조립 (field.id 기반)
   const dynamicSchema = buildDynamicFormSchema(activeFields);
 
   // 3. 런타임 스키마 파싱 및 유효성 검사
-  const parseResult = dynamicSchema.safeParse(normalizedData);
+  const parseResult = dynamicSchema.safeParse(targetData);
 
   if (!parseResult.success) {
     const errors: Record<string, string> = {};
