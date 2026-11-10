@@ -11,8 +11,10 @@ export const CONSUMER_NAVIGATOR_SYSTEM_PROMPT = `
 1. 상황 A: 현재 화면에 있는 대상 조작 (화면 우선 / In-View Mode)
    - 조건: 사용자가 현재 화면에 눈으로 보이는 대상(목록 테이블의 N번째 응답, 특정 이름, 현재 열린 폼의 필드 등)을 지칭할 때
    - 행동: 불필요하게 서버 조회 도구를 호출하지 말고, 화면 맥락(visibleSubmissions, availableFields)을 참조하여 즉시 화면을 제어하세요.
-     * "두 번째 거 열어줘" / "홍길동 거 열어줘" (응답 목록 화면)
-       -> visibleSubmissions의 2번 항목 ID를 찾아 'navigate' 호출 ('/consumer/forms/[id]/submissions/[id]/edit')
+     * "두 번째 거 열어줘" / "홍길동 거 상세 보여줘" / "자세히 볼래" (응답 목록 화면)
+       -> visibleSubmissions의 해당 항목 ID를 찾아 'navigate' 호출 ('/consumer/forms/[id]/submissions/[submissionId]')
+     * "두 번째 거 수정할래" / "수정하러 갈래" (응답 목록 화면)
+       -> visibleSubmissions의 해당 항목 ID를 찾아 'navigate' 호출 ('/consumer/forms/[id]/submissions/[submissionId]/edit')
      * "두 번째 거 삭제해줘" / "1번, 3번 응답 삭제해줘" (응답 목록 화면)
        -> visibleSubmissions의 해당 항목 ID들을 모아 'deleteSubmissions({ submissionIds: [...] })' 호출
      * 현재 열린 폼 화면에서 필드 입력/수정
@@ -36,6 +38,8 @@ export const CONSUMER_NAVIGATOR_SYSTEM_PROMPT = `
    - 폼 전체 메뉴: 'navigate' 도구로 '/consumer/forms' 이동
    - 특정 폼의 데이터 목록: 'navigate' 도구로 '/consumer/forms/[id]' 이동
    - 특정 폼의 신규 작성: 'navigate' 도구로 '/consumer/forms/[id]/new' 이동
+   - 특정 폼의 응답 상세 조회: 'navigate' 도구로 '/consumer/forms/[id]/submissions/[submissionId]' 이동
+   - 특정 폼의 응답 수정: 'navigate' 도구로 '/consumer/forms/[id]/submissions/[submissionId]/edit' 이동
    - 뷰 목록 화면: 'navigate' 도구로 '/consumer/views' 이동
 
 5. 단순 안내 및 대화
@@ -82,13 +86,18 @@ export function formatConsumerContextPrompt(
       : "없음 (입력 대기 상태)";
 
   const isEditMode = currentPath.endsWith("/edit");
+  const isDetailMode = /\/submissions\/[^/]+$/.test(currentPath);
+  const isNewMode = currentPath.endsWith("/new");
+  const isListMode = /^\/consumer\/forms\/[^/]+$/.test(currentPath);
   const screenMode = isEditMode
     ? "기존 응답 수정 화면 (수정 모드)"
-    : currentPath.includes("/submissions")
-      ? "기제출 응답 목록 화면"
-      : currentFormId !== "없음 (목록 또는 외부 화면)"
-        ? "신규 폼 입력 화면"
-        : "포털 대시보드 / 폼 목록 화면";
+    : isDetailMode
+      ? "기제출 응답 단건 상세 조회 화면"
+      : isNewMode
+        ? "신규 폼 데이터 작성 화면"
+        : isListMode
+          ? "기제출 응답 목록 및 가상화 테이블 관리 화면"
+          : "포털 대시보드 / 폼 목록 화면";
 
   return `사용자 발화: "${prompt}"
 
