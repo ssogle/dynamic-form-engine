@@ -102,7 +102,7 @@ export function SubmissionListTable({ form }: SubmissionListTableProps) {
                 <tr key={sub.id} className="hover:bg-muted/30 transition-colors">
                   <td className="text-muted-foreground px-4 py-3 font-mono">{idx + 1}</td>
                   {activeFields.map((field) => {
-                    const rawVal = sub.data?.[field.name];
+                    const rawVal = sub.data?.[field.id];
                     const displayVal =
                       rawVal !== undefined && rawVal !== null && rawVal !== ""
                         ? String(rawVal)
@@ -120,7 +120,7 @@ export function SubmissionListTable({ form }: SubmissionListTableProps) {
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <div className="flex items-center justify-end gap-1.5">
                       <Button asChild variant="outline" size="sm" className="h-7 px-2 text-xs">
-                        <Link href={`/consumer/forms/${form.slug}/submissions/${sub.id}/edit`}>
+                        <Link href={`/consumer/forms/${form.id}/submissions/${sub.id}/edit`}>
                           수정
                         </Link>
                       </Button>

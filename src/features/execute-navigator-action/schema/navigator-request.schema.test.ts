@@ -1,0 +1,220 @@
+import { describe, expect, it } from "vitest";
+import { navigatorRequestSchema } from "./navigator-request.schema";
+
+describe("Navigator Request Schema Validation (src/features/execute-navigator-action/schema/navigator-request.schema.ts)", () => {
+  describe("기본값 및 필수 속성(prompt, mode) 검증", () => {
+    it("최소 필수 속성인 prompt만 전달되어도 검증을 통과하고 mode 기본값 'builder'를 할당해야 한다", () => {
+      const payload = {
+        prompt: "새로운 고객 설문 폼을 만들어줘",
+      };
+
+      const result = navigatorRequestSchema.safeParse(payload);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.prompt).toBe("새로운 고객 설문 폼을 만들어줘");
+        expect(result.data.mode).toBe("builder");
+        expect(result.data.messages).toBeUndefined();
+        expect(result.data.currentContext).toBeUndefined();
+      }
+    });
+
+    it("prompt가 빈 문자열이거나 누락된 경우 유효성 검사에 실패해야 한다", () => {
+      const missingPrompt = {};
+      const emptyPrompt = { prompt: "" };
+
+      expect(navigatorRequestSchema.safeParse(missingPrompt).success).toBe(false);
+
+      const emptyResult = navigatorRequestSchema.safeParse(emptyPrompt);
+      expect(emptyResult.success).toBe(false);
+      if (!emptyResult.success) {
+        expect(emptyResult.error.issues[0]?.message).toBe("사용자 명령 프롬프트는 필수입니다.");
+      }
+    });
+
+    it("mode에 올바른 열거형 값('builder', 'consumer')이 주어지면 정상 파싱해야 한다", () => {
+      const builderResult = navigatorRequestSchema.safeParse({
+        mode: "builder",
+        prompt: "폼 빌더 명령",
+      });
+      const consumerResult = navigatorRequestSchema.safeParse({
+        mode: "consumer",
+        prompt: "컨슈머 응답 명령",
+      });
+
+      expect(builderResult.success).toBe(true);
+      expect(consumerResult.success).toBe(true);
+    });
+
+    it("mode에 지원하지 않는 잘못된 값이 전달되면 파싱에 실패해야 한다", () => {
+      const invalidMode = {
+        mode: "admin",
+        prompt: "관리자 명령",
+      };
+
+      const result = navigatorRequestSchema.safeParse(invalidMode);
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("messages (대화 세션 히스토리 검증)", () => {
+    it("올바른 role(user, assistant, system)과 content를 가진 메시지 목록을 정상 파싱해야 한다", () => {
+      const payload = {
+        prompt: "다음 질문도 추가해줘",
+        messages: [
+          { role: "system", content: "당신은 AI 어시스턴트입니다." },
+          { role: "user", content: "이름 입력 필드 추가해줘" },
+          { role: "assistant", content: "이름 필드를 추가했습니다." },
+        ],
+      };
+
+      const result = navigatorRequestSchema.safeParse(payload);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.messages).toHaveLength(3);
+        expect(result.data.messages?.[0]?.role).toBe("system");
+      }
+    });
+
+    it("지원하지 않는 role이 포함된 경우 파싱에 실패해야 한다", () => {
+      const payload = {
+        prompt: "명령",
+        messages: [{ role: "developer", content: "잘못된 역할" }],
+      };
+
+      const result = navigatorRequestSchema.safeParse(payload);
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("currentContext (Builder 화면 맥락 검증)", () => {
+    it("빌더 활성 폼 정보(currentForm)와 가시 폼 캐시 목록(visibleForms)을 정상 파싱해야 한다", () => {
+      const payload = {
+        mode: "builder",
+        prompt: "현재 폼에 전화번호 필드 추가해줘",
+        currentContext: {
+          currentPath: "/builder/forms/form-uuid-1",
+          currentForm: {
+            id: "form-uuid-1",
+            title: "입사 지원서",
+            description: "개발팀 채용 폼",
+            fields: [
+              {
+                id: "f_name",
+                label: "이름",
+                type: "text",
+                required: true,
+              },
+            ],
+          },
+          visibleForms: [
+            {
+              id: "form-uuid-1",
+              title: "입사 지원서",
+              createdAt: "2026-11-10T00:00:00.000Z",
+              summary: "개발팀 채용 폼",
+            },
+          ],
+        },
+      };
+
+      const result = navigatorRequestSchema.safeParse(payload);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.currentContext?.currentForm?.id).toBe("form-uuid-1");
+        expect(result.data.currentContext?.currentForm?.fields).toHaveLength(1);
+        expect(result.data.currentContext?.visibleForms).toHaveLength(1);
+      }
+    });
+
+    it("currentForm의 fields가 생략된 경우 기본값 빈 배열([])을 할당해야 한다", () => {
+      const payload = {
+        mode: "builder",
+        prompt: "새 폼 수정",
+        currentContext: {
+          currentForm: {
+            id: "form-uuid-2",
+            title: "제목만 있는 폼",
+          },
+        },
+      };
+
+      const result = navigatorRequestSchema.safeParse(payload);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.currentContext?.currentForm?.fields).toEqual([]);
+      }
+    });
+  });
+
+  describe("currentContext (Consumer 화면 맥락 검증)", () => {
+    it("컨슈머 화면 맥락(currentFormId, availableFields, currentDraftValues, visibleSubmissions)을 정상 파싱해야 한다", () => {
+      const payload = {
+        mode: "consumer",
+        prompt: "내 이름은 홍길동이야",
+        currentContext: {
+          currentPath: "/consumer/forms/form-uuid-1",
+          currentFormId: "form-uuid-1",
+          currentFormTitle: "입사 지원서",
+          availableFields: [
+            {
+              id: "f_name",
+              label: "이름",
+              type: "text",
+              required: true,
+            },
+            {
+              id: "f_role",
+              label: "희망 직무",
+              type: "select",
+              required: false,
+              options: ["Frontend", "Backend"],
+            },
+          ],
+          currentDraftValues: {
+            f_name: "홍길동",
+            f_role: "Frontend",
+          },
+          visibleSubmissions: [
+            {
+              id: "sub-1",
+              title: "응답 #1 (홍길동)",
+              createdAt: "2026-11-10T00:00:00.000Z",
+              summary: "이름: 홍길동",
+            },
+          ],
+        },
+      };
+
+      const result = navigatorRequestSchema.safeParse(payload);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.currentContext?.currentFormId).toBe("form-uuid-1");
+        expect(result.data.currentContext?.availableFields).toHaveLength(2);
+        expect(result.data.currentContext?.currentDraftValues).toEqual({
+          f_name: "홍길동",
+          f_role: "Frontend",
+        });
+        expect(result.data.currentContext?.visibleSubmissions).toHaveLength(1);
+      }
+    });
+
+    it("visibleItemSchema의 id 또는 title이 누락되면 파싱에 실패해야 한다", () => {
+      const payloadMissingId = {
+        prompt: "목록 조회",
+        currentContext: {
+          visibleForms: [{ title: "제목만 있음" }],
+        },
+      };
+
+      const payloadMissingTitle = {
+        prompt: "목록 조회",
+        currentContext: {
+          visibleForms: [{ id: "uuid-1" }],
+        },
+      };
+
+      expect(navigatorRequestSchema.safeParse(payloadMissingId).success).toBe(false);
+      expect(navigatorRequestSchema.safeParse(payloadMissingTitle).success).toBe(false);
+    });
+  });
+});

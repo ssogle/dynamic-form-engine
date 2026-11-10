@@ -10,9 +10,9 @@ import { SubmissionListTable } from "./submission-list-table";
 
 export interface ManageFormSubmissionsProps {
   /**
-   * 대상 폼 식별자 (슬러그)
+   * 대상 폼 식별자 (UUID)
    */
-  slug: string;
+  formId: string;
 }
 
 /**
@@ -21,11 +21,11 @@ export interface ManageFormSubmissionsProps {
  * 특정 폼의 상세 정보와 제출된 모든 응답 데이터를 조회하고,
  * 각 응답의 열람, 수정 전용 화면 이동, 삭제 인터랙션을 종합적으로 제공하는 자립형 기능 컴포넌트입니다.
  */
-export function ManageFormSubmissions({ slug }: ManageFormSubmissionsProps) {
-  const { data: form, isLoading, isError, error } = useFormDetailQuery(slug);
+export function ManageFormSubmissions({ formId }: ManageFormSubmissionsProps) {
+  const { data: form, isLoading, isError, error } = useFormDetailQuery(formId);
 
-  // 1. 로딩 상태 스켈레톤
-  if (isLoading) {
+  // 1. 서버 SSR 및 클라이언트 초기 하이드레이션, 데이터 로딩 단계 스켈레톤
+  if (isLoading || (!form && !isError)) {
     return (
       <div className="space-y-4">
         <div className="space-y-2">
@@ -37,7 +37,7 @@ export function ManageFormSubmissions({ slug }: ManageFormSubmissionsProps) {
     );
   }
 
-  // 2. 에러 상태
+  // 2. 에러 상태 (에러 확정 또는 로딩 완료 후에도 폼 부재)
   if (isError || !form) {
     return (
       <Card className="border-destructive/30 bg-destructive/5 shadow-xs">

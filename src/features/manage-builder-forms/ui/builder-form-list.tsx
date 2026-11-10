@@ -14,7 +14,7 @@ import {
 } from "@/shared/ui/card";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { formatDate } from "@/shared/lib/date";
-import { useDeleteFormMutation, useFormsQuery } from "@/entities/form";
+import { useDeleteFormMutation, useFormsQuery, usePublishFormMutation } from "@/entities/form";
 
 /**
  * 빌더 전용 폼 목록 열람 및 소프트 삭제 기능 컴포넌트 (BuilderFormList)
@@ -25,6 +25,17 @@ import { useDeleteFormMutation, useFormsQuery } from "@/entities/form";
 export function BuilderFormList() {
   const { data: forms, isLoading, isError, error } = useFormsQuery();
   const deleteFormMutation = useDeleteFormMutation();
+  const publishFormMutation = usePublishFormMutation();
+
+  /**
+   * 폼 발행 상태 토글 핸들러
+   *
+   * @param id 대상 폼 고유 식별자(UUID)
+   * @param isPublished 변경할 발행 상태 (true: 발행, false: 초안 회수)
+   */
+  const handleTogglePublish = (id: string, isPublished: boolean) => {
+    publishFormMutation.mutate({ id, isPublished });
+  };
 
   /**
    * 폼 소프트 삭제 핸들러
@@ -125,9 +136,6 @@ export function BuilderFormList() {
                   </Badge>
                 )}
               </div>
-              <Badge variant="outline" className="font-mono text-xs">
-                {form.slug}
-              </Badge>
             </div>
             {form.description ? (
               <p className="text-muted-foreground text-xs/relaxed">{form.description}</p>
@@ -144,8 +152,16 @@ export function BuilderFormList() {
                 )}
               </span>
               <div className="flex items-center gap-2">
+                <Button
+                  size="xs"
+                  variant={form.publishedAt ? "outline" : "default"}
+                  onClick={() => handleTogglePublish(form.id, !form.publishedAt)}
+                  disabled={publishFormMutation.isPending}
+                >
+                  {form.publishedAt ? "발행 취소" : "발행"}
+                </Button>
                 <Button size="xs" variant="outline" asChild>
-                  <Link href={`/builder/forms/${form.slug}`}>캔버스 열기</Link>
+                  <Link href={`/builder/forms/${form.id}`}>캔버스 열기</Link>
                 </Button>
                 <Button
                   size="xs"

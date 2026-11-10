@@ -1,4 +1,12 @@
 import { z } from "zod";
+import { coreFormFieldSchema } from "@/entities/form";
+
+const visibleItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  createdAt: z.string().optional(),
+  summary: z.string().optional(),
+});
 
 /**
  * 네비게이터 HTTP 요청 페이로드 검증 스키마
@@ -20,20 +28,20 @@ export const navigatorRequestSchema = z.object({
       // Builder Context
       currentForm: z
         .object({
-          slug: z.string(),
+          id: z.string(),
           title: z.string(),
           description: z.string().optional(),
-          fields: z.array(z.any()).default([]),
+          fields: z.array(coreFormFieldSchema).default([]),
         })
         .optional(),
+      visibleForms: z.array(visibleItemSchema).optional(),
       // Consumer Context
-      currentFormSlug: z.string().optional(),
+      currentFormId: z.string().optional(),
       currentFormTitle: z.string().optional(),
       availableFields: z
         .array(
           z.object({
-            id: z.string().optional(),
-            name: z.string(),
+            id: z.string(),
             label: z.string(),
             type: z.string(),
             required: z.boolean().optional(),
@@ -42,6 +50,7 @@ export const navigatorRequestSchema = z.object({
         )
         .optional(),
       currentDraftValues: z.record(z.string(), z.unknown()).optional(),
+      visibleSubmissions: z.array(visibleItemSchema).optional(),
     })
     .optional(),
 });

@@ -19,6 +19,7 @@ const renderWithClient = (ui: React.ReactElement) => {
 
 describe("BuilderFormList (features/manage-builder-forms)", () => {
   const mockDeleteMutate = vi.fn();
+  const mockPublishMutate = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -26,6 +27,10 @@ describe("BuilderFormList (features/manage-builder-forms)", () => {
       mutate: mockDeleteMutate,
       isPending: false,
     } as unknown as ReturnType<typeof formEntity.useDeleteFormMutation>);
+    vi.spyOn(formEntity, "usePublishFormMutation").mockReturnValue({
+      mutate: mockPublishMutate,
+      isPending: false,
+    } as unknown as ReturnType<typeof formEntity.usePublishFormMutation>);
   });
 
   it("로딩 중일 때 스켈레톤 로딩 상태를 표시해야 한다", () => {
@@ -57,11 +62,10 @@ describe("BuilderFormList (features/manage-builder-forms)", () => {
     ).toBeInTheDocument();
   });
 
-  it("폼 목록이 존재할 때 제목, 슬러그, 설명이 카드에 정상 렌더링되어야 한다", () => {
+  it("폼 목록이 존재할 때 제목, ID 요약, 설명이 카드에 정상 렌더링되어야 한다", () => {
     const mockForms = [
       {
         id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-        slug: "daily-report",
         title: "일일 업무 보고서",
         description: "매일 진행한 업무 내용을 기록합니다.",
         schemaDefinition: { fields: [] },
@@ -82,13 +86,13 @@ describe("BuilderFormList (features/manage-builder-forms)", () => {
     renderWithClient(<BuilderFormList />);
 
     expect(screen.getByText("일일 업무 보고서")).toBeInTheDocument();
-    expect(screen.getByText("daily-report")).toBeInTheDocument();
+    expect(screen.getByText(/ID: a0eebc99\.\.\./)).toBeInTheDocument();
     expect(screen.getByText("매일 진행한 업무 내용을 기록합니다.")).toBeInTheDocument();
     expect(screen.getByText("발행됨")).toBeInTheDocument();
     expect(screen.getByText(/2026\.11\.08 발행/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "캔버스 열기" })).toHaveAttribute(
       "href",
-      "/builder/forms/daily-report"
+      "/builder/forms/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
     );
     expect(screen.getByRole("button", { name: "삭제" })).toBeInTheDocument();
   });
@@ -97,7 +101,6 @@ describe("BuilderFormList (features/manage-builder-forms)", () => {
     const mockForms = [
       {
         id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-        slug: "daily-report",
         title: "일일 업무 보고서",
         description: "매일 진행한 업무 내용을 기록합니다.",
         schemaDefinition: { fields: [] },
@@ -121,5 +124,69 @@ describe("BuilderFormList (features/manage-builder-forms)", () => {
     fireEvent.click(deleteButton);
 
     expect(mockDeleteMutate).toHaveBeenCalledWith("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11");
+  });
+
+  it("미발행 폼의 발행 버튼 클릭 시 발행 뮤테이션을 호출해야 한다", () => {
+    const mockForms = [
+      {
+        id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+        title: "일일 업무 보고서",
+        description: null,
+        schemaDefinition: { fields: [] },
+        createdAt: new Date("2026-01-01T00:00:00Z"),
+        updatedAt: new Date("2026-01-01T00:00:00Z"),
+        publishedAt: null,
+        deletedAt: null,
+      },
+    ];
+
+    vi.spyOn(formEntity, "useFormsQuery").mockReturnValue({
+      data: mockForms,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof formEntity.useFormsQuery>);
+
+    renderWithClient(<BuilderFormList />);
+
+    const publishButton = screen.getByRole("button", { name: "발행" });
+    fireEvent.click(publishButton);
+
+    expect(mockPublishMutate).toHaveBeenCalledWith({
+      id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+      isPublished: true,
+    });
+  });
+
+  it("이미 발행된 폼의 발행 취소 버튼 클릭 시 회수 뮤테이션을 호출해야 한다", () => {
+    const mockForms = [
+      {
+        id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+        title: "일일 업무 보고서",
+        description: null,
+        schemaDefinition: { fields: [] },
+        createdAt: new Date("2026-01-01T00:00:00Z"),
+        updatedAt: new Date("2026-01-01T00:00:00Z"),
+        publishedAt: new Date("2026-11-10T00:00:00Z"),
+        deletedAt: null,
+      },
+    ];
+
+    vi.spyOn(formEntity, "useFormsQuery").mockReturnValue({
+      data: mockForms,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof formEntity.useFormsQuery>);
+
+    renderWithClient(<BuilderFormList />);
+
+    const unpublishButton = screen.getByRole("button", { name: "발행 취소" });
+    fireEvent.click(unpublishButton);
+
+    expect(mockPublishMutate).toHaveBeenCalledWith({
+      id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+      isPublished: false,
+    });
   });
 });

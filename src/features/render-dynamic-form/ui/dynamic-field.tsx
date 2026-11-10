@@ -42,13 +42,13 @@ export function DynamicField({
   error: propError,
   disabled = false,
 }: DynamicFieldProps) {
-  const { id, name, label, type, placeholder, required, options, description } = field;
+  const { id, label, type, placeholder, required, options, description } = field;
 
   // React Hook Form 컨텍스트 획득 (컨슈머 제출 모드 또는 FormProvider 래핑 시 유효)
   const formContext = useFormContext();
 
   // 에러 메시지 우선순위: React Hook Form 에러 > 외부 주입 에러
-  const formError = formContext?.formState?.errors?.[name]?.message;
+  const formError = formContext?.formState?.errors?.[id]?.message;
   const displayError = (typeof formError === "string" ? formError : undefined) ?? propError;
 
   /**
@@ -64,7 +64,7 @@ export function DynamicField({
               id={id}
               placeholder={placeholder}
               disabled={disabled}
-              {...formContext.register(name)}
+              {...formContext.register(id)}
             />
           );
 
@@ -75,7 +75,7 @@ export function DynamicField({
               placeholder={placeholder}
               disabled={disabled}
               className="min-h-24 resize-y"
-              {...formContext.register(name)}
+              {...formContext.register(id)}
             />
           );
 
@@ -86,7 +86,7 @@ export function DynamicField({
               type="number"
               placeholder={placeholder}
               disabled={disabled}
-              {...formContext.register(name)}
+              {...formContext.register(id)}
             />
           );
 
@@ -94,7 +94,7 @@ export function DynamicField({
           const selectOptions = options && options.length > 0 ? options : ["선택 옵션 없음"];
           return (
             <Controller
-              name={name}
+              name={id}
               control={formContext.control}
               render={({ field: controllerField }) => (
                 <Select
@@ -124,7 +124,7 @@ export function DynamicField({
               id={id}
               placeholder={placeholder}
               disabled={disabled}
-              {...formContext.register(name)}
+              {...formContext.register(id)}
             />
           );
       }
@@ -136,7 +136,7 @@ export function DynamicField({
         return (
           <Input
             id={id}
-            name={name}
+            name={id}
             type="text"
             placeholder={placeholder}
             required={required}
@@ -148,7 +148,7 @@ export function DynamicField({
         return (
           <Textarea
             id={id}
-            name={name}
+            name={id}
             placeholder={placeholder}
             required={required}
             disabled={disabled}
@@ -160,7 +160,7 @@ export function DynamicField({
         return (
           <Input
             id={id}
-            name={name}
+            name={id}
             type="number"
             placeholder={placeholder}
             required={required}
@@ -190,7 +190,7 @@ export function DynamicField({
         return (
           <Input
             id={id}
-            name={name}
+            name={id}
             type="text"
             placeholder={placeholder}
             required={required}
@@ -203,7 +203,6 @@ export function DynamicField({
   return (
     <FormFieldWrapper
       id={id}
-      name={name}
       label={label}
       required={required}
       description={description}

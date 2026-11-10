@@ -35,8 +35,10 @@ export { getFormDetail, useFormDetailQuery } from "./queries/use-form-detail.que
 export {
   createForm,
   updateForm,
+  publishForm,
   deleteForm,
   useCreateFormMutation,
   useUpdateFormMutation,
+  usePublishFormMutation,
   useDeleteFormMutation,
 } from "./queries/use-form.mutation";

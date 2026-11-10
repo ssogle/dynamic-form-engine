@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/shared/db/server";
 import {
   formSubmissions,
@@ -114,4 +114,26 @@ export const softDeleteSubmissionById = async (id: string): Promise<FormSubmissi
     .returning();
 
   return deletedSubmission;
+};
+
+/**
+ * 지정된 복수 ID의 응답들을 소프트 삭제(deletedAt 및 updatedAt을 중앙 DB 시각으로 갱신)합니다.
+ *
+ * @param ids 소프트 삭제할 응답 고유 식별자(UUID) 배열
+ * @returns 소프트 삭제된 FormSubmission 객체 배열
+ */
+export const softDeleteSubmissionsByIds = async (ids: string[]): Promise<FormSubmission[]> => {
+  const validIds = ids.filter((id) => UUID_REGEX.test(id));
+  if (validIds.length === 0) {
+    return [];
+  }
+
+  return await db
+    .update(formSubmissions)
+    .set({
+      deletedAt: sql`now()`,
+      updatedAt: sql`now()`,
+    })
+    .where(and(inArray(formSubmissions.id, validIds), isNull(formSubmissions.deletedAt)))
+    .returning();
 };

@@ -24,7 +24,6 @@ describe("useFormDetailQuery (폼 단건 상세 조회 훅)", () => {
 
   const mockForm = {
     id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-    slug: "project-info",
     title: "프로젝트 정보 등록",
     description: "신규 프로젝트 폼입니다.",
     schemaDefinition: { fields: [] },
@@ -78,7 +77,7 @@ describe("useFormDetailQuery (폼 단건 상세 조회 훅)", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(result.current.data).toEqual(mockForm);
-    expect(result.current.data?.slug).toBe("project-info");
+    expect(result.current.data?.id).toBe(mockForm.id);
   });
 
   it("identifier가 비어있으면 enabled: false가 되어 쿼리를 실행하지 않아야 한다", () => {

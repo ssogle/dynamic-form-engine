@@ -5,12 +5,12 @@ import { create } from "zustand";
  */
 export interface ConsumerFormDraftState {
   /**
-   * 대상 폼 슬러그
+   * 대상 폼 고유 식별자 (UUID)
    */
-  currentSlug: string | null;
+  currentFormId: string | null;
 
   /**
-   * AI Navigator가 추출하여 자동 입력하도록 지시한 필드값 맵 (field.name -> value)
+   * AI Navigator가 추출하여 자동 입력하도록 지시한 필드값 맵 (field.id -> value)
    */
   draftValues: Record<string, unknown>;
 
@@ -22,17 +22,17 @@ export interface ConsumerFormDraftState {
   /**
    * 대상 폼 설정 및 기존 임시값 초기화
    */
-  setCurrentSlug: (slug: string) => void;
+  setCurrentFormId: (formId: string) => void;
 
   /**
    * AI가 채워준 단일 또는 복수 필드값을 임시 저장소에 병합
    */
-  applyDraftFields: (slug: string, fields: Record<string, unknown>) => void;
+  applyDraftFields: (formId: string, fields: Record<string, unknown>) => void;
 
   /**
    * AI에 의한 폼 제출 신호 발생
    */
-  triggerSubmit: (slug: string) => void;
+  triggerSubmit: (formId: string) => void;
 
   /**
    * 임시 데이터 초기화
@@ -46,38 +46,41 @@ export interface ConsumerFormDraftState {
  * entities/form-submission 레이어에 위치하여 AI 제어 피처와 폼 렌더링 피처 간 FSD 의존성 결합을 분리합니다.
  */
 export const useConsumerFormDraftStore = create<ConsumerFormDraftState>((set) => ({
-  currentSlug: null,
+  currentFormId: null,
   draftValues: {},
   submitTriggerCount: 0,
 
-  setCurrentSlug: (slug) =>
+  setCurrentFormId: (formId) =>
     set((state) => {
-      if (state.currentSlug === slug) return state;
+      if (state.currentFormId === formId) return state;
       return {
-        currentSlug: slug,
+        currentFormId: formId,
         draftValues: {},
         submitTriggerCount: 0,
       };
     }),
 
-  applyDraftFields: (slug, fields) =>
+  applyDraftFields: (formId, fields) =>
     set((state) => ({
-      currentSlug: slug,
-      draftValues: {
-        ...state.draftValues,
-        ...fields,
-      },
+      currentFormId: formId,
+      draftValues:
+        state.currentFormId === formId
+          ? {
+              ...state.draftValues,
+              ...fields,
+            }
+          : { ...fields },
     })),
 
-  triggerSubmit: (slug) =>
+  triggerSubmit: (formId) =>
     set((state) => ({
-      currentSlug: slug,
+      currentFormId: formId,
       submitTriggerCount: state.submitTriggerCount + 1,
     })),
 
   resetDraft: () =>
     set({
-      currentSlug: null,
+      currentFormId: null,
       draftValues: {},
       submitTriggerCount: 0,
     }),

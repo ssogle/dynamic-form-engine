@@ -13,7 +13,6 @@ vi.mock("next/navigation", () => ({
 
 const mockForm: Form = {
   id: "form-uuid-1",
-  slug: "job-application",
   title: "개발자 채용 지원서",
   description: "멋진 팀에서 일해요",
   publishedAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -21,14 +20,12 @@ const mockForm: Form = {
     fields: [
       {
         id: "f1",
-        name: "applicantName",
         label: "지원자 이름",
         type: "text",
         required: true,
       },
       {
         id: "f2",
-        name: "yearsOfExperience",
         label: "경력 연수",
         type: "number",
         required: false,
@@ -44,8 +41,8 @@ const mockSubmission: FormSubmission = {
   id: "sub-uuid-1",
   formId: "form-uuid-1",
   data: {
-    applicantName: "홍길동",
-    yearsOfExperience: 5,
+    f1: "홍길동",
+    f2: 5,
   },
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
   updatedAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -90,7 +87,7 @@ describe("ConsumerSubmissionEditor (features/render-dynamic-form)", () => {
     });
     vi.stubGlobal("fetch", mockFetch);
 
-    renderWithClient(<ConsumerSubmissionEditor slug="job-application" submissionId="sub-uuid-1" />);
+    renderWithClient(<ConsumerSubmissionEditor formId="form-uuid-1" submissionId="sub-uuid-1" />);
 
     await waitFor(() => {
       expect(screen.getByText(/개발자 채용 지원서.*응답 수정/)).toBeDefined();
@@ -111,7 +108,7 @@ describe("ConsumerSubmissionEditor (features/render-dynamic-form)", () => {
             success: true,
             data: {
               ...mockSubmission,
-              data: { applicantName: "이순신", yearsOfExperience: 5 },
+              data: { f1: "이순신", f2: 5 },
             },
           }),
         } as unknown as Response);
@@ -133,7 +130,7 @@ describe("ConsumerSubmissionEditor (features/render-dynamic-form)", () => {
     });
     vi.stubGlobal("fetch", mockFetch);
 
-    renderWithClient(<ConsumerSubmissionEditor slug="job-application" submissionId="sub-uuid-1" />);
+    renderWithClient(<ConsumerSubmissionEditor formId="form-uuid-1" submissionId="sub-uuid-1" />);
 
     await waitFor(() => {
       expect(screen.getByDisplayValue("홍길동")).toBeDefined();
@@ -169,7 +166,7 @@ describe("ConsumerSubmissionEditor (features/render-dynamic-form)", () => {
     });
     vi.stubGlobal("fetch", mockFetch);
 
-    renderWithClient(<ConsumerSubmissionEditor slug="job-application" submissionId="sub-uuid-1" />);
+    renderWithClient(<ConsumerSubmissionEditor formId="form-uuid-1" submissionId="sub-uuid-1" />);
 
     await waitFor(() => {
       expect(screen.getByDisplayValue("홍길동")).toBeDefined();
@@ -177,8 +174,8 @@ describe("ConsumerSubmissionEditor (features/render-dynamic-form)", () => {
 
     // AI Navigator가 store에 새 필드값을 주입한 상황 시뮬레이션
     act(() => {
-      useConsumerFormDraftStore.getState().applyDraftFields("job-application", {
-        applicantName: "강감찬",
+      useConsumerFormDraftStore.getState().applyDraftFields("form-uuid-1", {
+        f1: "강감찬",
       });
     });
 

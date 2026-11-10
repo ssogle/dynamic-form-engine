@@ -56,6 +56,30 @@ describe("Form Submission Schemas (entities/form-submission)", () => {
       const result = insertFormSubmissionSchema.safeParse(invalidPayload);
       expect(result.success).toBe(false);
     });
+
+    it("시스템 전유 필드(id, createdAt, updatedAt, deletedAt)가 전달되어도 스키마에서 제외되어 파싱 결과에 포함되지 않아야 한다", () => {
+      const payloadWithSystemFields = {
+        formId: "123e4567-e89b-12d3-a456-426614174000",
+        data: { answer: "네" },
+        id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: new Date(),
+      };
+
+      const result = insertFormSubmissionSchema.safeParse(payloadWithSystemFields);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toEqual({
+          formId: "123e4567-e89b-12d3-a456-426614174000",
+          data: { answer: "네" },
+        });
+        expect(result.data).not.toHaveProperty("id");
+        expect(result.data).not.toHaveProperty("createdAt");
+        expect(result.data).not.toHaveProperty("updatedAt");
+        expect(result.data).not.toHaveProperty("deletedAt");
+      }
+    });
   });
 
   describe("updateFormSubmissionSchema", () => {
@@ -71,6 +95,28 @@ describe("Form Submission Schemas (entities/form-submission)", () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.data).toEqual(validPayload.data);
+      }
+    });
+
+    it("수정 시 시스템 전유 필드 및 formId는 스키마에서 제외되어야 한다", () => {
+      const payloadWithDisallowedFields = {
+        data: { score: 5 },
+        formId: "123e4567-e89b-12d3-a456-426614174000",
+        id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: new Date(),
+      };
+
+      const result = updateFormSubmissionSchema.safeParse(payloadWithDisallowedFields);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toEqual({ data: { score: 5 } });
+        expect(result.data).not.toHaveProperty("id");
+        expect(result.data).not.toHaveProperty("formId");
+        expect(result.data).not.toHaveProperty("createdAt");
+        expect(result.data).not.toHaveProperty("updatedAt");
+        expect(result.data).not.toHaveProperty("deletedAt");
       }
     });
 

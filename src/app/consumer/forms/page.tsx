@@ -98,7 +98,9 @@ export default function ConsumerFormsPage() {
                   <Badge variant="default" className="text-[10px]">
                     발행됨
                   </Badge>
-                  <span className="text-muted-foreground font-mono text-xs">/{form.slug}</span>
+                  <span className="text-muted-foreground font-mono text-xs">
+                    ID: {form.id.slice(0, 8)}...
+                  </span>
                 </div>
                 <CardTitle className="text-lg font-bold tracking-tight">{form.title}</CardTitle>
                 {form.description && (
@@ -114,10 +116,10 @@ export default function ConsumerFormsPage() {
 
               <CardFooter className="flex items-center gap-2">
                 <Button asChild className="flex-1 font-medium" size="sm">
-                  <Link href={`/consumer/forms/${form.slug}`}>응답 작성하기</Link>
+                  <Link href={`/consumer/forms/${form.id}`}>응답 작성하기</Link>
                 </Button>
                 <Button asChild variant="outline" size="sm">
-                  <Link href={`/consumer/forms/${form.slug}/submissions`}>응답 내역</Link>
+                  <Link href={`/consumer/forms/${form.id}/submissions`}>응답 내역</Link>
                 </Button>
               </CardFooter>
             </Card>

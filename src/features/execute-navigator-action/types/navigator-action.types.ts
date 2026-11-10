@@ -23,17 +23,16 @@ export interface NavigateAction {
 export interface UpdateSchemaAction {
   type: "UPDATE_SCHEMA";
   operation: SchemaOperation;
+  formId: string;
   field?: CoreFormField | undefined;
   fields?: CoreFormField[] | undefined;
   title?: string | undefined;
-  slug?: string | undefined;
-  formId?: string | undefined;
   message?: string | undefined;
 }
 
 export interface CreateFormAction {
   type: "CREATE_FORM";
-  slug: string;
+  formId: string;
   title: string;
   description?: string | undefined;
   fields: CoreFormField[];
@@ -42,14 +41,14 @@ export interface CreateFormAction {
 
 export interface PublishFormAction {
   type: "PUBLISH_FORM";
-  slug: string;
+  formId: string;
   isPublished: boolean;
   message?: string | undefined;
 }
 
 export interface DeleteFormsAction {
   type: "DELETE_FORMS";
-  deletedSlugs: string[];
+  deletedIds: string[];
   message?: string | undefined;
 }
 
@@ -62,18 +61,25 @@ export type NavigatorBuilderAction =
 
 export interface FillFieldsAction {
   type: "FILL_FIELDS";
-  formSlug?: string | undefined;
+  formId?: string | undefined;
   fields: Record<string, unknown>;
   message?: string | undefined;
 }
 
 export interface SubmitFormAction {
   type: "SUBMIT_FORM";
-  formSlug?: string | undefined;
+  formId?: string | undefined;
   message?: string | undefined;
 }
 
-export type NavigatorConsumerAction = NavigateAction | FillFieldsAction | SubmitFormAction;
+export interface DeleteSubmissionsAction {
+  type: "DELETE_SUBMISSIONS";
+  deletedIds: string[];
+  message?: string | undefined;
+}
+
+export type NavigatorConsumerAction =
+  NavigateAction | FillFieldsAction | SubmitFormAction | DeleteSubmissionsAction;
 
 // ==========================================
 // 3. 통합 액션 규격 (Unified Action)
@@ -90,6 +96,20 @@ export interface NavigatorChatMessageDto {
 }
 
 /**
+ * 화면 테이블/목록에 렌더링된 항목의 경량 요약 정보 (React Query 캐시 연동)
+ */
+export interface VisibleItemSummary {
+  /** 레코드 고유 ID (UUID) */
+  id: string;
+  /** 항목 제목 (폼 제목 또는 응답자 요약) */
+  title: string;
+  /** 생성 일시 (UTC) */
+  createdAt?: string | undefined;
+  /** 보조 요약 문구 (예: '홍길동 (경력 5년)') */
+  summary?: string | undefined;
+}
+
+/**
  * 네비게이터 실행 요청 컨텍스트
  */
 export interface NavigatorClientContext {
@@ -100,23 +120,24 @@ export interface NavigatorClientContext {
   /** 빌더 화면에서 열려있는 활성 폼 정보 */
   currentForm?:
     | {
-        slug: string;
+        id: string;
         title: string;
         description?: string | undefined;
         fields: CoreFormField[];
       }
     | undefined;
+  /** 빌더 폼 목록 테이블의 렌더링 캐시 목록 */
+  visibleForms?: VisibleItemSummary[] | undefined;
 
   // Consumer Context
-  /** 컨슈머 화면에서 열려있는 폼 슬러그 */
-  currentFormSlug?: string | undefined;
+  /** 컨슈머 화면에서 열려있는 폼 ID (UUID) */
+  currentFormId?: string | undefined;
   /** 컨슈머 화면에서 열려있는 폼 제목 */
   currentFormTitle?: string | undefined;
   /** 컨슈머 화면에서 사용 가능한 필드 명세 */
   availableFields?:
     | Array<{
-        id?: string | undefined;
-        name: string;
+        id: string;
         label: string;
         type: string;
         required?: boolean | undefined;
@@ -125,6 +146,8 @@ export interface NavigatorClientContext {
     | undefined;
   /** 현재 응답자가 작성 중인 임시 필드값 (draftValues) */
   currentDraftValues?: Record<string, unknown> | undefined;
+  /** 컨슈머 응답 목록 테이블의 렌더링 캐시 목록 */
+  visibleSubmissions?: VisibleItemSummary[] | undefined;
 }
 
 /**
@@ -149,6 +172,8 @@ export interface NavigatorExecutionResponse {
   reply: string;
   /** 화면을 제어하기 위해 클라이언트가 수행해야 할 단일 액션 (없는 경우 null) */
   action: NavigatorAction | null;
+  /** [신규] 순차 실행할 클라이언트 복합 액션 배열 (예: [NAVIGATE, FILL_FIELDS]) */
+  actions?: NavigatorAction[] | undefined;
   /** 서버에서 갱신/생성된 폼 데이터 (존재하는 경우) */
   updatedForm?: ActiveForm | Form | null | undefined;
   /** 호환용 메시지 필드 */

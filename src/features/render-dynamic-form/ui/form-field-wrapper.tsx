@@ -11,9 +11,6 @@ export interface FormFieldWrapperProps {
   /** 필드 고유 식별자 (Click-to-Mention 타깃팅 속성으로 주입) */
   id: string;
 
-  /** 필드 키 이름 */
-  name: string;
-
   /** 필드 라벨 텍스트 */
   label: string;
 
@@ -48,7 +45,6 @@ export interface FormFieldWrapperProps {
  */
 export function FormFieldWrapper({
   id,
-  name,
   label,
   required = false,
   description,
@@ -65,7 +61,6 @@ export function FormFieldWrapper({
   return (
     <div
       data-field-id={id}
-      data-field-name={name}
       onClick={handleClick}
       className={cn(
         "group relative flex flex-col gap-1.5 rounded-lg border border-transparent p-3 transition-colors",

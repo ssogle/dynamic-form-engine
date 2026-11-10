@@ -11,4 +11,5 @@ export {
   findSubmissionById,
   updateSubmissionById,
   softDeleteSubmissionById,
+  softDeleteSubmissionsByIds,
 } from "./server/form-submission.server";

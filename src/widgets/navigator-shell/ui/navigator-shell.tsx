@@ -9,7 +9,11 @@ import {
   type NavigatorClientContext,
 } from "@/features/execute-navigator-action";
 import { formKeys, type Form, extractActiveFields } from "@/entities/form";
-import { useConsumerFormDraftStore } from "@/entities/form-submission";
+import {
+  formSubmissionsKeys,
+  useConsumerFormDraftStore,
+  type FormSubmission,
+} from "@/entities/form-submission";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -48,7 +52,7 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
   // 2. 컨슈머 전용 초안 스토어 훅 바인딩
   const applyDraftFields = useConsumerFormDraftStore((state) => state.applyDraftFields);
   const triggerSubmit = useConsumerFormDraftStore((state) => state.triggerSubmit);
-  const currentDraftSlug = useConsumerFormDraftStore((state) => state.currentSlug);
+  const currentDraftFormId = useConsumerFormDraftStore((state) => state.currentFormId);
   const currentDraftValues = useConsumerFormDraftStore((state) => state.draftValues);
 
   // 3. UI 로컬 상태
@@ -85,42 +89,51 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
           break;
 
         case "CREATE_FORM":
-          if (action.slug) {
-            router.push(`/builder/forms/${action.slug}`);
+          if (action.formId) {
+            router.push(`/builder/forms/${action.formId}`);
           }
           break;
 
         case "DELETE_FORMS":
+          queryClient.invalidateQueries({ queryKey: formKeys.all });
           router.push("/builder/forms");
           break;
 
+        case "PUBLISH_FORM":
+          queryClient.invalidateQueries({ queryKey: formKeys.all });
+          break;
+
         case "FILL_FIELDS": {
-          const formSlugMatch = pathname.match(/^\/consumer\/forms\/([^/]+)/);
-          const targetSlug = action.formSlug || formSlugMatch?.[1] || currentDraftSlug || "";
-          if (targetSlug && action.fields) {
-            applyDraftFields(targetSlug, action.fields);
+          const formIdMatch = pathname.match(/^\/consumer\/forms\/([^/]+)/);
+          const targetFormId = action.formId || formIdMatch?.[1] || currentDraftFormId || "";
+          if (targetFormId && action.fields) {
+            applyDraftFields(targetFormId, action.fields);
           }
           break;
         }
 
         case "SUBMIT_FORM": {
-          const formSlugMatch = pathname.match(/^\/consumer\/forms\/([^/]+)/);
-          const targetSlug = action.formSlug || formSlugMatch?.[1] || currentDraftSlug || "";
-          if (targetSlug) {
-            triggerSubmit(targetSlug);
+          const formIdMatch = pathname.match(/^\/consumer\/forms\/([^/]+)/);
+          const targetFormId = action.formId || formIdMatch?.[1] || currentDraftFormId || "";
+          if (targetFormId) {
+            triggerSubmit(targetFormId);
           }
           break;
         }
+
+        case "DELETE_SUBMISSIONS":
+          queryClient.invalidateQueries({ queryKey: formSubmissionsKeys.all });
+          break;
 
         default:
           break;
       }
     },
-    [pathname, router, currentDraftSlug, applyDraftFields, triggerSubmit]
+    [pathname, router, queryClient, currentDraftFormId, applyDraftFields, triggerSubmit]
   );
 
   /**
-   * 현재 화면 맥락(Context)을 모드에 맞게 추출
+   * 현재 화면 맥락(Context)을 모드에 맞게 추출 (React Query 캐시 연동)
    */
   const resolveCurrentContext = React.useCallback((): NavigatorClientContext => {
     const context: NavigatorClientContext = {
@@ -128,33 +141,45 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
     };
 
     if (mode === "builder") {
+      // 1. 개별 폼 상세 화면일 때
       const match = pathname.match(/\/builder\/forms\/([^/]+)/);
       if (match && match[1]) {
-        const slug = match[1];
-        const cachedForm = queryClient.getQueryData<Form>(formKeys.detail(slug));
+        const formId = match[1];
+        const cachedForm = queryClient.getQueryData<Form>(formKeys.detail(formId));
         if (cachedForm) {
           const fields = extractActiveFields(cachedForm);
           context.currentForm = {
-            slug: cachedForm.slug,
+            id: cachedForm.id,
             title: cachedForm.title,
             description: cachedForm.description ?? undefined,
             fields,
           };
         }
       }
-    } else if (mode === "consumer") {
-      const match = pathname.match(/^\/consumer\/forms\/([^/]+)/);
-      const activeSlug = match ? match[1] : (currentDraftSlug ?? undefined);
 
-      if (activeSlug) {
-        context.currentFormSlug = activeSlug;
-        const cachedForm = queryClient.getQueryData<Form>(formKeys.detail(activeSlug));
+      // 2. 폼 목록 캐시가 존재할 때 (In-View 빠른 조회를 위해 상위 10개 주입)
+      const cachedForms = queryClient.getQueryData<Form[]>(formKeys.lists());
+      if (cachedForms && cachedForms.length > 0) {
+        context.visibleForms = cachedForms.slice(0, 10).map((f) => ({
+          id: f.id,
+          title: f.title,
+          summary: f.description ?? undefined,
+          createdAt: f.createdAt ? new Date(f.createdAt).toISOString() : undefined,
+        }));
+      }
+    } else if (mode === "consumer") {
+      // 1. 현재 열려있는 폼 파악
+      const match = pathname.match(/^\/consumer\/forms\/([^/]+)/);
+      const activeFormId = match ? match[1] : (currentDraftFormId ?? undefined);
+
+      if (activeFormId) {
+        context.currentFormId = activeFormId;
+        const cachedForm = queryClient.getQueryData<Form>(formKeys.detail(activeFormId));
         if (cachedForm) {
           context.currentFormTitle = cachedForm.title;
           const activeFields = extractActiveFields(cachedForm);
           context.availableFields = activeFields.map((f) => ({
             id: f.id,
-            name: f.name,
             label: f.label,
             type: f.type,
             required: f.required ?? false,
@@ -163,10 +188,47 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
         }
       }
       context.currentDraftValues = currentDraftValues;
+
+      // 2. 현재 화면의 기제출 응답 목록 캐시가 존재할 때
+      let cachedSubmissions: FormSubmission[] | undefined;
+      if (activeFormId) {
+        cachedSubmissions = queryClient.getQueryData<FormSubmission[]>(
+          formSubmissionsKeys.byForm(activeFormId)
+        );
+      }
+      if (!cachedSubmissions) {
+        const queries = queryClient.getQueriesData<FormSubmission[]>({
+          queryKey: formSubmissionsKeys.all,
+        });
+        for (const [, data] of queries) {
+          if (Array.isArray(data) && data.length > 0) {
+            cachedSubmissions = data;
+            break;
+          }
+        }
+      }
+
+      if (cachedSubmissions && cachedSubmissions.length > 0) {
+        context.visibleSubmissions = cachedSubmissions.slice(0, 10).map((s, idx) => {
+          const dataObj = (s.data as Record<string, unknown>) ?? {};
+          const summaryKeys = Object.keys(dataObj);
+          const firstKey = summaryKeys[0];
+          const firstVal = firstKey ? String(dataObj[firstKey] ?? "") : "";
+          return {
+            id: s.id,
+            title: firstVal ? `응답 #${idx + 1} (${firstVal})` : `응답 #${idx + 1}`,
+            createdAt: s.createdAt ? new Date(s.createdAt).toISOString() : undefined,
+            summary: summaryKeys
+              .slice(0, 3)
+              .map((k) => `${k}: ${String(dataObj[k] ?? "")}`)
+              .join(", "),
+          };
+        });
+      }
     }
 
     return context;
-  }, [mode, pathname, queryClient, currentDraftSlug, currentDraftValues]);
+  }, [mode, pathname, queryClient, currentDraftFormId, currentDraftValues]);
 
   /**
    * 사용자 명령 실행 핸들러
@@ -205,8 +267,23 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
         action: response.action ?? undefined,
       });
 
-      if (response.action) {
-        dispatchAction(response.action);
+      // 복합 액션 및 단일 액션 추출
+      const actionsToExecute: NavigatorAction[] =
+        response.actions && response.actions.length > 0
+          ? response.actions
+          : response.action
+            ? [response.action]
+            : [];
+
+      // 원샷 복합 명령 지원: 초안값 선주입(FILL_FIELDS)을 화면 이동(NAVIGATE)보다 먼저 실행
+      const sortedActions = [...actionsToExecute].sort((a, b) => {
+        if (a.type === "FILL_FIELDS" && b.type === "NAVIGATE") return -1;
+        if (a.type === "NAVIGATE" && b.type === "FILL_FIELDS") return 1;
+        return 0;
+      });
+
+      for (const act of sortedActions) {
+        dispatchAction(act);
       }
     } catch (err) {
       console.error("AI Navigator 통신 오류:", err);

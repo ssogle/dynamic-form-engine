@@ -10,4 +10,5 @@ export type {
   NavigatorExecutionResponse,
   NavigatorChatMessageDto,
   NavigatorClientContext,
+  VisibleItemSummary,
 } from "./types/navigator-action.types";

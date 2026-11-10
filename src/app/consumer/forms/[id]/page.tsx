@@ -3,19 +3,19 @@ import Link from "next/link";
 import { Button } from "@/shared/ui/button";
 import { ConsumerFormSubmitter } from "@/features/render-dynamic-form";
 
-interface ConsumerFormSlugPageProps {
+interface ConsumerFormIdPageProps {
   params: Promise<{
-    slug: string;
+    id: string;
   }>;
 }
 
 /**
- * 컨슈머 개별 폼 입력 및 실시간 제출 페이지 (/consumer/forms/[slug])
+ * 컨슈머 개별 폼 입력 및 실시간 제출 페이지 (/consumer/forms/[id])
  *
  * 공식 발행된 활성 폼을 불러와 엔드유저가 답변을 입력하고 서버로 안전하게 일괄 제출하는 Thin 라우트 페이지입니다.
  */
-export default async function ConsumerFormSlugPage({ params }: ConsumerFormSlugPageProps) {
-  const { slug } = await params;
+export default async function ConsumerFormIdPage({ params }: ConsumerFormIdPageProps) {
+  const { id } = await params;
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6">
@@ -27,11 +27,11 @@ export default async function ConsumerFormSlugPage({ params }: ConsumerFormSlugP
         </div>
 
         <Button asChild variant="outline" size="sm">
-          <Link href={`/consumer/forms/${slug}/submissions`}>제출 내역 확인</Link>
+          <Link href={`/consumer/forms/${id}/submissions`}>제출 내역 확인</Link>
         </Button>
       </div>
 
-      <ConsumerFormSubmitter slug={slug} />
+      <ConsumerFormSubmitter formId={id} />
     </div>
   );
 }

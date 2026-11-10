@@ -5,9 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createForm,
   deleteForm,
+  publishForm,
   updateForm,
   useCreateFormMutation,
   useDeleteFormMutation,
+  usePublishFormMutation,
   useUpdateFormMutation,
 } from "./use-form.mutation";
 
@@ -31,7 +33,6 @@ describe("useFormMutation (엔티티 공용 폼 조작 뮤테이션 훅)", () =>
 
   const sampleForm = {
     id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-    slug: "sample-form",
     title: "샘플 폼",
     description: "설명",
     schemaDefinition: { fields: [] },
@@ -93,7 +94,6 @@ describe("useFormMutation (엔티티 공용 폼 조작 뮤테이션 훅)", () =>
 
       await act(async () => {
         await result.current.mutateAsync({
-          slug: "sample-form",
           title: "샘플 폼",
           schemaDefinition: { fields: [] },
         });
@@ -187,6 +187,57 @@ describe("useFormMutation (엔티티 공용 폼 조작 뮤테이션 훅)", () =>
 
       await act(async () => {
         await result.current.mutateAsync(sampleForm.id);
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(invalidateSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe("publishForm & usePublishFormMutation", () => {
+    it("publishForm 함수가 /api/v1/forms/[id]/publish POST 요청을 수행해야 한다", async () => {
+      const mockFetch = vi.fn().mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => ({
+          success: true,
+          data: { ...sampleForm, publishedAt: "2026-11-10T09:30:00Z" },
+        }),
+      } as unknown as Response);
+      vi.stubGlobal("fetch", mockFetch);
+
+      const result = await publishForm(sampleForm.id, true);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        `/api/v1/forms/${sampleForm.id}/publish`,
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ isPublished: true }),
+        })
+      );
+      expect(result.publishedAt).toBeDefined();
+    });
+
+    it("usePublishFormMutation 성공 시 캐시를 무효화해야 한다", async () => {
+      const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => ({
+          success: true,
+          data: { ...sampleForm, publishedAt: "2026-11-10T09:30:00Z" },
+        }),
+      } as unknown as Response);
+
+      const { result } = renderHook(() => usePublishFormMutation(), {
+        wrapper: createWrapper(queryClient),
+      });
+
+      await act(async () => {
+        await result.current.mutateAsync({ id: sampleForm.id, isPublished: true });
       });
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true));

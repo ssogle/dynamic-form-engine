@@ -6,21 +6,18 @@ describe("Dynamic Form Schema & Validator (entities/form/schema)", () => {
   const mockFields: CoreFormField[] = [
     {
       id: "f1",
-      name: "applicantName",
       label: "지원자 이름",
       type: "text",
       required: true,
     },
     {
       id: "f2",
-      name: "yearsOfExperience",
       label: "경력 연수",
       type: "number",
       required: true,
     },
     {
       id: "f3",
-      name: "targetPosition",
       label: "지원 직무",
       type: "select",
       required: true,
@@ -28,14 +25,12 @@ describe("Dynamic Form Schema & Validator (entities/form/schema)", () => {
     },
     {
       id: "f4",
-      name: "portfolioUrl",
       label: "포트폴리오 링크",
       type: "text",
       required: false,
     },
     {
       id: "f5",
-      name: "deletedField",
       label: "삭제된 필드",
       type: "text",
       required: true,
@@ -45,10 +40,10 @@ describe("Dynamic Form Schema & Validator (entities/form/schema)", () => {
 
   it("모든 필수 항목이 올바르게 채워진 경우 검증을 통과해야 한다", () => {
     const rawData = {
-      applicantName: "홍길동",
-      yearsOfExperience: 5,
-      targetPosition: "Frontend",
-      portfolioUrl: "https://github.com/example",
+      f1: "홍길동",
+      f2: 5,
+      f3: "Frontend",
+      f4: "https://github.com/example",
     };
 
     const result = validateSubmissionData(mockFields, rawData);
@@ -56,117 +51,100 @@ describe("Dynamic Form Schema & Validator (entities/form/schema)", () => {
     expect(result.isValid).toBe(true);
     expect(result.errors).toEqual({});
     expect(result.cleanedData).toEqual({
-      applicantName: "홍길동",
-      yearsOfExperience: 5,
-      targetPosition: "Frontend",
-      portfolioUrl: "https://github.com/example",
+      f1: "홍길동",
+      f2: 5,
+      f3: "Frontend",
+      f4: "https://github.com/example",
     });
   });
 
   it("필수 입력 필드가 누락되거나 빈 문자열인 경우 에러를 반환해야 한다", () => {
     const rawData = {
-      applicantName: "   ",
-      yearsOfExperience: undefined,
-      targetPosition: "",
+      f1: "   ",
+      f2: undefined,
+      f3: "",
     };
 
     const result = validateSubmissionData(mockFields, rawData);
 
     expect(result.isValid).toBe(false);
-    expect(result.errors.applicantName).toContain("필수 입력");
-    expect(result.errors.yearsOfExperience).toContain("필수 입력");
-    expect(result.errors.targetPosition).toContain("필수 입력");
+    expect(result.errors.f1).toContain("필수 입력");
+    expect(result.errors.f2).toContain("필수 입력");
+    expect(result.errors.f3).toContain("필수 입력");
   });
 
   it("선택 항목(required: false)이 비어있으면 에러 없이 통과해야 한다", () => {
     const rawData = {
-      applicantName: "홍길동",
-      yearsOfExperience: 3,
-      targetPosition: "Backend",
-      portfolioUrl: "",
+      f1: "홍길동",
+      f2: 3,
+      f3: "Backend",
+      f4: "",
     };
 
     const result = validateSubmissionData(mockFields, rawData);
 
     expect(result.isValid).toBe(true);
     expect(result.errors).toEqual({});
-    expect(result.cleanedData?.portfolioUrl).toBeUndefined();
+    expect(result.cleanedData?.f4).toBeUndefined();
   });
 
   describe("number 타입 필드 유효성 검증", () => {
     it("숫자 형태 문자열이 전달되면 number 타입으로 파싱하여 정제해야 한다", () => {
       const rawData = {
-        applicantName: "홍길동",
-        yearsOfExperience: "7",
-        targetPosition: "Fullstack",
+        f1: "홍길동",
+        f2: "7",
+        f3: "Fullstack",
       };
 
       const result = validateSubmissionData(mockFields, rawData);
 
       expect(result.isValid).toBe(true);
-      expect(result.cleanedData?.yearsOfExperience).toBe(7);
-      expect(typeof result.cleanedData?.yearsOfExperience).toBe("number");
+      expect(result.cleanedData?.f2).toBe(7);
+      expect(typeof result.cleanedData?.f2).toBe("number");
     });
 
     it("유효하지 않은 숫자 문자열이 입력되면 에러를 반환해야 한다", () => {
       const rawData = {
-        applicantName: "홍길동",
-        yearsOfExperience: "invalid_number",
-        targetPosition: "Backend",
+        f1: "홍길동",
+        f2: "invalid_number",
+        f3: "Backend",
       };
 
       const result = validateSubmissionData(mockFields, rawData);
 
       expect(result.isValid).toBe(false);
-      expect(result.errors.yearsOfExperience).toContain("유효한 숫자");
+      expect(result.errors.f2).toContain("유효한 숫자");
     });
   });
 
   describe("select 타입 필드 유효성 검증", () => {
     it("정의된 options에 포함되지 않은 값이 입력되면 에러를 반환해야 한다", () => {
       const rawData = {
-        applicantName: "홍길동",
-        yearsOfExperience: 2,
-        targetPosition: "DevOps",
+        f1: "홍길동",
+        f2: 2,
+        f3: "DevOps",
       };
 
       const result = validateSubmissionData(mockFields, rawData);
 
       expect(result.isValid).toBe(false);
-      expect(result.errors.targetPosition).toContain("제공된 선택지 중 하나");
-    });
-  });
-
-  describe("식별자(id vs name) 매핑 호환성", () => {
-    it("field.id로 값이 전달되어도 field.name으로 정규화하여 cleanedData에 수납해야 한다", () => {
-      const rawData = {
-        f1: "이순신",
-        f2: 10,
-        f3: "Frontend",
-      };
-
-      const result = validateSubmissionData(mockFields, rawData);
-
-      expect(result.isValid).toBe(true);
-      expect(result.cleanedData?.applicantName).toBe("이순신");
-      expect(result.cleanedData?.yearsOfExperience).toBe(10);
-      expect(result.cleanedData?.targetPosition).toBe("Frontend");
+      expect(result.errors.f3).toContain("제공된 선택지 중 하나");
     });
   });
 
   describe("소프트 삭제된 필드 처리", () => {
     it("deletedAt이 존재하는 필드는 신규 검증 및 cleanedData에서 제외되어야 한다", () => {
       const rawData = {
-        applicantName: "강감찬",
-        yearsOfExperience: 4,
-        targetPosition: "Backend",
-        deletedField: "이 값은 무시되어야 함",
+        f1: "강감찬",
+        f2: 4,
+        f3: "Backend",
+        f5: "이 값은 무시되어야 함",
       };
 
       const result = validateSubmissionData(mockFields, rawData);
 
       expect(result.isValid).toBe(true);
-      expect(result.cleanedData?.deletedField).toBeUndefined();
+      expect(result.cleanedData?.f5).toBeUndefined();
     });
   });
 
@@ -177,16 +155,16 @@ describe("Dynamic Form Schema & Validator (entities/form/schema)", () => {
       expect(schema).toBeDefined();
 
       const parseSuccess = schema.safeParse({
-        applicantName: "을지문덕",
-        yearsOfExperience: 20,
-        targetPosition: "Fullstack",
+        f1: "을지문덕",
+        f2: 20,
+        f3: "Fullstack",
       });
       expect(parseSuccess.success).toBe(true);
 
       const parseFailure = schema.safeParse({
-        applicantName: "",
-        yearsOfExperience: "not-a-number",
-        targetPosition: "Unknown",
+        f1: "",
+        f2: "not-a-number",
+        f3: "Unknown",
       });
       expect(parseFailure.success).toBe(false);
     });
@@ -195,7 +173,6 @@ describe("Dynamic Form Schema & Validator (entities/form/schema)", () => {
       const customFields: CoreFormField[] = [
         {
           id: "custom_1",
-          name: "customColor",
           label: "커스텀 색상",
           type: "color" as unknown as CoreFormField["type"],
           required: true,
@@ -205,11 +182,11 @@ describe("Dynamic Form Schema & Validator (entities/form/schema)", () => {
       const schema = buildDynamicFormSchema(customFields);
 
       // 1. 필수 입력 미충족 시 검증 실패
-      const failResult = schema.safeParse({ customColor: "" });
+      const failResult = schema.safeParse({ custom_1: "" });
       expect(failResult.success).toBe(false);
 
       // 2. 값 전달 시 통과
-      const passResult = schema.safeParse({ customColor: "#ff0000" });
+      const passResult = schema.safeParse({ custom_1: "#ff0000" });
       expect(passResult.success).toBe(true);
     });
   });

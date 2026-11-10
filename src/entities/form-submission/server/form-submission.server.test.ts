@@ -4,6 +4,7 @@ import {
   findSubmissionsByFormId,
   insertSubmission,
   softDeleteSubmissionById,
+  softDeleteSubmissionsByIds,
   updateSubmissionById,
 } from "./form-submission.server";
 
@@ -185,6 +186,36 @@ describe("Form Submission Server Repository (entities/form-submission/server)", 
         })
       );
       expect(result).toEqual(deletedSubmission);
+    });
+  });
+
+  describe("softDeleteSubmissionsByIds", () => {
+    it("빈 배열 전달 시 DB 쿼리 없이 빈 배열을 즉시 반환해야 한다", async () => {
+      const result = await softDeleteSubmissionsByIds([]);
+      expect(mockUpdate).not.toHaveBeenCalled();
+      expect(result).toEqual([]);
+    });
+
+    it("유효하지 않은 UUID들만 전달 시 빈 배열을 반환해야 한다", async () => {
+      const result = await softDeleteSubmissionsByIds(["invalid-id-1", "invalid-id-2"]);
+      expect(mockUpdate).not.toHaveBeenCalled();
+      expect(result).toEqual([]);
+    });
+
+    it("복수 ID 전달 시 inArray 갱신으로 소프트 삭제를 수행해야 한다", async () => {
+      const deletedList = [
+        { ...sampleSubmission, id: "00000000-0000-0000-0000-000000000001", deletedAt: new Date() },
+        { ...sampleSubmission, id: "00000000-0000-0000-0000-000000000002", deletedAt: new Date() },
+      ];
+      mockReturning.mockResolvedValueOnce(deletedList);
+
+      const result = await softDeleteSubmissionsByIds([
+        "00000000-0000-0000-0000-000000000001",
+        "00000000-0000-0000-0000-000000000002",
+      ]);
+
+      expect(mockUpdate).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(deletedList);
     });
   });
 });

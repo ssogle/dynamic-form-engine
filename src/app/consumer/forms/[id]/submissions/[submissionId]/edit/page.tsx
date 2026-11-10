@@ -3,7 +3,7 @@ import { ConsumerSubmissionEditor } from "@/features/render-dynamic-form";
 
 interface ConsumerSubmissionEditPageProps {
   params: Promise<{
-    slug: string;
+    id: string;
     submissionId: string;
   }>;
 }
@@ -14,19 +14,19 @@ export const metadata: Metadata = {
 };
 
 /**
- * 컨슈머 폼 응답 수정 페이지 (GET /consumer/forms/[slug]/submissions/[submissionId]/edit)
+ * 컨슈머 폼 응답 수정 페이지 (GET /consumer/forms/[id]/submissions/[submissionId]/edit)
  *
- * App Router 비동기 파라미터 규격을 준수하여 slug와 submissionId를 추출하고,
+ * App Router 비동기 파라미터 규격을 준수하여 id와 submissionId를 추출하고,
  * 전용 응답 수정 위젯을 렌더링하는 Thin 라우트 페이지입니다.
  */
 export default async function ConsumerSubmissionEditPage({
   params,
 }: ConsumerSubmissionEditPageProps) {
-  const { slug, submissionId } = await params;
+  const { id, submissionId } = await params;
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <ConsumerSubmissionEditor slug={slug} submissionId={submissionId} />
+      <ConsumerSubmissionEditor formId={id} submissionId={submissionId} />
     </div>
   );
 }

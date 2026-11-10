@@ -43,7 +43,6 @@ describe("Route Handler: /api/v1/forms/[id]", () => {
   describe("GET /api/v1/forms/[id] (폼 단건 상세 조회)", () => {
     const sampleForm = {
       id: formId,
-      slug: "daily-report",
       title: "일일 업무 보고",
       description: "업무 보고용 폼입니다.",
       schemaDefinition: { fields: [] },
@@ -63,29 +62,15 @@ describe("Route Handler: /api/v1/forms/[id]", () => {
       expect(response.status).toBe(200);
       const json = await response.json();
       expect(json.success).toBe(true);
-      expect(json.data.slug).toBe("daily-report");
-    });
-
-    it("유효한 slug로 조회 시 200 OK와 함께 폼 데이터를 반환해야 한다", async () => {
-      mockLimit.mockResolvedValueOnce([sampleForm]);
-
-      const request = new NextRequest("http://localhost:3000/api/v1/forms/daily-report");
-      const response = await GET(request, {
-        params: Promise.resolve({ id: "daily-report" }),
-      });
-
-      expect(response.status).toBe(200);
-      const json = await response.json();
-      expect(json.success).toBe(true);
-      expect(json.data.title).toBe("일일 업무 보고");
+      expect(json.data.id).toBe(formId);
     });
 
     it("존재하지 않거나 삭제된 폼 조회 시 404 Not Found를 반환해야 한다", async () => {
       mockLimit.mockResolvedValueOnce([]);
 
-      const request = new NextRequest("http://localhost:3000/api/v1/forms/non-existent");
+      const request = new NextRequest(`http://localhost:3000/api/v1/forms/${formId}`);
       const response = await GET(request, {
-        params: Promise.resolve({ id: "non-existent" }),
+        params: Promise.resolve({ id: formId }),
       });
 
       expect(response.status).toBe(404);
