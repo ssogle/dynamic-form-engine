@@ -142,7 +142,7 @@ export function ConsumerFormSubmitter({ formId }: ConsumerFormSubmitterProps) {
               새로운 응답 작성하기
             </Button>
             <Button asChild size="sm">
-              <Link href={`/consumer/forms/${formId}/submissions`}>제출된 내역 확인하기</Link>
+              <Link href={`/consumer/forms/${formId}`}>제출된 목록 확인하기</Link>
             </Button>
           </CardFooter>
         </Card>

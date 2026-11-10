@@ -1,10 +1,15 @@
 import * as React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Form } from "@/entities/form";
 import type { FormSubmission } from "@/entities/form-submission";
-import { SubmissionListTable } from "./submission-list-table";
+import { SubmissionListTable, SYSTEM_COLUMN_LABELS } from "./submission-list-table";
+
+const mockPush = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: mockPush }),
+}));
 
 const mockSubmissions: FormSubmission[] = [
   {
@@ -71,7 +76,14 @@ describe("SubmissionListTable (features/manage-form-submissions/ui)", () => {
       headers: new Headers({ "content-type": "application/json" }),
       json: async () => ({
         success: true,
-        data: mockSubmissions,
+        data: {
+          items: mockSubmissions,
+          page: 1,
+          limit: 20,
+          totalCount: 1,
+          totalPages: 1,
+          hasMore: false,
+        },
       }),
     } as unknown as Response);
     vi.stubGlobal("fetch", mockFetch);
@@ -85,6 +97,49 @@ describe("SubmissionListTable (features/manage-form-submissions/ui)", () => {
 
     expect(screen.getByText("지원자 이름")).toBeDefined();
     expect(screen.getByText("경력 연수")).toBeDefined();
+    expect(screen.getByText(SYSTEM_COLUMN_LABELS.createdAt)).toBeDefined();
+    expect(screen.getByText(SYSTEM_COLUMN_LABELS.updatedAt)).toBeDefined();
+    expect(screen.getByText(SYSTEM_COLUMN_LABELS.actions)).toBeDefined();
+  });
+
+  it("컬럼 표시 팝오버에서 영문 컬럼 ID 대신 친화적인 한글 레이블을 노출해야 한다", async () => {
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({
+        success: true,
+        data: {
+          items: mockSubmissions,
+          page: 1,
+          limit: 20,
+          totalCount: 1,
+          totalPages: 1,
+          hasMore: false,
+        },
+      }),
+    } as unknown as Response);
+    vi.stubGlobal("fetch", mockFetch);
+
+    renderWithClient(<SubmissionListTable form={mockForm} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("컬럼 표시")).toBeDefined();
+    });
+
+    // 컬럼 표시 버튼 클릭하여 팝오버 열기
+    const columnVisibilityBtn = screen.getByRole("button", { name: /컬럼 표시/ });
+    fireEvent.click(columnVisibilityBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText("표시할 컬럼 선택")).toBeDefined();
+    });
+
+    // 체크박스 레이블에 'createdAt', 'updatedAt' 영문 ID 대신 한글 명칭이 노출되는지 검증
+    expect(screen.getAllByText(SYSTEM_COLUMN_LABELS.createdAt).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(SYSTEM_COLUMN_LABELS.updatedAt).length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("createdAt")).toBeNull();
+    expect(screen.queryByText("updatedAt")).toBeNull();
   });
 
   it("제출된 응답이 없는 경우 빈 상태 카드를 렌더링해야 한다", async () => {
@@ -94,7 +149,14 @@ describe("SubmissionListTable (features/manage-form-submissions/ui)", () => {
       headers: new Headers({ "content-type": "application/json" }),
       json: async () => ({
         success: true,
-        data: [],
+        data: {
+          items: [],
+          page: 1,
+          limit: 20,
+          totalCount: 0,
+          totalPages: 0,
+          hasMore: false,
+        },
       }),
     } as unknown as Response);
     vi.stubGlobal("fetch", mockFetch);
@@ -106,14 +168,21 @@ describe("SubmissionListTable (features/manage-form-submissions/ui)", () => {
     });
   });
 
-  it("수정 버튼이 해당 응답의 수정 전용 페이지 링크로 렌더링되어야 한다", async () => {
+  it("상세 버튼 및 수정 버튼이 해당 응답의 상세/수정 링크로 렌더링되어야 한다", async () => {
     const mockFetch = vi.fn().mockResolvedValueOnce({
       ok: true,
       status: 200,
       headers: new Headers({ "content-type": "application/json" }),
       json: async () => ({
         success: true,
-        data: mockSubmissions,
+        data: {
+          items: mockSubmissions,
+          page: 1,
+          limit: 20,
+          totalCount: 1,
+          totalPages: 1,
+          hasMore: false,
+        },
       }),
     } as unknown as Response);
     vi.stubGlobal("fetch", mockFetch);
@@ -121,8 +190,14 @@ describe("SubmissionListTable (features/manage-form-submissions/ui)", () => {
     renderWithClient(<SubmissionListTable form={mockForm} />);
 
     await waitFor(() => {
+      expect(screen.getByText("상세")).toBeDefined();
       expect(screen.getByText("수정")).toBeDefined();
     });
+
+    const detailLink = screen.getByRole("link", { name: "상세" });
+    expect(detailLink.getAttribute("href")).toBe(
+      `/consumer/forms/${mockForm.id}/submissions/sub-1`
+    );
 
     const editLink = screen.getByRole("link", { name: "수정" });
     expect(editLink.getAttribute("href")).toBe(

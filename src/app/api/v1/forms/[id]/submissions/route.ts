@@ -1,7 +1,9 @@
 import type { NextRequest } from "next/server";
+import { z } from "zod";
 import { findFormById } from "@/entities/form/server";
 import { extractActiveFields, validateSubmissionData } from "@/entities/form";
-import { findSubmissionsByFormId, insertSubmission } from "@/entities/form-submission/server";
+import { findSubmissionsPaginated, insertSubmission } from "@/entities/form-submission/server";
+import { submissionQuerySchema } from "@/entities/form-submission";
 import { apiResponse, badRequest, notFound, withErrorHandler } from "@/shared/lib/http";
 
 interface RouteContext {
@@ -13,14 +15,14 @@ interface RouteContext {
 /**
  * GET /api/v1/forms/[id]/submissions
  *
- * 특정 폼에 귀속된 소프트 삭제되지 않은 활성 응답 목록을 생성 최신순으로 조회하여 반환합니다.
+ * 특정 폼에 귀속된 소프트 삭제되지 않은 활성 응답 목록을 페이지네이션, 멀티 정렬, 컬럼 필터를 적용하여 조회합니다.
  * 식별자(id)는 폼 UUID 식별자입니다.
  *
- * @param _req NextRequest 객체 (미사용)
+ * @param req NextRequest 객체 (쿼리 파라미터: page, limit, sort, filters)
  * @param context URL 파라미터 (id: 폼 UUID)
- * @returns 200 OK와 함께 FormSubmission[] 배열 반환
+ * @returns 200 OK와 함께 PaginatedSubmissionsResponse 객체 반환
  */
-export const GET = withErrorHandler(async (_req: NextRequest, context: RouteContext) => {
+export const GET = withErrorHandler(async (req: NextRequest, context: RouteContext) => {
   const { id } = await context.params;
 
   // 1. 대상 폼 존재 여부 확인 (UUID)
@@ -29,9 +31,26 @@ export const GET = withErrorHandler(async (_req: NextRequest, context: RouteCont
     throw notFound("존재하지 않거나 삭제된 폼입니다.");
   }
 
-  // 2. 폼의 실제 UUID(form.id)를 기반으로 응답 목록 조회
-  const submissions = await findSubmissionsByFormId(form.id);
-  return apiResponse.ok(submissions);
+  // 2. 쿼리 파라미터 유효성 검증
+  const searchParams = req.nextUrl.searchParams;
+  const rawQuery = {
+    page: searchParams.get("page") ?? undefined,
+    limit: searchParams.get("limit") ?? undefined,
+    sort: searchParams.get("sort") ?? undefined,
+    filters: searchParams.get("filters") ?? undefined,
+  };
+  const parsed = submissionQuerySchema.safeParse(rawQuery);
+
+  if (!parsed.success) {
+    throw badRequest(
+      "요청 쿼리 매개변수가 올바르지 않습니다.",
+      z.flattenError(parsed.error).fieldErrors
+    );
+  }
+
+  // 3. 폼의 실제 UUID(form.id)를 기반으로 페이지네이션 응답 조회
+  const paginatedResult = await findSubmissionsPaginated(form.id, parsed.data);
+  return apiResponse.ok(paginatedResult);
 });
 
 /**

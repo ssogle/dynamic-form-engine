@@ -5,6 +5,17 @@
  */
 export const formSubmissionsKeys = {
   all: ["submissions"] as const,
-  byForm: (formIdOrSlug: string) => [...formSubmissionsKeys.all, "byForm", formIdOrSlug] as const,
+  byForm: (formId: string) => [...formSubmissionsKeys.all, "byForm", formId] as const,
+  infiniteRoot: (formId: string) => [...formSubmissionsKeys.all, "infinite", formId] as const,
+  infinite: (
+    formId: string,
+    params?:
+      | {
+          sort?: string | undefined;
+          filters?: string | undefined;
+          limit?: number | undefined;
+        }
+      | undefined
+  ) => [...formSubmissionsKeys.all, "infinite", formId, params ?? {}] as const,
   detail: (id: string) => [...formSubmissionsKeys.all, "detail", id] as const,
 };

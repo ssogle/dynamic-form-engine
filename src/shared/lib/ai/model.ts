@@ -4,20 +4,25 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 /**
  * 프로젝트 전역 AI 모델 티어 식별자
  *
- * 소비자는 특정 AI 제공사(벤더) 이름이 아닌 범용 티어(DEFAULT, FAST 등)를 참조합니다.
+ * 소비자는 특정 AI 제공사(벤더) 이름이 아닌 범용 티어(DEFAULT, NORMAL, LITE 등)를 참조합니다.
  */
 export const AI_MODELS = {
+  /**
+   * 기본 설정 모델
+   */
+  DEFAULT: "gemini-flash-lite-latest",
+
   /**
    * 고성능/표준 멀티모달 모델
    * 복잡한 문서 분석, 폼 스키마 생성 및 정밀한 도구 호출(Tool Calling)에 권장됩니다.
    */
-  DEFAULT: "gemini-flash-latest",
+  NORMAL: "gemini-flash-latest",
 
   /**
    * 초경량/초고속 저비용 모델
    * 단순 텍스트 분류, 빠른 요약 및 즉각적인 라우팅 판별에 최적화되어 있습니다.
    */
-  FAST: "gemini-flash-lite-latest",
+  LITE: "gemini-flash-lite-latest",
 } as const;
 
 export type AiModelTier = (typeof AI_MODELS)[keyof typeof AI_MODELS] | (string & {});

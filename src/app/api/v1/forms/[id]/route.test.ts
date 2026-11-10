@@ -84,7 +84,6 @@ describe("Route Handler: /api/v1/forms/[id]", () => {
     it("유효한 수정 요청 시 200 OK와 함께 수정된 폼을 반환해야 한다", async () => {
       const updatedForm = {
         id: formId,
-        slug: "daily-report",
         title: "수정된 일일 업무 보고",
         description: "수정된 설명",
         schemaDefinition: { fields: [] },
@@ -137,7 +136,6 @@ describe("Route Handler: /api/v1/forms/[id]", () => {
     it("소프트 삭제 성공 시 deletedAt이 기록된 폼을 200 OK와 함께 반환해야 한다", async () => {
       const deletedForm = {
         id: formId,
-        slug: "daily-report",
         title: "삭제 대상 폼",
         description: null,
         schemaDefinition: { fields: [] },

@@ -55,7 +55,7 @@ describe("ManageFormSubmissions (features/manage-form-submissions)", () => {
     });
 
     render(<ManageFormSubmissions formId={formId} />);
-    expect(screen.getByText("[고객 만족도 설문] 제출 내역")).toBeDefined();
+    expect(screen.getByText("[고객 만족도 설문] 데이터 목록")).toBeDefined();
     expect(screen.getByTestId("submission-list-table")).toBeDefined();
     expect(screen.getByText("고객 만족도 설문 응답 테이블")).toBeDefined();
   });

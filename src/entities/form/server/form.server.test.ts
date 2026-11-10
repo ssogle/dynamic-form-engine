@@ -103,7 +103,7 @@ describe("Form Server Repository (entities/form/server)", () => {
     });
 
     it("UUID 형식이 아닌 ID로 조회 시 DB 쿼리를 타지 않고 undefined를 즉시 반환해야 한다", async () => {
-      const result = await findFormById("non-uuid-slug");
+      const result = await findFormById("invalid-uuid-string");
 
       expect(mockSelect).not.toHaveBeenCalled();
       expect(result).toBeUndefined();

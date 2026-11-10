@@ -60,7 +60,6 @@ describe("extractActiveFields (entities/form/lib)", () => {
   it("schemaDefinition 내 fields가 배열이 아니거나 비어있는 경우 빈 배열을 반환해야 한다", () => {
     const malformedForm = {
       id: "malformed",
-      slug: "malformed",
       title: "비정상 폼",
       description: null,
       schemaDefinition: { fields: "not-an-array" as unknown as [] },

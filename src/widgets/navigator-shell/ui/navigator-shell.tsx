@@ -189,21 +189,34 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
       }
       context.currentDraftValues = currentDraftValues;
 
-      // 2. 현재 화면의 기제출 응답 목록 캐시가 존재할 때
+      // 2. 현재 화면의 기제출 응답 목록 캐시가 존재할 때 (단순 캐시 또는 무한 스크롤 캐시)
       let cachedSubmissions: FormSubmission[] | undefined;
       if (activeFormId) {
         cachedSubmissions = queryClient.getQueryData<FormSubmission[]>(
           formSubmissionsKeys.byForm(activeFormId)
         );
       }
-      if (!cachedSubmissions) {
-        const queries = queryClient.getQueriesData<FormSubmission[]>({
+      if (!cachedSubmissions || cachedSubmissions.length === 0) {
+        const queries = queryClient.getQueriesData<unknown>({
           queryKey: formSubmissionsKeys.all,
         });
-        for (const [, data] of queries) {
-          if (Array.isArray(data) && data.length > 0) {
-            cachedSubmissions = data;
+        for (const [, queryData] of queries) {
+          if (Array.isArray(queryData) && queryData.length > 0) {
+            cachedSubmissions = queryData as FormSubmission[];
             break;
+          }
+          if (
+            queryData &&
+            typeof queryData === "object" &&
+            "pages" in queryData &&
+            Array.isArray((queryData as { pages: unknown[] }).pages)
+          ) {
+            const pages = (queryData as { pages: { items?: FormSubmission[] }[] }).pages;
+            const flattened = pages.flatMap((p) => p.items ?? []);
+            if (flattened.length > 0) {
+              cachedSubmissions = flattened;
+              break;
+            }
           }
         }
       }

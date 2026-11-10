@@ -26,7 +26,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
  * 신규 폼 메타데이터를 등록합니다.
  * 요청 본문은 insertFormSchema를 통해 엄격히 검증되며, 검증 실패 시 400 Bad Request를 반환합니다.
  *
- * @param req 클라이언트의 JSON 요청 본문(slug, title, schemaDefinition 등)
+ * @param req 클라이언트의 JSON 요청 본문(title, description, schemaDefinition 등)
  * @returns 201 Created와 함께 영속화된 단일 Form 객체 반환
  */
 export const POST = withErrorHandler(async (req: NextRequest) => {

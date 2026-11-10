@@ -21,19 +21,22 @@ export const CONSUMER_NAVIGATOR_SYSTEM_PROMPT = `
 2. 상황 B: 현재 화면에 없는 대상 조작 (원격 탐색 / Out-of-View Mode)
    - 조건: 사용자가 현재 열려있지 않은 다른 폼 조작이나 메인 화면에서 원샷 복합 명령을 내릴 때
    - 행동: 성급하게 화면을 이동하지 말고, 조회 도구를 먼저 호출하여 팩트(Fact)를 파악한 뒤 액션을 내리세요.
-     * "~설문 작성하러 갈래", "등록된 폼 뭐 있어?"
-       -> 'searchForms({ mode: "consumer", keyword: "..." })' 호출 후 대상 폼으로 'navigate'
-     * "프로젝트 추가할 건데 제목은 A 프로젝트고 기간은 내일까지야" (메인 목록 화면)
+     * "~폼 열어줘", "~제출 목록 볼래"
+       -> 'searchForms({ mode: "consumer", keyword: "..." })' 호출 후 데이터 목록 화면('/consumer/forms/[id]')으로 'navigate'
+     * "~설문 작성하러 갈래", "새로 등록할래"
+       -> 'searchForms({ mode: "consumer", keyword: "..." })' 호출 후 작성 화면('/consumer/forms/[id]/new')으로 'navigate'
+     * "프로젝트 추가할 건데 제목은 A 프로젝트고 기간은 내일까지야" (원샷 복합 명령)
        -> 1단계: 'getFormDetails({ formId: "..." })'로 폼의 필드 규격 파악
-       -> 2단계: 'navigate'와 'fillFields'를 연쇄 실행하여 이동과 입력을 한 번에 지시
+       -> 2단계: 신규 작성 화면('/consumer/forms/[id]/new')으로 'navigate'와 'fillFields'를 연쇄 실행하여 이동과 입력을 한 번에 지시
 
 3. 상황 C: 폼 최종 제출 및 수정 저장 의도 ("제출해줘", "수정 완료", "저장해줘", "다 작성했어", "보내줘")
    - 사용자가 폼 작성을 마치거나 응답 수정을 마치고 저장을 원하면 즉시 'submitForm' 도구를 호출하세요.
 
 4. 상황 D: 일반 화면 이동 의도
-   - 폼 목록 화면: 'navigate' 도구로 '/consumer/forms' 이동
+   - 폼 전체 메뉴: 'navigate' 도구로 '/consumer/forms' 이동
+   - 특정 폼의 데이터 목록: 'navigate' 도구로 '/consumer/forms/[id]' 이동
+   - 특정 폼의 신규 작성: 'navigate' 도구로 '/consumer/forms/[id]/new' 이동
    - 뷰 목록 화면: 'navigate' 도구로 '/consumer/views' 이동
-   - 기제출 응답 목록: 'navigate' 도구로 '/consumer/forms/[id]/submissions' 이동
 
 5. 단순 안내 및 대화
    - 도구 호출이 필요 없는 일반 질문이나 인사에는 친절하고 정중하게 답변하세요.

@@ -61,11 +61,11 @@ export function ManageFormSubmissions({ formId }: ManageFormSubmissionsProps) {
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-foreground text-2xl font-bold tracking-tight">
-          [{form.title}] 제출 내역
+          [{form.title}] 데이터 목록
         </h1>
         <p className="text-muted-foreground text-xs">
-          총 등록된 제출 데이터 목록입니다. 각 응답 데이터를 직접 확인하고 수정하거나 삭제할 수
-          있습니다.
+          등록된 데이터 레코드 목록입니다. 컬럼 헤더를 클릭하여 다중 정렬하거나, 필터 아이콘으로
+          컬럼별 검색 및 가로 스크롤을 이용할 수 있습니다.
         </p>
       </div>
 
