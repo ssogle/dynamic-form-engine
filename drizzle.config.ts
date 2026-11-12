@@ -16,7 +16,11 @@ export default defineConfig({
   schema: "./src/shared/tables/*.table.ts",
   out: "./drizzle",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "",
+    /**
+     * 마이그레이션 및 스키마 푸시(DDL)는 Prepared Statement / 세션 유지가 가능한 DIRECT_URL(예: 5432)을 우선 사용합니다.
+     * 미설정 시 하위 호환을 위해 DATABASE_URL로 fallback합니다.
+     */
+    url: process.env.DIRECT_URL ?? process.env.DATABASE_URL ?? "",
   },
   // 테이블 생성 시 엄격 모드 활성화
   strict: true,
