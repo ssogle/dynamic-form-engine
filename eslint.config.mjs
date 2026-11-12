@@ -3,7 +3,6 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import boundaries from "eslint-plugin-boundaries";
 import checkFile from "eslint-plugin-check-file";
-import betterTailwindcss from "eslint-plugin-better-tailwindcss";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -117,6 +116,7 @@ const eslintConfig = defineConfig([
       "check-file/folder-match-with-fex": [
         "error",
         {
+          "*.hook.{ts,tsx}": "**/hooks/",
           "*.table.{ts,tsx}": "**/tables/",
           "*.store.{ts,tsx}": "**/store/",
           "*.schema.{ts,tsx}": "**/schema/",
@@ -133,9 +133,12 @@ const eslintConfig = defineConfig([
       "check-file/filename-blocklist": [
         "error",
         {
-          // 슬라이스 내부 비표준 세그먼트 폴더 차단 (7대 표준 세그먼트만 허용, 슬라이스 루트 index.{ts,tsx}는 허용)
-          "src/{widgets,features,entities}/*/!(ui|queries|server|store|schema|types|lib|index.ts|index.tsx)/**":
-            "src/**/{ui,queries,server,store,schema,types,lib}/**",
+          // 슬라이스 내부 비표준 세그먼트 폴더 차단 (8대 표준 세그먼트만 허용, 슬라이스 루트 index.{ts,tsx}는 허용)
+          "src/{widgets,features,entities}/*/!(ui|queries|server|store|schema|types|lib|hooks|index.ts|index.tsx)/**":
+            "src/**/{ui,queries,server,store,schema,types,lib,hooks}/**",
+
+          // hooks 폴더 내 파일은 반드시 use- 접두사와 .hook.ts 접미사를 가져야 함 (테스트 및 index 제외)
+          "src/**/hooks/**/!(use-*.hook|use-*.hook.test|index).{ts,tsx}": "use-*.hook.ts",
 
           // tables 폴더 내 파일은 반드시 .table.ts 접미사를 가져야 함 (테스트 및 index 제외)
           "src/**/tables/**/!(*.table|*.table.test|index).{ts,tsx}": "*.table.ts",
@@ -199,26 +202,10 @@ const eslintConfig = defineConfig([
     },
   },
 
-  // 9. Tailwind CSS v4 정규 클래스 가드레일 (임의 값 축약 및 표준 토큰 강제)
+  // 9. 서드파티 라이브러리(date-fns, cn) 직접 import 차단 및 공통 lib 단일 창구 강제 가드레일
   {
     files: ["**/*.ts", "**/*.tsx"],
-    plugins: {
-      "better-tailwindcss": betterTailwindcss,
-    },
-    rules: {
-      "better-tailwindcss/enforce-canonical-classes": [
-        "error",
-        {
-          entryPoint: "src/app/globals.css",
-        },
-      ],
-    },
-  },
-
-  // 10. 서드파티 시간 라이브러리 직접 import 차단 및 @/shared/lib/date 단일 창구 강제 가드레일
-  {
-    files: ["**/*.ts", "**/*.tsx"],
-    ignores: ["src/shared/lib/date/date.ts"],
+    ignores: ["src/shared/lib/date/date.ts", "src/shared/lib/cn/cn.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -234,12 +221,22 @@ const eslintConfig = defineConfig([
               message:
                 "서드파티 로케일 직접 import는 금지됩니다. 반드시 '@/shared/lib/date'의 날짜 함수를 사용하세요.",
             },
+            {
+              name: "cn",
+              message:
+                "외부 'cn' 패키지 직접 import는 금지됩니다. 반드시 '@/shared/lib/cn'을 사용하세요.",
+            },
           ],
           patterns: [
             {
               group: ["date-fns/*"],
               message:
                 "서드파티 시간 라이브러리 하위 모듈 직접 import는 금지됩니다. 반드시 '@/shared/lib/date'를 사용하세요.",
+            },
+            {
+              group: ["cn/*"],
+              message:
+                "외부 'cn' 패키지 하위 모듈 직접 import는 금지됩니다. 반드시 '@/shared/lib/cn'을 사용하세요.",
             },
           ],
         },

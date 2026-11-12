@@ -123,28 +123,29 @@ flowchart TD
 
 ## 5. 슬라이스 내부 표준 세그먼트 규칙 (Slice Segments)
 
-모호한 명칭인 `model/`과 `api/`는 도메인 슬라이스 내부에서 사용하지 않습니다. 역할이 명확한 아래 7개 표준 세그먼트만 허용됩니다.
+모호한 명칭인 `model/`과 `api/`는 도메인 슬라이스 내부에서 사용하지 않습니다. 역할이 명확한 아래 8대 표준 세그먼트만 허용됩니다.
 
-### 7대 표준 세그먼트 및 파일 확장자 접미사(Suffix) 규격
+### 8대 표준 세그먼트 및 파일 확장자 접미사(Suffix) 규격
 
-ESLint(`eslint-plugin-check-file`)에 의해 기계적으로 강제되며, 세그먼트별로 고유 접미사(`.xxx.ts`)를 준수해야 합니다:
+ESLint(`eslint-plugin-check-file`)에 의해 기계적으로 강제되며, 세그먼트별로 고유 접미사(`.xxx.ts`) 또는 명명 규칙을 준수해야 합니다:
 
-| 세그먼트  | 실행 환경       | 주 역할                                                          | 필수 파일명 접미사 (Suffix)                  | 예시 파일명                         |
-| :-------- | :-------------- | :--------------------------------------------------------------- | :------------------------------------------- | :---------------------------------- |
-| `ui`      | Client / Server | 뷰 레이어                                                        | `[name].tsx`                                 | `form-card.tsx`                     |
-| `queries` | Client          | 클라이언트 데이터 패칭                                           | `*.query.ts` / `*.mutation.ts` / `*.keys.ts` | `use-form.query.ts`, `form.keys.ts` |
-| `server`  | Server 전용     | 백엔드 데이터 영속성 (Drizzle 쿼리 및 `db.transaction` 트랜잭션) | `*.server.ts`                                | `form-db.server.ts`                 |
-| `store`   | Client 전용     | 클라이언트 전역 상태                                             | `*.store.ts`                                 | `form-editor.store.ts`              |
-| `schema`  | 공통            | 런타임 데이터 검증 (Zod `z.object` 및 `drizzle-zod` 파생 스키마) | `*.schema.ts`                                | `form.schema.ts`                    |
-| `types`   | 컴파일 타임     | 순수 정적 타입 정의 (**Zod import 금지**, 순수 type/interface)   | `*.types.ts` / `*.dto.ts` / `index.ts`       | `action.types.ts`, `health.dto.ts`  |
-| `lib`     | 공통            | 순수 함수/도구                                                   | `*.util.ts` 또는 `[name].ts`                 | `calculate-score.util.ts`           |
-| `tables`  | 공통 (shared)   | 물리 DB 테이블 DDL (`pgTable`, `src/shared/tables/` 전용)        | `*.table.ts`                                 | `forms.table.ts`                    |
+| 세그먼트  | 실행 환경       | 주 역할                                                          | 필수 파일명 접미사/접두사                                        | 예시 파일명                           |
+| :-------- | :-------------- | :--------------------------------------------------------------- | :--------------------------------------------------------------- | :------------------------------------ |
+| `ui`      | Client / Server | 뷰 레이어                                                        | `[name].tsx`                                                     | `form-card.tsx`                       |
+| `hooks`   | Client 전용     | UI 로컬 상태, 라이프사이클 및 폼 오케스트레이션 커스텀 훅        | `use-[name].hook.ts` (반드시 `use-` 접두사 및 `.hook.ts` 접미사) | `use-consumer-form-submitter.hook.ts` |
+| `queries` | Client          | 클라이언트 서버 데이터 패칭 (TanStack Query)                     | `*.query.ts` / `*.mutation.ts` / `*.keys.ts`                     | `use-form.query.ts`, `form.keys.ts`   |
+| `server`  | Server 전용     | 백엔드 데이터 영속성 (Drizzle 쿼리 및 `db.transaction` 트랜잭션) | `*.server.ts`                                                    | `form-db.server.ts`                   |
+| `store`   | Client 전용     | 클라이언트 전역 상태 (Zustand 스토어)                            | `*.store.ts`                                                     | `form-editor.store.ts`                |
+| `schema`  | 공통            | 런타임 데이터 검증 (Zod `z.object` 및 `drizzle-zod` 파생 스키마) | `*.schema.ts`                                                    | `form.schema.ts`                      |
+| `types`   | 컴파일 타임     | 순수 정적 타입 정의 (**Zod import 금지**, 순수 type/interface)   | `*.types.ts` / `*.dto.ts` / `index.ts`                           | `action.types.ts`, `health.dto.ts`    |
+| `lib`     | 공통            | 순수 함수/도구                                                   | `*.util.ts` 또는 `[name].ts`                                     | `calculate-score.util.ts`             |
+| `tables`  | 공통 (shared)   | 물리 DB 테이블 DDL (`pgTable`, `src/shared/tables/` 전용)        | `*.table.ts`                                                     | `forms.table.ts`                      |
 
-- 단위 테스트 파일은 해당 접미사 뒤에 `.test.ts`를 부착합니다 (예: `form-editor.store.test.ts`, `form.schema.test.ts`).
+- 단위 테스트 파일은 해당 접미사 뒤에 `.test.ts`를 부착합니다 (예: `use-consumer-form-submitter.hook.test.ts`, `form-editor.store.test.ts`, `form.schema.test.ts`).
 
 ### 슬라이스 템플릿 및 YAGNI 원칙
 
-모든 슬라이스가 7개 세그먼트를 억지로 갖출 필요는 없습니다. **해당 슬라이스에 실제로 필요한 세그먼트만 선택적으로 생성**합니다.
+모든 슬라이스가 8개 세그먼트를 억지로 갖출 필요는 없습니다. **해당 슬라이스에 실제로 필요한 세그먼트만 선택적으로 생성**합니다.
 
 ```text
 # 범용 슬라이스 디렉터리 구조 예시
@@ -152,6 +153,7 @@ src/[layer]/[slice-name]/
 ├── index.ts                # Public API (외부 공개 진입점 - 필수)
 ├── ui/                     # [선택] 화면 컴포넌트
 │   └── [slice-name].tsx
+├── hooks/                  # [선택] UI 로컬 상태 및 오케스트레이션 커스텀 훅 (use-*.hook.ts)
 ├── queries/                # [선택] TanStack Query 훅 (useQuery, useMutation)
 ├── server/                 # [선택] Drizzle DB 직접 쿼리 및 트랜잭션 함수 (서버 전용)
 ├── store/                  # [선택] Zustand 상태 스토어

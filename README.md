@@ -87,8 +87,8 @@ sequenceDiagram
 | **아키텍처 경계**      | `eslint-plugin-boundaries`                                              | FSD 레이어 간 단방향 의존성 강제, 세부 구현 직통 import 차단 및 Public API(`index.ts`) 강제                               | [.agents/rules/fsd-architecture-rule.md](.agents/rules/fsd-architecture-rule.md)                                   |
 | **코딩 패러다임**      | ESLint `no-restricted-syntax`                                           | 함수형 지향, `class` 및 `this` 키워드 원천 차단, `{ data, error }` Result 패턴 준수                                       | [.agents/rules/coding-paradigm-rule.md](.agents/rules/coding-paradigm-rule.md)                                     |
 | **파일 컨벤션**        | `eslint-plugin-check-file`                                              | 전역 `kebab-case` 파일/폴더 네이밍 강제 (OS 간 대소문자 경로 불일치 원천 차단)                                            | [.agents/rules/fsd-architecture-rule.md](.agents/rules/fsd-architecture-rule.md)                                   |
-| **테스트 하네스**      | Vitest + React Testing Library                                          | ROI 중심 테스트 전략 (비즈니스 로직 및 상태 변환 중심 TDD 루프, UI 테스트 배제)                                           | [.agents/rules/testing-strategy-rule.md](.agents/rules/testing-strategy-rule.md)                                   |
-| **UI 거버넌스**        | Tailwind CSS v4 + shadcn/ui                                             | `@/shared/ui` 최우선 재사용, 시맨틱 토큰(`bg-background`, `text-foreground`) 필수화                                       | [.agents/rules/ui-and-styling-rule.md](.agents/rules/ui-and-styling-rule.md)                                       |
+| **테스트 하네스**      | Vitest                                                                  | ROI 중심 테스트 전략 (순수 비즈니스 로직 및 상태 변환 중심 TDD 선행, `*.test.tsx` UI 단위 테스트 완전 배제)               | [.agents/rules/testing-strategy-rule.md](.agents/rules/testing-strategy-rule.md)                                   |
+| **UI 거버넌스**        | Tailwind CSS v4 + shadcn/ui                                             | `@/shared/ui` 최우선 재사용, 시맨틱 토큰 필수화, 얇은 뷰(Thin View) 원칙 및 커스텀 훅(`use-*.hook.ts`) 상태 분리          | [.agents/rules/ui-and-styling-rule.md](.agents/rules/ui-and-styling-rule.md)                                       |
 | **스펙 거버넌스**      | Spec-Driven Dev + YAGNI                                                 | [`TEMPLATE.md`](docs/specs/TEMPLATE.md) 기반 Non-Goals 엄격 통제, 추측성 오버엔지니어링 차단 및 검증된 요구사항 중심 구현 | [규칙 문서](.agents/rules/spec-driven-development-rule.md) / [자동화 스킬](.agents/skills/spec-authoring/SKILL.md) |
 | **커밋 거버넌스**      | Husky + lint-staged + Commitlint                                        | Conventional Commits 규격 강제, 빠른 커밋 리듬 유지를 위한 점진적 검증                                                    | [.agents/rules/git-commit-automation-rule.md](.agents/rules/git-commit-automation-rule.md)                         |
 | **날짜/시간 거버넌스** | `date-fns` 래핑 + ESLint `no-restricted-imports` + Drizzle `sql`now()`` | "Store in UTC, Display in Local" 철칙 강제, 중앙 DB 시계 권한 확립, 서드파티 직접 import 원천 차단                        | [.agents/rules/date-and-time-rule.md](.agents/rules/date-and-time-rule.md)                                         |
@@ -101,13 +101,13 @@ sequenceDiagram
 - **아키텍처 & 설계 규격**:
   - [FSD 아키텍처 규칙](.agents/rules/fsd-architecture-rule.md) - 레이어 단방향 의존성 및 Public API 원칙
   - [코딩 패러다임 규칙](.agents/rules/coding-paradigm-rule.md) - 함수형 지향, Result 패턴, 경계선 Zod 검증, YAGNI
-  - [UI & 스타일링 규칙](.agents/rules/ui-and-styling-rule.md) - shadcn/ui 재사용, Tailwind v4 시맨틱 토큰
+  - [UI & 스타일링 규칙](.agents/rules/ui-and-styling-rule.md) - shadcn/ui 재사용, Tailwind v4 시맨틱 토큰, 얇은 뷰(Thin View) 원칙
   - [날짜 & 시간 처리 규칙](.agents/rules/date-and-time-rule.md) - "Store in UTC, Display in Local" 철칙 및 중앙 DB 시계 권한, 공통 유틸리티 래핑
 - **프로세스 & 자동화 스킬**:
   - [스펙 주도 개발(SDD) 규칙](.agents/rules/spec-driven-development-rule.md) - 5단계 적응형 라이프사이클 및 브랜치 격리
   - [스펙 표준 템플릿](docs/specs/TEMPLATE.md) - 단일 진실 원천(SSOT) 마크다운 양식
   - [스펙 작성 자동화 스킬](.agents/skills/spec-authoring/SKILL.md) - 대화형 초안 생성 및 브랜치 분기 스킬
-  - [ROI 중심 테스트 전략](.agents/rules/testing-strategy-rule.md) - 비즈니스 로직 중심 TDD (UI 테스트 배제)
+  - [ROI 중심 테스트 전략](.agents/rules/testing-strategy-rule.md) - 순수 로직 중심 TDD (`*.test.tsx` UI 테스트 완전 배제)
   - [Git 커밋 자동화 규칙](.agents/rules/git-commit-automation-rule.md) - Conventional Commits 컨벤션
 
 ---
@@ -166,6 +166,11 @@ src/
 
 - **결정**: DB 레코드 타임스탬프(`updatedAt`, `deletedAt`, `publishedAt`)는 Drizzle의 `sql`now()``를 사용하여 PostgreSQL 중앙 시계에 위임하고, 비-DB 계층(JSONB 직렬화 등)은 `@/shared/lib/date`의 `nowUtcIso()`로 표준화. UI 표시 시점에만 브라우저 로컬 시간대로 변환("Store in UTC, Display in Local").
 - **이유**: 분산 서버/컨테이너 환경에서 각 인스턴스 런타임의 `new Date()` 호출 시 발생할 수 있는 Clock Drift(시계 불일치) 및 타임존 오차를 원천 방지하고, ESLint `no-restricted-imports` 가드레일로 서드파티 라이브러리(`date-fns`) 직접 참조를 차단하여 날짜 연산 로직을 단일 진실 원천(SSOT)으로 캡슐화하기 위함.
+
+### 8. UI 단위 테스트 배제 및 얇은 뷰(Thin View) / 커스텀 훅 오케스트레이션 (vs 가상 돔 모킹 테스트)
+
+- **결정**: JSDOM 환경에서 화면 마크업 변경에 쉽게 깨지는 취약한 컴포넌트 단위 테스트(`*.test.tsx`)와 브라우저 API(`ResizeObserver` 등) 모킹을 전면 배제. UI 컴포넌트는 오직 마크업 렌더링만 전담하는 얇은 뷰(Thin View)로 유지하고, 상태 관리 및 폼 오케스트레이션 로직은 `hooks/use-*.hook.ts`로 추출하여 순수 비즈니스 로직만 `*.test.ts` 선행 TDD로 검증.
+- **이유**: 잦은 화면 수정에 따른 무의미한 테스트 유지보수 비용을 제거하고, 브라우저 핫 리로드(Fast Refresh)로 시각적 인터랙션을 신속하게 검증하면서 시스템의 실제 결함(상태 전이, 데이터 파이프라인)에 테스트 자원을 100% 집중하기 위함.
 
 ---
 
