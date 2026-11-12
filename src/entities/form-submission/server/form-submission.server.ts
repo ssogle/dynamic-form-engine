@@ -10,6 +10,7 @@ import {
 } from "../schema/form-submission.schema";
 import {
   parseFiltersParam,
+  parseIdsParam,
   parseSortParam,
   type PaginatedSubmissionsResponse,
 } from "../schema/submission-query.schema";
@@ -150,13 +151,14 @@ export interface FindSubmissionsPaginatedOptions {
   limit?: number | undefined;
   sort?: string | undefined;
   filters?: string | undefined;
+  ids?: string | undefined;
 }
 
 /**
- * 특정 폼 ID의 응답 목록을 페이지네이션, 동적 JSONB 멀티 정렬, 컬럼별 ILIKE 필터를 적용하여 조회합니다.
+ * 특정 폼 ID의 응답 목록을 페이지네이션, 동적 JSONB 멀티 정렬, 컬럼별 ILIKE 필터, 배치 ID 조건을 적용하여 조회합니다.
  *
  * @param formId 조회 대상 폼 고유 식별자(UUID)
- * @param options 페이징, 정렬, 필터 옵션
+ * @param options 페이징, 정렬, 필터, 배치 ID 옵션
  * @returns PaginatedSubmissionsResponse 페이징 응답 객체
  */
 export const findSubmissionsPaginated = async (
@@ -181,6 +183,22 @@ export const findSubmissionsPaginated = async (
 
   // 1. Where 절 조립 (기본: 대상 폼 일치 및 소프트 삭제 제외)
   const conditions = [eq(formSubmissions.formId, formId), isNull(formSubmissions.deletedAt)];
+
+  // 1-1. 배치 ID 필터 조립 (선택된 관계형 레코드의 다건 직접 조회용)
+  if (options.ids !== undefined && options.ids.trim().length > 0) {
+    const parsedIds = parseIdsParam(options.ids);
+    if (parsedIds.length === 0) {
+      return {
+        items: [],
+        page,
+        limit,
+        totalCount: 0,
+        totalPages: 0,
+        hasMore: false,
+      };
+    }
+    conditions.push(inArray(formSubmissions.id, parsedIds));
+  }
 
   // 2. 컬럼별 필터 조립 (JSONB 동적 필드 ILIKE 검색)
   const filtersMap = parseFiltersParam(options.filters);

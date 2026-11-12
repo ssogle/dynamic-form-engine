@@ -9,7 +9,13 @@ import {
   type NavigatorClientContext,
   type NavigatorMode,
 } from "@/features/execute-navigator-action";
-import { formKeys, type Form, extractActiveFields } from "@/entities/form";
+import {
+  formKeys,
+  type Form,
+  extractActiveFields,
+  extractPrimaryFieldId,
+  extractPrimaryFieldValue,
+} from "@/entities/form";
 import {
   formSubmissionsKeys,
   useConsumerFormDraftStore,
@@ -195,6 +201,7 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
             title: cachedForm.title,
             description: cachedForm.description ?? undefined,
             isPublished: Boolean(cachedForm.publishedAt),
+            primaryFieldId: extractPrimaryFieldId(cachedForm),
             fields,
           };
         }
@@ -265,15 +272,23 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
         }
       }
 
-      if (cachedSubmissions && cachedSubmissions.length > 0) {
+      if (cachedSubmissions && Array.isArray(cachedSubmissions) && cachedSubmissions.length > 0) {
+        const cachedConsumerForm = activeFormId
+          ? queryClient.getQueryData<Form>(formKeys.detail(activeFormId))
+          : undefined;
+
         context.visibleSubmissions = cachedSubmissions.slice(0, 10).map((s, idx) => {
           const dataObj = (s.data as Record<string, unknown>) ?? {};
           const summaryKeys = Object.keys(dataObj);
           const firstKey = summaryKeys[0];
-          const firstVal = firstKey ? String(dataObj[firstKey] ?? "") : "";
+          const primaryVal = cachedConsumerForm
+            ? extractPrimaryFieldValue(cachedConsumerForm, s)
+            : firstKey
+              ? String(dataObj[firstKey] ?? "")
+              : "";
           return {
             id: s.id,
-            title: firstVal ? `응답 #${idx + 1} (${firstVal})` : `응답 #${idx + 1}`,
+            title: primaryVal ? `응답 #${idx + 1} (${primaryVal})` : `응답 #${idx + 1}`,
             createdAt: s.createdAt ? new Date(s.createdAt).toISOString() : undefined,
             summary: summaryKeys
               .slice(0, 3)

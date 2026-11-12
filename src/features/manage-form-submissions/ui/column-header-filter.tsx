@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ArrowUpDown, ArrowUp, ArrowDown, Filter, RotateCcw } from "lucide-react";
+import { PrimaryFieldBadge } from "@/entities/form";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
@@ -11,6 +12,10 @@ export interface ColumnHeaderFilterProps {
    * 컬럼 표시 레이블
    */
   label: string;
+  /**
+   * 현재 폼의 대표 식별 필드 여부
+   */
+  isPrimary?: boolean | undefined;
   /**
    * 현재 정렬 방향
    */
@@ -37,6 +42,7 @@ export interface ColumnHeaderFilterProps {
  */
 export function ColumnHeaderFilter({
   label,
+  isPrimary = false,
   isSorted,
   onToggleSort,
   filterValue,
@@ -76,6 +82,7 @@ export function ColumnHeaderFilter({
         title={`${label} (클릭하여 정렬, Shift+클릭으로 다중 정렬)`}
       >
         <span className="truncate">{label}</span>
+        {isPrimary && <PrimaryFieldBadge className="shrink-0" />}
         {isSorted === "asc" && <ArrowUp className="text-primary size-3.5 shrink-0" />}
         {isSorted === "desc" && <ArrowDown className="text-primary size-3.5 shrink-0" />}
         {!isSorted && (

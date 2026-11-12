@@ -98,6 +98,7 @@ describe("Navigator Request Schema Validation (src/features/execute-navigator-ac
             title: "입사 지원서",
             description: "개발팀 채용 폼",
             isPublished: true,
+            primaryFieldId: "f_name",
             fields: [
               {
                 id: "f_name",
@@ -124,6 +125,7 @@ describe("Navigator Request Schema Validation (src/features/execute-navigator-ac
       if (result.success) {
         expect(result.data.currentContext?.currentForm?.id).toBe("form-uuid-1");
         expect(result.data.currentContext?.currentForm?.isPublished).toBe(true);
+        expect(result.data.currentContext?.currentForm?.primaryFieldId).toBe("f_name");
         expect(result.data.currentContext?.currentForm?.fields).toHaveLength(1);
         expect(result.data.currentContext?.visibleForms).toHaveLength(1);
       }

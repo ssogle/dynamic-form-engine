@@ -7,6 +7,7 @@ import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { cn } from "@/shared/lib/cn";
+import { extractPrimaryFieldId } from "@/entities/form";
 import type { DynamicFormRendererProps } from "../types/render-dynamic-form.types";
 import { useDynamicForm } from "../hooks/use-dynamic-form.hook";
 import { DynamicField } from "./dynamic-field";
@@ -175,15 +176,19 @@ export function DynamicFormRenderer({
             ) : (
               <form onSubmit={handleFormSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  {activeFields.map((field) => (
-                    <DynamicField
-                      key={field.id}
-                      field={field}
-                      isSelected={Boolean(selectedFieldId && selectedFieldId === field.id)}
-                      onFieldClick={mode === "preview" ? onFieldClick : undefined}
-                      disabled={disabled || isSubmitting}
-                    />
-                  ))}
+                  {activeFields.map((field) => {
+                    const primaryFieldId = extractPrimaryFieldId(activeForm);
+                    return (
+                      <DynamicField
+                        key={field.id}
+                        field={field}
+                        isPrimary={Boolean(primaryFieldId && field.id === primaryFieldId)}
+                        isSelected={Boolean(selectedFieldId && selectedFieldId === field.id)}
+                        onFieldClick={mode === "preview" ? onFieldClick : undefined}
+                        disabled={disabled || isSubmitting}
+                      />
+                    );
+                  })}
                 </div>
 
                 {/* 컨슈머 제출 모드: 제출 버튼 노출 */}

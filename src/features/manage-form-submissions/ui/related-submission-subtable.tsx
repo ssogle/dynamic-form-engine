@@ -3,7 +3,12 @@
 import * as React from "react";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
-import { extractActiveFields, type Form } from "@/entities/form";
+import {
+  extractActiveFields,
+  extractPrimaryFieldId,
+  PrimaryFieldBadge,
+  type Form,
+} from "@/entities/form";
 import type { RelatedSubmissionsGroup } from "@/entities/form-submission";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/shared/ui/table";
 import { Button } from "@/shared/ui/button";
@@ -45,16 +50,27 @@ function formatFieldValue(value: unknown): string {
 export function RelatedSubmissionSubtable({ group }: RelatedSubmissionSubtableProps) {
   const { sourceForm, submissions } = group;
 
-  // 1. 소스 폼의 활성 필드 추출
-  const columns = React.useMemo(() => {
-    const rawForm = {
-      schemaDefinition: sourceForm.schemaDefinition,
-    } as unknown as Form;
+  // 1. 소스 폼의 활성 필드 및 대표 필드 ID 추출 (대표 필드를 가장 왼쪽 컬럼으로 우선 배치)
+  const rawSourceForm = React.useMemo(
+    () =>
+      ({
+        schemaDefinition: sourceForm.schemaDefinition,
+      }) as unknown as Form,
+    [sourceForm.schemaDefinition]
+  );
+  const primaryFieldId = extractPrimaryFieldId(rawSourceForm);
 
-    const allActive = extractActiveFields(rawForm);
+  const columns = React.useMemo(() => {
+    const allActive = extractActiveFields(rawSourceForm);
+    const ordered = primaryFieldId
+      ? [
+          ...allActive.filter((f) => f.id === primaryFieldId),
+          ...allActive.filter((f) => f.id !== primaryFieldId),
+        ]
+      : allActive;
     // 최대 4개의 주요 데이터 컬럼만 노출하여 테이블 가독성 유지
-    return allActive.slice(0, 4);
-  }, [sourceForm.schemaDefinition]);
+    return ordered.slice(0, 4);
+  }, [rawSourceForm, primaryFieldId]);
 
   if (!submissions || submissions.length === 0) {
     return (
@@ -71,7 +87,10 @@ export function RelatedSubmissionSubtable({ group }: RelatedSubmissionSubtablePr
           <TableRow className="bg-muted/40">
             {columns.map((col) => (
               <TableHead key={col.id} className="text-xs font-semibold whitespace-nowrap">
-                {col.label}
+                <div className="flex items-center gap-1.5">
+                  <span>{col.label}</span>
+                  {col.id === primaryFieldId && <PrimaryFieldBadge />}
+                </div>
               </TableHead>
             ))}
             <TableHead className="text-xs font-semibold whitespace-nowrap">제출 일시</TableHead>

@@ -88,7 +88,6 @@ describe("buildDefaultValues (features/render-dynamic-form/lib)", () => {
         description: "참조할 단일 대상을 연결합니다.",
         relationConfig: {
           targetFormId: "550e8400-e29b-41d4-a716-446655440000",
-          displayField: "title",
           multiple: false,
         },
       },
@@ -100,7 +99,6 @@ describe("buildDefaultValues (features/render-dynamic-form/lib)", () => {
         description: "참조할 다중 대상을 연결합니다.",
         relationConfig: {
           targetFormId: "550e8400-e29b-41d4-a716-446655440000",
-          displayField: "title",
           multiple: true,
         },
       },

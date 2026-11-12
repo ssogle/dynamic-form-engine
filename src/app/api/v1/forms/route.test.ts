@@ -99,6 +99,7 @@ describe("Route Handler: /api/v1/forms", () => {
         title: "고객 만족도 조사",
         description: "고객 피드백 수집 목적",
         schemaDefinition: {
+          primaryFieldId: "q1",
           fields: [
             {
               id: "q1",

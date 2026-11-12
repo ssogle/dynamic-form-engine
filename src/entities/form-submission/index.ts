@@ -18,6 +18,7 @@ export {
   submissionQuerySchema,
   parseSortParam,
   parseFiltersParam,
+  parseIdsParam,
   type SubmissionQueryParams,
   type SortItem,
   type PaginatedSubmissionsResponse,
@@ -27,9 +28,11 @@ export { formSubmissionsKeys } from "./queries/form-submissions.keys";
 
 export {
   getFormSubmissions,
+  getFormSubmissionsByIds,
   getPaginatedFormSubmissions,
   getFormSubmissionDetail,
   useFormSubmissionsQuery,
+  useFormSubmissionsByIdsQuery,
   useInfiniteFormSubmissionsQuery,
   useFormSubmissionDetailQuery,
   type UseInfiniteFormSubmissionsQueryOptions,

@@ -8,7 +8,8 @@ export type NavigatorMode = "builder" | "consumer";
 /**
  * 폼 스키마 변경 오퍼레이션 유형 (Builder 전용)
  */
-export type SchemaOperation = "ADD_FIELD" | "UPDATE_FIELD" | "REMOVE_FIELD" | "SET_ALL_FIELDS";
+export type SchemaOperation =
+  "ADD_FIELD" | "UPDATE_FIELD" | "REMOVE_FIELD" | "SET_ALL_FIELDS" | "SET_PRIMARY_FIELD";
 
 // ==========================================
 // 1. 빌더 클라이언트 액션 규격 (Builder Actions)
@@ -24,6 +25,7 @@ export interface UpdateSchemaAction {
   type: "UPDATE_SCHEMA";
   operation: SchemaOperation;
   formId: string;
+  primaryFieldId?: string | undefined;
   field?: CoreFormField | undefined;
   fields?: CoreFormField[] | undefined;
   title?: string | undefined;
@@ -35,6 +37,7 @@ export interface CreateFormAction {
   formId: string;
   title: string;
   description?: string | undefined;
+  primaryFieldId?: string | undefined;
   fields: CoreFormField[];
   message?: string | undefined;
 }
@@ -124,6 +127,7 @@ export interface NavigatorClientContext {
         title: string;
         description?: string | undefined;
         isPublished?: boolean | undefined;
+        primaryFieldId?: string | undefined;
         fields: CoreFormField[];
       }
     | undefined;

@@ -3,8 +3,10 @@ import { z } from "zod";
 import {
   coreFormFieldSchema,
   extractActiveFields,
+  extractPrimaryFieldId,
   mergeOptionsWithPreservation,
   selectOptionSchema,
+  validatePrimaryFieldSelection,
   type CoreFormField,
   type Form,
   type InsertForm,
@@ -88,26 +90,60 @@ export const navigateInputSchema = z.object({
 });
 
 // 2. createForm 입력 스키마
-export const createFormInputSchema = z.object({
-  title: z.string().min(1, "폼 제목은 필수입니다.").describe("폼 제목"),
-  description: z.string().optional().describe("폼에 대한 설명"),
-  fields: z
-    .array(coreFormFieldSchema)
-    .describe(
-      "생성할 초기 필드 배열 (text, textarea, number, select, radio, checkbox, date, switch, relation — 모든 필드에 description 필수)"
-    ),
-});
+export const createFormInputSchema = z
+  .object({
+    title: z.string().min(1, "폼 제목은 필수입니다.").describe("폼 제목"),
+    description: z.string().optional().describe("폼에 대한 설명"),
+    primaryFieldId: z
+      .string({ message: "대표 식별자 필드(primaryFieldId) 지정은 필수입니다." })
+      .trim()
+      .min(1, "대표 식별자 필드(primaryFieldId) 지정은 필수입니다.")
+      .describe(
+        "이 도메인 레코드를 대표하여 식별할 기본 필드 ID (반드시 fields에 포함되고 checkbox·relation이 아닌 활성 필드 ID여야 함)"
+      ),
+    fields: z
+      .array(coreFormFieldSchema)
+      .min(1, "폼에는 최소 1개 이상의 필드가 포함되어야 합니다.")
+      .describe(
+        "생성할 초기 필드 배열 (text, textarea, number, select, radio, checkbox, date, switch, relation — 모든 필드에 description 필수)"
+      ),
+  })
+  .superRefine((val, ctx) => {
+    const check = validatePrimaryFieldSelection(val.fields, val.primaryFieldId);
+    if (!check.isValid) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["primaryFieldId"],
+        message: check.reason ?? "유효하지 않은 대표 필드(primaryFieldId)입니다.",
+      });
+    }
+  });
 
 // 3. updateSchema 입력 스키마
 export const updateSchemaInputSchema = z.object({
   formId: z.uuid("수정 대상 폼의 ID(UUID)는 필수입니다.").describe("수정할 대상 폼의 고유 ID"),
   operation: z
-    .enum(["ADD_FIELD", "REMOVE_FIELD", "MODIFY_FIELD", "UPDATE_INFO", "SET_ALL_FIELDS"])
-    .describe("수행할 스키마 조작 유형 (다중 수정이나 복합 필드 변경 시에는 SET_ALL_FIELDS 사용)"),
+    .enum([
+      "ADD_FIELD",
+      "REMOVE_FIELD",
+      "MODIFY_FIELD",
+      "UPDATE_INFO",
+      "SET_ALL_FIELDS",
+      "SET_PRIMARY_FIELD",
+    ])
+    .describe(
+      "수행할 스키마 조작 유형 (다중 수정이나 복합 필드 변경 시에는 SET_ALL_FIELDS, 대표 식별 필드 변경 시에는 SET_PRIMARY_FIELD 사용)"
+    ),
   targetFieldId: z
     .string()
     .optional()
     .describe("수정/삭제 대상 필드 식별자 (단일 필드 ADD/REMOVE/MODIFY 시 사용)"),
+  primaryFieldId: z
+    .string()
+    .optional()
+    .describe(
+      "대표 식별자 필드(primaryFieldId)로 지정하거나 교체할 활성 필드의 ID 또는 라벨 (SET_PRIMARY_FIELD 시 필수, SET_ALL_FIELDS에서 기존 대표 필드를 대체할 때도 전달)"
+    ),
   fieldData: coreFormFieldSchema.partial().optional().describe("추가 또는 변경할 단일 필드 데이터"),
   fields: z
     .array(coreFormFieldSchema)
@@ -145,12 +181,6 @@ export const addRelationFieldInputSchema = z.object({
   targetFormId: z
     .uuid("참조할 대상 폼의 ID(UUID)는 필수입니다.")
     .describe("관계(외래키)를 맺을 타깃 도메인 폼의 UUID"),
-  displayField: z
-    .string()
-    .optional()
-    .describe(
-      "타깃 폼에서 콤보박스 선택지로 노출할 대표 필드 ID (생략 시 타깃 폼의 첫 번째 텍스트 계열 필드를 자동 탐색하여 지정)"
-    ),
   multiple: z
     .boolean()
     .default(false)
@@ -221,11 +251,16 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
     description:
       "새로운 폼을 생성하고 데이터베이스에 영속화합니다. 폼 생성 후 즉시 해당 폼의 라이브 캔버스(/builder/forms/[id])로 이동하도록 처리됩니다.",
     inputSchema: createFormInputSchema,
-    execute: async ({ title, description, fields }: z.infer<typeof createFormInputSchema>) => {
+    execute: async ({
+      title,
+      description,
+      primaryFieldId,
+      fields,
+    }: z.infer<typeof createFormInputSchema>) => {
       const created = await deps.insertForm({
         title,
         description: description ?? null,
-        schemaDefinition: { fields },
+        schemaDefinition: { primaryFieldId, fields },
       });
 
       const action: NavigatorBuilderAction = {
@@ -233,6 +268,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
         formId: created.id,
         title: created.title,
         description: created.description ?? undefined,
+        primaryFieldId: extractPrimaryFieldId(created) ?? primaryFieldId,
         fields: extractFieldsFromForm(created),
         message: `새로운 폼 '${created.title}'을 생성했습니다.`,
       };
@@ -248,12 +284,13 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
 
   const updateSchemaTool = tool({
     description:
-      "기존 폼의 필드를 추가, 수정, 삭제하거나 전체 필드를 일괄 교체(SET_ALL_FIELDS)합니다.",
+      "기존 폼의 필드를 추가, 수정, 삭제하거나 전체 필드를 일괄 교체(SET_ALL_FIELDS), 대표 식별 필드 변경(SET_PRIMARY_FIELD)을 수행합니다.",
     inputSchema: updateSchemaInputSchema,
     execute: async ({
       formId,
       operation,
       targetFieldId,
+      primaryFieldId: inputPrimaryFieldId,
       fieldData,
       fields: newFieldsList,
       formTitle,
@@ -267,14 +304,16 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
       }
 
       const currentFields = extractFieldsFromForm(existing);
+      const existingPrimaryFieldId = extractPrimaryFieldId(existing);
+      let nextPrimaryFieldId: string | undefined = existingPrimaryFieldId;
       const isProtected = await isFormHistoryProtected(existing, deps);
       let updatedFields: CoreFormField[] = [...currentFields];
 
       if (operation === "SET_ALL_FIELDS") {
-        if (!newFieldsList) {
+        if (!newFieldsList || newFieldsList.length === 0) {
           return {
             success: false,
-            error: "SET_ALL_FIELDS 오퍼레이션에는 완성된 fields 배열이 필수입니다.",
+            error: "SET_ALL_FIELDS 오퍼레이션에는 최소 1개 이상의 완성된 fields 배열이 필수입니다.",
           };
         }
 
@@ -318,6 +357,34 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
           // 미발행 초기 빌드 상태(응답 0건)에서는 누락된 기존 필드를 깔끔하게 물리 삭제합니다.
           updatedFields = mergedNewFields;
         }
+
+        // SET_ALL_FIELDS에서 대체 primaryFieldId가 전달된 경우 새 활성 필드 ID로 해석하여 갱신합니다.
+        if (inputPrimaryFieldId && inputPrimaryFieldId.trim().length > 0) {
+          const matchedPrimary = mergedNewFields.find((f) =>
+            matchesTargetField(f, inputPrimaryFieldId)
+          );
+          nextPrimaryFieldId = matchedPrimary ? matchedPrimary.id : inputPrimaryFieldId;
+        }
+      } else if (operation === "SET_PRIMARY_FIELD") {
+        const candidateIdentifier = inputPrimaryFieldId ?? targetFieldId;
+        if (!candidateIdentifier || candidateIdentifier.trim().length === 0) {
+          return {
+            success: false,
+            error:
+              "SET_PRIMARY_FIELD 오퍼레이션에는 변경할 대표 필드 ID 또는 라벨(primaryFieldId)이 필수입니다.",
+          };
+        }
+
+        const activeFields = extractActiveFields(existing);
+        const matched = activeFields.find((f) => matchesTargetField(f, candidateIdentifier));
+        if (!matched) {
+          return {
+            success: false,
+            error: `대표 필드로 지정할 활성 필드('${candidateIdentifier}')를 찾을 수 없습니다.`,
+          };
+        }
+
+        nextPrimaryFieldId = matched.id;
       } else if (operation === "ADD_FIELD") {
         if (
           !fieldData ||
@@ -347,6 +414,17 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
           return {
             success: false,
             error: "필드 삭제 시 대상 targetFieldId는 필수입니다.",
+          };
+        }
+
+        // 현재 도메인의 대표 식별 필드(primaryFieldId)는 직접 삭제할 수 없도록 선제 차단합니다.
+        const activeTarget = currentFields.find(
+          (f) => !f.deletedAt && matchesTargetField(f, targetFieldId)
+        );
+        if (activeTarget && existingPrimaryFieldId && activeTarget.id === existingPrimaryFieldId) {
+          return {
+            success: false,
+            error: `현재 폼의 대표 필드('${activeTarget.label}', ID: ${activeTarget.id})는 삭제할 수 없습니다. 먼저 'SET_PRIMARY_FIELD' 오퍼레이션으로 다른 활성 필드를 대표 필드로 변경한 뒤 삭제해 주세요.`,
           };
         }
 
@@ -421,9 +499,31 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
         });
       }
 
+      // 모든 스키마 변경 후 최종 상태의 대표 필드(primaryFieldId) 무결성을 검증합니다.
+      if (!nextPrimaryFieldId) {
+        return {
+          success: false,
+          error:
+            "현재 폼에 대표 필드(primaryFieldId)가 지정되어 있지 않습니다. SET_PRIMARY_FIELD로 대표 필드를 먼저 지정해 주세요.",
+        };
+      }
+      const primaryValidation = validatePrimaryFieldSelection(updatedFields, nextPrimaryFieldId);
+      if (!primaryValidation.isValid) {
+        return {
+          success: false,
+          error:
+            primaryValidation.reason && primaryValidation.reason.includes("대표 필드")
+              ? primaryValidation.reason
+              : `대표 필드(primaryFieldId) 무결성 검증 실패: ${primaryValidation.reason ?? "활성 필드 중 유효한 대표 필드를 유지해야 합니다."}`,
+        };
+      }
+
       const updatePayload: UpdateForm = {
         title: formTitle ?? existing.title,
-        schemaDefinition: { fields: updatedFields },
+        schemaDefinition: {
+          primaryFieldId: nextPrimaryFieldId,
+          fields: updatedFields,
+        },
       };
 
       const updated = await deps.updateFormById(existing.id, updatePayload);
@@ -438,6 +538,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
         type: "UPDATE_SCHEMA",
         operation: op,
         formId: existing.id,
+        primaryFieldId: nextPrimaryFieldId,
         field: fieldData as CoreFormField | undefined,
         fields: newFieldsList,
         title: formTitle,
@@ -531,18 +632,17 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
 
   const addRelationFieldTool = tool({
     description:
-      "현재 폼에 다른 도메인 폼을 참조하는 관계형 필드(type: 'relation')를 추가합니다. 타깃 폼을 스캔하여 대표 필드를 콤보박스에 바인딩합니다.",
+      "현재 폼에 다른 도메인 폼을 참조하는 관계형 필드(type: 'relation')를 추가합니다. 타깃 폼의 대표 식별 필드(primaryFieldId)와 테이블 스키마 유효성을 검증하여 연결합니다.",
     inputSchema: addRelationFieldInputSchema,
     execute: async ({
       formId,
       label,
       targetFormId,
-      displayField: inputDisplayField,
       multiple,
       required,
       description,
     }: z.infer<typeof addRelationFieldInputSchema>) => {
-      // 1. 현재 작업 중인 폼 유효성 검증
+      // 1. 현재 작업 중인 폼 및 대표 필드 유효성 검증
       const currentForm = await deps.findFormById(formId);
       if (!currentForm) {
         return {
@@ -551,7 +651,16 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
         };
       }
 
-      // 2. 참조 대상 타깃 폼 존재 여부 및 필드 검증
+      const currentPrimaryFieldId = extractPrimaryFieldId(currentForm);
+      if (!currentPrimaryFieldId) {
+        return {
+          success: false,
+          error:
+            "현재 폼에 대표 필드(primaryFieldId)가 지정되어 있지 않습니다. 먼저 SET_PRIMARY_FIELD로 대표 필드를 지정해 주세요.",
+        };
+      }
+
+      // 2. 참조 대상 타깃 폼 존재 여부 및 타깃 폼의 대표 필드(primaryFieldId) 검증
       const targetForm = await deps.findFormById(targetFormId);
       if (!targetForm) {
         return {
@@ -561,26 +670,13 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
       }
 
       const targetFields = extractFieldsFromForm(targetForm);
-      let resolvedDisplayField = inputDisplayField;
-
-      // 대표 필드가 명시되지 않은 경우, 타깃 폼의 필드 중 적합한 텍스트/라벨 계열 필드를 자동 탐색
-      if (!resolvedDisplayField) {
-        const candidateField =
-          targetFields.find((f) => f.type === "text" || f.type === "textarea") ?? targetFields[0];
-
-        if (!candidateField) {
-          return {
-            success: false,
-            error: `참조 대상 폼 '${targetForm.title}'에 대표 필드로 노출할 필드가 존재하지 않습니다.`,
-          };
-        }
-        resolvedDisplayField = candidateField.id;
-      } else {
-        // 명시된 displayField가 타깃 폼에 존재하는지 검증 (ID 또는 라벨 매칭)
-        const matched = targetFields.find((f) => matchesTargetField(f, resolvedDisplayField));
-        if (matched) {
-          resolvedDisplayField = matched.id;
-        }
+      const targetPrimaryFieldId = extractPrimaryFieldId(targetForm);
+      const targetPrimaryCheck = validatePrimaryFieldSelection(targetFields, targetPrimaryFieldId);
+      if (!targetPrimaryCheck.isValid || !targetPrimaryFieldId) {
+        return {
+          success: false,
+          error: `참조 대상 폼 '${targetForm.title}'에 유효한 대표 식별 필드(primaryFieldId)가 설정되어 있지 않아 관계 필드를 연결할 수 없습니다. (${targetPrimaryCheck.reason ?? "primaryFieldId 누락"})`,
+        };
       }
 
       const currentFields = extractFieldsFromForm(currentForm);
@@ -593,20 +689,23 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
         description: description.trim(),
         relationConfig: {
           targetFormId: targetForm.id,
-          displayField: resolvedDisplayField,
           multiple: multiple ?? false,
         },
       };
 
       const updatedFields = [...currentFields, newField];
       const updated = await deps.updateFormById(currentForm.id, {
-        schemaDefinition: { fields: updatedFields },
+        schemaDefinition: {
+          primaryFieldId: currentPrimaryFieldId,
+          fields: updatedFields,
+        },
       });
 
       const action: NavigatorBuilderAction = {
         type: "UPDATE_SCHEMA",
         operation: "ADD_FIELD",
         formId: currentForm.id,
+        primaryFieldId: currentPrimaryFieldId,
         field: newField,
         message: `'${targetForm.title}' 폼을 참조하는 관계형 필드 '${label}'을 추가했습니다.`,
       };
@@ -615,6 +714,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
         success: true,
         field: newField,
         targetFormTitle: targetForm.title,
+        targetPrimaryFieldId,
         updatedForm: updated,
         clientAction: action,
       };
@@ -788,14 +888,27 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
       const updatedFields = [...currentFields];
       updatedFields[targetFieldIndex] = updatedField;
 
+      const currentPrimaryFieldId = extractPrimaryFieldId(existing);
+      if (!currentPrimaryFieldId) {
+        return {
+          success: false,
+          error:
+            "현재 폼에 대표 필드(primaryFieldId)가 지정되어 있지 않습니다. 먼저 SET_PRIMARY_FIELD로 대표 필드를 지정해 주세요.",
+        };
+      }
+
       const updatedForm = await deps.updateFormById(existing.id, {
-        schemaDefinition: { fields: updatedFields },
+        schemaDefinition: {
+          primaryFieldId: currentPrimaryFieldId,
+          fields: updatedFields,
+        },
       });
 
       const action: NavigatorBuilderAction = {
         type: "UPDATE_SCHEMA",
         operation: "UPDATE_FIELD",
         formId: existing.id,
+        primaryFieldId: currentPrimaryFieldId,
         field: updatedField,
         message: `'${targetField.label}' 필드의 옵션을 성공적으로 변경했습니다.`,
       };

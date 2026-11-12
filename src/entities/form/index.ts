@@ -6,6 +6,7 @@
  */
 export {
   forms,
+  formSchemaDefinitionSchema,
   insertFormSchema,
   selectFormSchema,
   updateFormSchema,
@@ -29,6 +30,14 @@ export {
 
 export { extractActiveFields } from "./lib/extract-active-fields";
 export { mergeOptionsWithPreservation } from "./lib/merge-options-with-preservation";
+export {
+  PRIMARY_FIELD_DISALLOWED_TYPES,
+  validatePrimaryFieldSelection,
+  extractPrimaryFieldId,
+  extractPrimaryFieldValue,
+  type PrimaryFieldValidationResult,
+} from "./lib/primary-field";
+export { PrimaryFieldBadge, type PrimaryFieldBadgeProps } from "./ui/primary-field-badge";
 
 export { buildDynamicFormSchema, validateSubmissionData } from "./schema/dynamic-form.schema";
 export type { SubmissionValidationResult } from "./types/dynamic-form.types";

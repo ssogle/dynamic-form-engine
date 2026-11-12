@@ -26,6 +26,9 @@ export interface DynamicFieldProps {
   /** 렌더링 대상 코어 폼 필드 정의 */
   field: CoreFormField;
 
+  /** 도메인의 대표 식별 필드 여부 */
+  isPrimary?: boolean | undefined;
+
   /** 현재 네비게이터 또는 사용자가 선택한 필드 여부 */
   isSelected?: boolean | undefined;
 
@@ -151,6 +154,7 @@ function renderSelectOptionItems(visibleOptions: SelectOption[]) {
  */
 export function DynamicField({
   field,
+  isPrimary = false,
   isSelected,
   onFieldClick,
   error: propError,
@@ -409,10 +413,10 @@ export function DynamicField({
         }
 
         case "relation": {
-          if (!relationConfig?.targetFormId || !relationConfig.displayField) {
+          if (!relationConfig?.targetFormId) {
             return (
               <div className="text-muted-foreground bg-muted/40 rounded-md border border-dashed p-2 text-xs">
-                관계형 필드 설정(참조 폼 및 대표 필드)이 올바르지 않습니다.
+                관계형 필드 설정(참조 대상 폼 ID)이 올바르지 않습니다.
               </div>
             );
           }
@@ -424,7 +428,6 @@ export function DynamicField({
               render={({ field: controllerField }) => (
                 <RelationFieldInput
                   targetFormId={relationConfig.targetFormId}
-                  displayField={relationConfig.displayField}
                   multiple={relationConfig.multiple ?? false}
                   value={controllerField.value as string | string[] | undefined}
                   onChange={controllerField.onChange}
@@ -579,12 +582,24 @@ export function DynamicField({
 
       case "relation":
         return (
-          <div className="text-muted-foreground bg-muted/30 rounded-md border border-dashed p-2 text-xs">
-            [관계형 연결] 대상 폼:{" "}
-            {relationConfig?.targetFormId
-              ? `${relationConfig.targetFormId.slice(0, 8)}...`
-              : "미지정"}{" "}
-            (대표 필드: {relationConfig?.displayField ?? "미지정"})
+          <div className="text-muted-foreground bg-muted/20 space-y-1.5 rounded-lg border border-dashed p-3 text-xs">
+            <div className="flex items-center justify-between gap-2">
+              <span>
+                연결 도메인:{" "}
+                <strong className="text-foreground font-medium">
+                  {relationConfig?.targetFormId
+                    ? `${relationConfig.targetFormId.slice(0, 8)}...`
+                    : "미지정"}
+                </strong>
+              </span>
+              <span className="border-border bg-background rounded border px-2 py-0.5 text-[11px]">
+                {relationConfig?.multiple ? "다중 선택 테이블 피커" : "단일 선택 테이블 피커"}
+              </span>
+            </div>
+            <p className="text-[11px]">
+              타깃 폼의 대표 필드(primaryFieldId)와 테이블 행(Row) 구조로 선택 및 미리보기를
+              제공합니다.
+            </p>
           </div>
         );
 
@@ -607,6 +622,7 @@ export function DynamicField({
       id={id}
       label={label}
       required={required}
+      isPrimary={isPrimary}
       description={description}
       error={displayError}
       isSelected={isSelected}

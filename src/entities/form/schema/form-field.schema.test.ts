@@ -94,17 +94,15 @@ describe("Form Field Schema Validation Engine (src/entities/form/schema/form-fie
   });
 
   describe("relationConfigSchema (관계형 필드 설정 검증)", () => {
-    it("정상적인 관계형 설정(targetFormId, displayField)을 파싱해야 한다", () => {
+    it("정상적인 관계형 설정(targetFormId, multiple)을 파싱해야 한다", () => {
       const validConfig = {
         targetFormId: "123e4567-e89b-12d3-a456-426614174000",
-        displayField: "f_project_name",
       };
 
       const result = relationConfigSchema.safeParse(validConfig);
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.targetFormId).toBe("123e4567-e89b-12d3-a456-426614174000");
-        expect(result.data.displayField).toBe("f_project_name");
         // multiple 미지정 시 기본값 false 할당 검증
         expect(result.data.multiple).toBe(false);
       }
@@ -113,20 +111,9 @@ describe("Form Field Schema Validation Engine (src/entities/form/schema/form-fie
     it("targetFormId가 UUID 형식이 아니면 실패해야 한다", () => {
       const invalidConfig = {
         targetFormId: "not-a-uuid",
-        displayField: "f_name",
       };
 
       const result = relationConfigSchema.safeParse(invalidConfig);
-      expect(result.success).toBe(false);
-    });
-
-    it("displayField가 비어있으면 실패해야 한다", () => {
-      const emptyFieldConfig = {
-        targetFormId: "123e4567-e89b-12d3-a456-426614174000",
-        displayField: "",
-      };
-
-      const result = relationConfigSchema.safeParse(emptyFieldConfig);
       expect(result.success).toBe(false);
     });
   });
@@ -232,7 +219,6 @@ describe("Form Field Schema Validation Engine (src/entities/form/schema/form-fie
         description: "이 비용 집행이 귀속되는 상위 프로젝트 도메인 레코드 연결",
         relationConfig: {
           targetFormId: "123e4567-e89b-12d3-a456-426614174000",
-          displayField: "f_title",
           multiple: true,
         },
       };
@@ -320,6 +306,7 @@ describe("Form Field Schema Validation Engine (src/entities/form/schema/form-fie
         id: "123e4567-e89b-12d3-a456-426614174000",
         title: "신규 입사 지원서",
         description: "개발팀 입사 지원 폼입니다.",
+        primaryFieldId: "f_name",
         fields: [
           {
             id: "f_name",
@@ -337,8 +324,26 @@ describe("Form Field Schema Validation Engine (src/entities/form/schema/form-fie
       if (result.success) {
         expect(result.data.id).toBe("123e4567-e89b-12d3-a456-426614174000");
         expect(result.data.title).toBe("신규 입사 지원서");
+        expect(result.data.primaryFieldId).toBe("f_name");
         expect(result.data.fields).toHaveLength(1);
       }
+    });
+
+    it("activeFormSchema에 존재하지 않거나 부적합한 primaryFieldId가 전달되면 검증에 실패해야 한다", () => {
+      const invalidPrimaryForm = {
+        title: "프로젝트 목록",
+        primaryFieldId: "nonexistent",
+        fields: [
+          {
+            id: "f_name",
+            label: "프로젝트명",
+            type: "text",
+            description: "프로젝트 이름입니다.",
+          },
+        ],
+      };
+
+      expect(activeFormSchema.safeParse(invalidPrimaryForm).success).toBe(false);
     });
 
     it("id가 UUID 형식이 아닌 경우 검증에 실패해야 한다", () => {

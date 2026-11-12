@@ -124,4 +124,113 @@ describe("useNavigatorShell (widgets/navigator-shell/hooks)", () => {
 
     expect(executedOrder).toEqual(["FILL_FIELDS", "NAVIGATE"]);
   });
+
+  it("빌더 모드에서 프롬프트 실행 시 캐시된 폼의 primaryFieldId를 currentForm 컨텍스트에 포함해야 한다", async () => {
+    currentPathname = "/builder/forms/form-uuid-1";
+    mockGetQueryData.mockImplementationOnce(() => ({
+      id: "form-uuid-1",
+      title: "프로젝트 관리",
+      description: "프로젝트 도메인 폼",
+      publishedAt: new Date("2026-11-01T00:00:00Z"),
+      schemaDefinition: {
+        primaryFieldId: "p_name",
+        fields: [
+          {
+            id: "p_code",
+            label: "코드",
+            type: "text",
+            required: true,
+            description: "코드 입력",
+          },
+          {
+            id: "p_name",
+            label: "프로젝트명",
+            type: "text",
+            required: true,
+            description: "프로젝트명 입력",
+          },
+        ],
+      },
+    }));
+
+    mockMutateAsync.mockResolvedValueOnce({
+      reply: "확인했습니다.",
+      action: null,
+    });
+
+    const { result } = renderHook(() => useNavigatorShell({ mode: "builder" }));
+
+    await act(async () => {
+      await result.current.handleExecutePrompt("대표 필드 확인해줘");
+    });
+
+    const callArg = mockMutateAsync.mock.calls[0]?.[0] as {
+      currentContext?: { currentForm?: { primaryFieldId?: string } };
+    };
+    expect(callArg.currentContext?.currentForm?.primaryFieldId).toBe("p_name");
+  });
+
+  it("컨슈머 모드에서 visibleSubmissions 요약 제목 생성 시 첫 번째 키가 아닌 폼의 primaryFieldId 값을 우선 사용해야 한다", async () => {
+    currentPathname = "/consumer/forms/form-uuid-1/submissions";
+    mockGetQueryData.mockImplementation((key: unknown) => {
+      if (Array.isArray(key) && key[0] === "forms") {
+        return {
+          id: "form-uuid-1",
+          title: "직원 마스터",
+          schemaDefinition: {
+            primaryFieldId: "f_name",
+            fields: [
+              {
+                id: "f_note",
+                label: "비고",
+                type: "text",
+                required: false,
+                description: "비고",
+              },
+              {
+                id: "f_name",
+                label: "성명",
+                type: "text",
+                required: true,
+                description: "직원 이름",
+              },
+            ],
+          },
+        };
+      }
+      return undefined;
+    });
+    mockGetQueriesData.mockImplementation(() => [
+      [
+        ["form-submissions", "list"],
+        [
+          {
+            id: "sub-1111",
+            formId: "form-uuid-1",
+            data: { f_note: "신규 입사자 메모", f_name: "김철수" },
+            createdAt: new Date("2026-11-02T00:00:00Z"),
+          },
+        ],
+      ],
+    ]);
+
+    mockMutateAsync.mockResolvedValueOnce({
+      reply: "첫 번째 응답을 찾았습니다.",
+      action: null,
+    });
+
+    const { result } = renderHook(() => useNavigatorShell({ mode: "consumer" }));
+
+    await act(async () => {
+      await result.current.handleExecutePrompt("김철수 응답 찾아줘");
+    });
+
+    const callArg = mockMutateAsync.mock.calls[0]?.[0] as {
+      currentContext?: { visibleSubmissions?: Array<{ title: string }> };
+    };
+    expect(callArg.currentContext?.visibleSubmissions?.[0]?.title).toContain("김철수");
+    expect(callArg.currentContext?.visibleSubmissions?.[0]?.title).not.toContain(
+      "신규 입사자 메모"
+    );
+  });
 });

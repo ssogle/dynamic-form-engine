@@ -6,6 +6,7 @@ import { ArrowLeft, Edit, Trash2, Calendar, Clock, FileText, Link2 } from "lucid
 import type { CoreFormField } from "@/entities/form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
+import { PrimaryFieldBadge } from "@/entities/form";
 import { Badge } from "@/shared/ui/badge";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
@@ -46,6 +47,9 @@ export function SubmissionDetailView({ formId, submissionId }: SubmissionDetailV
     submission,
     relatedGroups,
     activeFields,
+    primaryFieldId,
+    primaryDisplayValue,
+    relationDetails,
     submittedData,
     isLoading,
     isError,
@@ -172,8 +176,8 @@ export function SubmissionDetailView({ formId, submissionId }: SubmissionDetailV
       </div>
 
       {/* 2. 폼 기본 정보 및 응답 메타데이터 헤더 */}
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
+      <div className="space-y-1.5">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-primary text-xs font-semibold tracking-wide uppercase">
             Submission Detail
           </span>
@@ -181,8 +185,19 @@ export function SubmissionDetailView({ formId, submissionId }: SubmissionDetailV
           <span className="text-muted-foreground font-mono text-xs">
             ID: {submission.id.slice(0, 8)}...
           </span>
+          {primaryDisplayValue && (
+            <>
+              <span className="text-muted-foreground/60">•</span>
+              <div className="inline-flex items-center gap-1.5">
+                <PrimaryFieldBadge />
+                <span className="text-foreground text-xs font-semibold">{primaryDisplayValue}</span>
+              </div>
+            </>
+          )}
         </div>
-        <h1 className="text-foreground text-2xl font-bold tracking-tight">{form.title}</h1>
+        <h1 className="text-foreground text-2xl font-bold tracking-tight">
+          {primaryDisplayValue ? `${form.title} — ${primaryDisplayValue}` : form.title}
+        </h1>
         {form.description && (
           <p className="text-muted-foreground text-xs/relaxed">{form.description}</p>
         )}
@@ -232,15 +247,34 @@ export function SubmissionDetailView({ formId, submissionId }: SubmissionDetailV
         <CardContent className="divide-border/40 divide-y p-0">
           {activeFields.map((field: CoreFormField) => {
             const rawValue = submittedData[field.id];
-            const hasValue = rawValue !== undefined && rawValue !== null && rawValue !== "";
-            const displayValue = hasValue ? String(rawValue) : "-";
+            const isPrimary = Boolean(primaryFieldId && field.id === primaryFieldId);
+            const hasValue =
+              rawValue !== undefined &&
+              rawValue !== null &&
+              rawValue !== "" &&
+              (!Array.isArray(rawValue) || rawValue.length > 0);
+            const displayValue =
+              typeof rawValue === "boolean"
+                ? rawValue
+                  ? "예"
+                  : "아니오"
+                : Array.isArray(rawValue)
+                  ? rawValue.join(", ")
+                  : hasValue
+                    ? String(rawValue)
+                    : "-";
             const typeLabel = FIELD_TYPE_LABELS[field.type] ?? field.type;
+            const relDetail = field.type === "relation" ? relationDetails[field.id] : undefined;
 
             return (
-              <div key={field.id} className="space-y-1.5 p-4 sm:p-5">
+              <div
+                key={field.id}
+                className={`space-y-1.5 p-4 sm:p-5 ${isPrimary ? "bg-primary/[0.02]" : ""}`}
+              >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-foreground text-sm font-semibold">{field.label}</span>
+                    {isPrimary && <PrimaryFieldBadge />}
                     {field.required && (
                       <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
                         필수
@@ -256,17 +290,48 @@ export function SubmissionDetailView({ formId, submissionId }: SubmissionDetailV
                 </div>
 
                 {/* 필드 입력값 상세 출력 */}
-                <div className="bg-muted/30 border-border/40 mt-1 rounded-md border p-3">
-                  {field.type === "textarea" ? (
-                    <p className="text-foreground text-xs/relaxed whitespace-pre-wrap">
-                      {hasValue ? displayValue : <span className="text-muted-foreground">-</span>}
-                    </p>
-                  ) : (
-                    <p className="text-foreground text-xs font-medium">
-                      {hasValue ? displayValue : <span className="text-muted-foreground">-</span>}
-                    </p>
-                  )}
-                </div>
+                {field.type === "relation" ? (
+                  <div className="mt-1 space-y-2">
+                    {relDetail?.targetForm && relDetail.rows.length > 0 ? (
+                      <RelatedSubmissionSubtable
+                        group={{
+                          sourceForm: {
+                            id: relDetail.targetForm.id,
+                            title: relDetail.targetForm.title,
+                            schemaDefinition: relDetail.targetForm.schemaDefinition,
+                          },
+                          submissions: relDetail.rows,
+                        }}
+                      />
+                    ) : relDetail && relDetail.missingIds.length > 0 ? (
+                      <div className="bg-muted/30 border-border/40 flex flex-wrap gap-1.5 rounded-md border p-3">
+                        {relDetail.missingIds.map((missingId) => (
+                          <Badge key={missingId} variant="outline" className="font-mono text-xs">
+                            {missingId.slice(0, 8)}...
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="bg-muted/30 border-border/40 rounded-md border p-3">
+                        <span className="text-muted-foreground text-xs">
+                          연결된 타깃 레코드가 없습니다.
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-muted/30 border-border/40 mt-1 rounded-md border p-3">
+                    {field.type === "textarea" ? (
+                      <p className="text-foreground text-xs/relaxed whitespace-pre-wrap">
+                        {hasValue ? displayValue : <span className="text-muted-foreground">-</span>}
+                      </p>
+                    ) : (
+                      <p className="text-foreground text-xs font-medium">
+                        {hasValue ? displayValue : <span className="text-muted-foreground">-</span>}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}

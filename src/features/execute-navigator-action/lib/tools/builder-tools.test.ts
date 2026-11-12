@@ -20,6 +20,7 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
       title: "비용 정산서",
       description: "프로젝트 투입 비용을 정산합니다.",
       schemaDefinition: {
+        primaryFieldId: "f_title",
         fields: [
           {
             id: "f_title",
@@ -67,6 +68,7 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
       title: "프로젝트 관리",
       description: "전사 프로젝트 등록부",
       schemaDefinition: {
+        primaryFieldId: "p_name",
         fields: [
           {
             id: "p_code",
@@ -94,6 +96,7 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
       title: "신규 초안 설문",
       description: "아직 한 번도 발행되지 않은 초기 빌드 폼",
       schemaDefinition: {
+        primaryFieldId: "d_title",
         fields: [
           {
             id: "d_title",
@@ -141,6 +144,7 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
       title: "발행 취소된 응답 보유 폼",
       description: "발행 후 응답이 쌓인 상태에서 초안 회수된 폼",
       schemaDefinition: {
+        primaryFieldId: "u_title",
         fields: [
           {
             id: "u_title",
@@ -213,8 +217,113 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
     NonNullable<ReturnType<typeof createBuilderTools>["addRelationField"]["execute"]>
   >[1];
 
+  describe("createForm 도구", () => {
+    it("createFormInputSchema는 fields가 비어있거나 primaryFieldId가 누락/부적합(checkbox, relation, 미존재)이면 실패해야 한다", () => {
+      const emptyFields = createFormInputSchema.safeParse({
+        title: "빈 폼",
+        primaryFieldId: "f_title",
+        fields: [],
+      });
+      expect(emptyFields.success).toBe(false);
+
+      const missingPrimary = createFormInputSchema.safeParse({
+        title: "프로젝트 등록",
+        fields: [
+          {
+            id: "f_title",
+            label: "프로젝트명",
+            type: "text",
+            description: "프로젝트 이름을 입력합니다.",
+          },
+        ],
+      });
+      expect(missingPrimary.success).toBe(false);
+
+      const checkboxPrimary = createFormInputSchema.safeParse({
+        title: "설문",
+        primaryFieldId: "f_check",
+        fields: [
+          {
+            id: "f_check",
+            label: "관심 분야",
+            type: "checkbox",
+            description: "관심 분야를 모두 선택합니다.",
+            options: [
+              {
+                label: "개발",
+                value: "DEV",
+                description: "소프트웨어 엔지니어링 분야에 관심이 있는 경우 선택합니다.",
+              },
+            ],
+          },
+        ],
+      });
+      expect(checkboxPrimary.success).toBe(false);
+
+      const relationPrimary = createFormInputSchema.safeParse({
+        title: "정산",
+        primaryFieldId: "f_rel",
+        fields: [
+          {
+            id: "f_rel",
+            label: "프로젝트",
+            type: "relation",
+            description: "귀속 프로젝트를 연결합니다.",
+            relationConfig: {
+              targetFormId,
+              multiple: false,
+            },
+          },
+        ],
+      });
+      expect(relationPrimary.success).toBe(false);
+    });
+
+    it("createForm 실행 시 primaryFieldId와 fields를 schemaDefinition에 저장하고 CREATE_FORM 액션을 반환해야 한다", async () => {
+      const tools = createBuilderTools(dependencies);
+      const result = (await tools.createForm.execute!(
+        {
+          title: "자산 관리 대장",
+          description: "사내 보유 장비 및 자산을 관리합니다.",
+          primaryFieldId: "f_asset_name",
+          fields: [
+            {
+              id: "f_asset_name",
+              label: "자산명",
+              type: "text",
+              required: true,
+              description: "사내 장비의 공식 명칭을 입력합니다.",
+            },
+            {
+              id: "f_amount",
+              label: "취득 가액",
+              type: "number",
+              required: false,
+              description: "장비의 취득 금액을 원 단위로 입력합니다.",
+            },
+          ],
+        } as never,
+        mockExecutionOptions
+      )) as {
+        success: boolean;
+        form?: Form;
+        clientAction?: { type: string; primaryFieldId?: string };
+      };
+
+      expect(result.success).toBe(true);
+      const schema = result.form?.schemaDefinition as {
+        primaryFieldId?: string;
+        fields: CoreFormField[];
+      };
+      expect(schema.primaryFieldId).toBe("f_asset_name");
+      expect(schema.fields).toHaveLength(2);
+      expect(result.clientAction?.type).toBe("CREATE_FORM");
+      expect(result.clientAction?.primaryFieldId).toBe("f_asset_name");
+    });
+  });
+
   describe("addRelationField 도구", () => {
-    it("addRelationFieldInputSchema는 description이 누락되거나 공백만 있으면 파싱에 실패해야 한다", () => {
+    it("addRelationFieldInputSchema는 description이 누락되거나 공백만 있으면 파싱에 실패해야 하고 displayField 속성을 받지 않아야 한다", () => {
       const missingDesc = addRelationFieldInputSchema.safeParse({
         formId: currentFormId,
         label: "참조 프로젝트",
@@ -233,6 +342,7 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
 
       expect(missingDesc.success).toBe(false);
       expect(blankDesc.success).toBe(false);
+      expect("displayField" in addRelationFieldInputSchema.shape).toBe(false);
     });
 
     it("타깃 폼이 실존하지 않을 경우 에러를 반환해야 한다", async () => {
@@ -253,7 +363,42 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
       expect(result.error).toContain("참조 대상 타깃 폼");
     });
 
-    it("displayField 생략 시 타깃 폼의 첫 번째 텍스트 계열 필드를 자동 탐색하고 명시된 description으로 관계형 필드를 생성해야 한다", async () => {
+    it("타깃 폼의 대표 필드(primaryFieldId)가 유효하지 않으면 에러를 반환해야 한다", async () => {
+      const brokenTargetId = "55555555-5555-4555-a555-555555555555";
+      const tools = createBuilderTools({
+        ...dependencies,
+        findFormById: vi.fn().mockImplementation(async (id: string) => {
+          if (id === brokenTargetId) {
+            const targetBase = mockForms[targetFormId]!;
+            return {
+              ...targetBase,
+              id: brokenTargetId,
+              schemaDefinition: {
+                fields: targetBase.schemaDefinition.fields,
+              },
+            };
+          }
+          return mockForms[id];
+        }),
+      });
+
+      const result = (await tools.addRelationField.execute!(
+        {
+          formId: currentFormId,
+          label: "참조 프로젝트",
+          description: "비용 정산이 귀속되는 대상 프로젝트를 연결합니다.",
+          targetFormId: brokenTargetId,
+          multiple: false,
+          required: true,
+        },
+        mockExecutionOptions
+      )) as { success: boolean; error?: string };
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("primaryFieldId");
+    });
+
+    it("타깃 폼에 유효한 primaryFieldId가 존재할 때 displayField 없이 관계형 필드를 생성하고 현재 폼의 primaryFieldId를 보존해야 한다", async () => {
       const tools = createBuilderTools(dependencies);
       const result = (await tools.addRelationField.execute!(
         {
@@ -268,15 +413,23 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
       )) as {
         success: boolean;
         field?: CoreFormField;
+        updatedForm?: Form;
         clientAction?: { type: string; operation: string };
       };
 
       expect(result.success).toBe(true);
       expect(result.field?.type).toBe("relation");
       expect(result.field?.description).toBe("비용 정산이 귀속되는 대상 프로젝트를 연결합니다.");
-      expect(result.field?.relationConfig?.targetFormId).toBe(targetFormId);
-      expect(result.field?.relationConfig?.displayField).toBe("p_code");
-      expect(result.field?.relationConfig?.multiple).toBe(false);
+      expect(result.field?.relationConfig).toEqual({
+        targetFormId,
+        multiple: false,
+      });
+      expect("displayField" in (result.field?.relationConfig ?? {})).toBe(false);
+      const updatedSchema = result.updatedForm?.schemaDefinition as {
+        primaryFieldId?: string;
+        fields: CoreFormField[];
+      };
+      expect(updatedSchema.primaryFieldId).toBe("f_title");
       expect(result.clientAction?.type).toBe("UPDATE_SCHEMA");
       expect(result.clientAction?.operation).toBe("ADD_FIELD");
     });
@@ -297,6 +450,7 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
         success: boolean;
         operation?: string;
         field?: { options?: Array<{ label: string; value: string; disabled?: boolean }> };
+        updatedForm?: Form;
         clientAction?: { type: string; operation: string };
       };
 
@@ -307,6 +461,8 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
       );
       expect(mealOpt).toBeDefined();
       expect(mealOpt?.disabled).toBe(true);
+      const updatedSchema = result.updatedForm?.schemaDefinition as { primaryFieldId?: string };
+      expect(updatedSchema.primaryFieldId).toBe("f_title");
       expect(result.clientAction?.type).toBe("UPDATE_SCHEMA");
       expect(result.clientAction?.operation).toBe("UPDATE_FIELD");
     });
@@ -405,20 +561,47 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
           },
         },
         mockExecutionOptions
-      )) as { success: boolean; clientAction?: { type: string; operation: string } };
+      )) as {
+        success: boolean;
+        updatedForm?: Form;
+        clientAction?: { type: string; operation: string };
+      };
 
       expect(result.success).toBe(true);
       expect(result.clientAction?.type).toBe("UPDATE_SCHEMA");
       expect(result.clientAction?.operation).toBe("ADD_FIELD");
+      const addSchema = result.updatedForm?.schemaDefinition as {
+        primaryFieldId?: string;
+        fields: CoreFormField[];
+      };
+      expect(addSchema.primaryFieldId).toBe("f_title");
     });
 
-    it("REMOVE_FIELD: 대상 필드를 물리 삭제하지 않고 deletedAt을 설정하여 소프트 삭제해야 한다", async () => {
+    it("REMOVE_FIELD: 현재 폼의 대표 필드(primaryFieldId) 삭제 시도는 차단하고 SET_PRIMARY_FIELD 선행 안내를 반환해야 한다", async () => {
       const tools = createBuilderTools(dependencies);
       const result = (await tools.updateSchema.execute!(
         {
           formId: currentFormId,
           operation: "REMOVE_FIELD",
           targetFieldId: "f_title",
+        },
+        mockExecutionOptions
+      )) as {
+        success: boolean;
+        error?: string;
+      };
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("SET_PRIMARY_FIELD");
+    });
+
+    it("REMOVE_FIELD: 대표 필드가 아닌 대상 필드는 물리 삭제하지 않고 deletedAt을 설정하여 소프트 삭제하며 primaryFieldId를 보존해야 한다", async () => {
+      const tools = createBuilderTools(dependencies);
+      const result = (await tools.updateSchema.execute!(
+        {
+          formId: currentFormId,
+          operation: "REMOVE_FIELD",
+          targetFieldId: "f_category",
         },
         mockExecutionOptions
       )) as {
@@ -431,15 +614,45 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
       expect(result.clientAction?.type).toBe("UPDATE_SCHEMA");
       expect(result.clientAction?.operation).toBe("REMOVE_FIELD");
 
-      // schemaDefinition 내의 fields 배열 확인
-      const schema = result.updatedForm?.schemaDefinition as { fields: CoreFormField[] };
-      const targetField = schema.fields.find((f) => f.id === "f_title");
+      // schemaDefinition 내의 fields 배열 및 primaryFieldId 보존 확인
+      const schema = result.updatedForm?.schemaDefinition as {
+        primaryFieldId?: string;
+        fields: CoreFormField[];
+      };
+      expect(schema.primaryFieldId).toBe("f_title");
+      const targetField = schema.fields.find((f) => f.id === "f_category");
       expect(targetField).toBeDefined();
       expect(targetField?.deletedAt).toBeDefined();
       expect(typeof targetField?.deletedAt).toBe("string");
     });
 
-    it("SET_ALL_FIELDS: 기존 필드가 새 목록에서 누락되어도 물리 삭제하지 않고 deletedAt을 부여하여 영구 보존해야 한다", async () => {
+    it("SET_ALL_FIELDS: 기존 대표 필드(primaryFieldId)가 새 목록에서 누락되면서 대체 primaryFieldId를 지정하지 않으면 거부되어야 한다", async () => {
+      const tools = createBuilderTools(dependencies);
+      const result = (await tools.updateSchema.execute!(
+        {
+          formId: currentFormId,
+          operation: "SET_ALL_FIELDS",
+          fields: [
+            {
+              id: "f_new_only",
+              label: "신규 필드",
+              type: "text",
+              required: false,
+              description: "새로 추가된 단일 텍스트 필드입니다.",
+            },
+          ],
+        },
+        mockExecutionOptions
+      )) as {
+        success: boolean;
+        error?: string;
+      };
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("대표 필드");
+    });
+
+    it("SET_ALL_FIELDS: 대체 primaryFieldId를 함께 지정하면 누락된 기존 필드는 deletedAt으로 영구 보존하고 primaryFieldId를 갱신해야 한다", async () => {
       const tools = createBuilderTools(dependencies);
       const newOnlyFields: CoreFormField[] = [
         {
@@ -455,8 +668,9 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
         {
           formId: currentFormId,
           operation: "SET_ALL_FIELDS",
+          primaryFieldId: "f_new_only",
           fields: newOnlyFields,
-        },
+        } as never,
         mockExecutionOptions
       )) as {
         success: boolean;
@@ -464,7 +678,11 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
       };
 
       expect(result.success).toBe(true);
-      const schema = result.updatedForm?.schemaDefinition as { fields: CoreFormField[] };
+      const schema = result.updatedForm?.schemaDefinition as {
+        primaryFieldId?: string;
+        fields: CoreFormField[];
+      };
+      expect(schema.primaryFieldId).toBe("f_new_only");
 
       // 신규 필드 존재 확인
       const newField = schema.fields.find((f) => f.id === "f_new_only");
@@ -478,6 +696,43 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
       expect(oldTitle?.deletedAt).toBeDefined();
       expect(oldCategory).toBeDefined();
       expect(oldCategory?.deletedAt).toBeDefined();
+    });
+
+    it("SET_PRIMARY_FIELD: 유효한 다른 활성 필드로 대표 필드를 교체하고 부적합한 타입/미존재 필드는 거부해야 한다", async () => {
+      const tools = createBuilderTools(dependencies);
+
+      const validSwitch = (await tools.updateSchema.execute!(
+        {
+          formId: currentFormId,
+          operation: "SET_PRIMARY_FIELD",
+          primaryFieldId: "지출 분류",
+        } as never,
+        mockExecutionOptions
+      )) as {
+        success: boolean;
+        updatedForm?: Form;
+        clientAction?: { type: string; operation: string; primaryFieldId?: string };
+      };
+
+      expect(validSwitch.success).toBe(true);
+      expect(validSwitch.clientAction?.type).toBe("UPDATE_SCHEMA");
+      expect(validSwitch.clientAction?.operation).toBe("SET_PRIMARY_FIELD");
+      expect(validSwitch.clientAction?.primaryFieldId).toBe("f_category");
+      const validSchema = validSwitch.updatedForm?.schemaDefinition as {
+        primaryFieldId?: string;
+      };
+      expect(validSchema.primaryFieldId).toBe("f_category");
+
+      const nonexistentSwitch = (await tools.updateSchema.execute!(
+        {
+          formId: currentFormId,
+          operation: "SET_PRIMARY_FIELD",
+          primaryFieldId: "non_existent_field",
+        } as never,
+        mockExecutionOptions
+      )) as { success: boolean; error?: string };
+
+      expect(nonexistentSwitch.success).toBe(false);
     });
 
     it("발행된 폼(currentFormId)에서 MODIFY_FIELD로 options 수정 시 누락된 기존 옵션은 disabled: true로 보존되어야 한다", async () => {
@@ -603,29 +858,34 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
       );
     });
 
-    it("미발행 초안 폼(draftFormId, 응답 0건)에서 REMOVE_FIELD 실행 시 필드를 물리 삭제해야 한다", async () => {
+    it("미발행 초안 폼(draftFormId, 응답 0건)에서 REMOVE_FIELD 실행 시 비대표 필드를 물리 삭제하고 primaryFieldId를 보존해야 한다", async () => {
       const tools = createBuilderTools(dependencies);
       const result = (await tools.updateSchema.execute!(
         {
           formId: draftFormId,
           operation: "REMOVE_FIELD",
-          targetFieldId: "d_title",
+          targetFieldId: "d_priority",
         },
         mockExecutionOptions
       )) as { success: boolean; updatedForm?: Form };
 
       expect(result.success).toBe(true);
-      const schema = result.updatedForm?.schemaDefinition as { fields: CoreFormField[] };
-      expect(schema.fields.find((f) => f.id === "d_title")).toBeUndefined();
+      const schema = result.updatedForm?.schemaDefinition as {
+        primaryFieldId?: string;
+        fields: CoreFormField[];
+      };
+      expect(schema.primaryFieldId).toBe("d_title");
+      expect(schema.fields.find((f) => f.id === "d_priority")).toBeUndefined();
       expect(schema.fields).toHaveLength(1);
     });
 
-    it("미발행 초안 폼(draftFormId, 응답 0건)에서 SET_ALL_FIELDS 실행 시 누락된 기존 필드를 물리 삭제해야 한다", async () => {
+    it("미발행 초안 폼(draftFormId, 응답 0건)에서 SET_ALL_FIELDS 실행 시 대체 primaryFieldId를 지정하면 누락된 기존 필드를 물리 삭제해야 한다", async () => {
       const tools = createBuilderTools(dependencies);
       const result = (await tools.updateSchema.execute!(
         {
           formId: draftFormId,
           operation: "SET_ALL_FIELDS",
+          primaryFieldId: "d_new",
           fields: [
             {
               id: "d_new",
@@ -635,12 +895,16 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
               description: "초안 폼의 신규 텍스트 필드입니다.",
             },
           ],
-        },
+        } as never,
         mockExecutionOptions
       )) as { success: boolean; updatedForm?: Form };
 
       expect(result.success).toBe(true);
-      const schema = result.updatedForm?.schemaDefinition as { fields: CoreFormField[] };
+      const schema = result.updatedForm?.schemaDefinition as {
+        primaryFieldId?: string;
+        fields: CoreFormField[];
+      };
+      expect(schema.primaryFieldId).toBe("d_new");
       expect(schema.fields).toHaveLength(1);
       expect(schema.fields[0]?.id).toBe("d_new");
     });
@@ -651,14 +915,18 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
         {
           formId: unpublishedWithSubsFormId,
           operation: "REMOVE_FIELD",
-          targetFieldId: "u_title",
+          targetFieldId: "u_status",
         },
         mockExecutionOptions
       )) as { success: boolean; updatedForm?: Form };
 
       expect(result.success).toBe(true);
-      const schema = result.updatedForm?.schemaDefinition as { fields: CoreFormField[] };
-      const removedField = schema.fields.find((f) => f.id === "u_title");
+      const schema = result.updatedForm?.schemaDefinition as {
+        primaryFieldId?: string;
+        fields: CoreFormField[];
+      };
+      expect(schema.primaryFieldId).toBe("u_title");
+      const removedField = schema.fields.find((f) => f.id === "u_status");
       expect(removedField).toBeDefined();
       expect(removedField?.deletedAt).toBeDefined();
     });
@@ -695,6 +963,7 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
 
       const validCreate = createFormInputSchema.safeParse({
         title: "테스트 폼",
+        primaryFieldId: "f_1",
         fields: [
           {
             id: "f_1",
@@ -715,12 +984,13 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
             ],
           },
         ],
-      });
+      } as never);
       expect(validCreate.success).toBe(true);
 
       const invalidOptionDescription = createFormInputSchema.safeParse({
         title: "테스트",
         description: "설명",
+        primaryFieldId: "f_1",
         fields: [
           {
             id: "f_1",
@@ -873,9 +1143,12 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
       )) as {
         success: boolean;
         field?: CoreFormField;
+        updatedForm?: Form;
       };
 
       expect(result.success).toBe(true);
+      const updatedSchema = result.updatedForm?.schemaDefinition as { primaryFieldId?: string };
+      expect(updatedSchema.primaryFieldId).toBe("d_title");
       expect(result.field?.options).toEqual([
         {
           label: "긴급",
@@ -884,6 +1157,23 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
           disabled: false,
         },
       ]);
+    });
+
+    it("MODIFY_FIELD: 현재 대표 필드(primaryFieldId)의 타입을 checkbox/relation으로 변경하려 하면 차단해야 한다", async () => {
+      const tools = createBuilderTools(dependencies);
+      const result = (await tools.updateSchema.execute!(
+        {
+          formId: currentFormId,
+          operation: "MODIFY_FIELD",
+          targetFieldId: "f_title",
+          fieldData: {
+            type: "checkbox",
+          },
+        },
+        mockExecutionOptions
+      )) as { success: boolean; error?: string };
+
+      expect(result.success).toBe(false);
     });
   });
 });

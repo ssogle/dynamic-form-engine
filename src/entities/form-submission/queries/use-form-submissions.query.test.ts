@@ -4,8 +4,10 @@ import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getFormSubmissions,
+  getFormSubmissionsByIds,
   getFormSubmissionDetail,
   useFormSubmissionsQuery,
+  useFormSubmissionsByIdsQuery,
   useInfiniteFormSubmissionsQuery,
   useFormSubmissionDetailQuery,
 } from "./use-form-submissions.query";
@@ -174,5 +176,78 @@ describe("useFormSubmissionsQuery (특정 폼의 응답 목록 조회 훅)", () 
       expect.stringContaining("sort=f_exp%3Adesc"),
       expect.anything()
     );
+  });
+
+  it("getFormSubmissionsByIds는 빈 배열이면 네트워크 호출 없이 빈 배열을 반환하고, 유효 ID가 있으면 ids 쿼리로 조회해야 한다", async () => {
+    const emptyFetch = vi.fn();
+    vi.stubGlobal("fetch", emptyFetch);
+
+    const emptyResult = await getFormSubmissionsByIds("form-1", []);
+    expect(emptyResult).toEqual([]);
+    expect(emptyFetch).not.toHaveBeenCalled();
+
+    const id1 = "11111111-1111-4111-a111-111111111111";
+    const id2 = "22222222-2222-4222-a222-222222222222";
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({
+        success: true,
+        data: {
+          items: [{ ...mockSubmissions[0], id: id1 }],
+          page: 1,
+          limit: 20,
+          totalCount: 1,
+          totalPages: 1,
+          hasMore: false,
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const loaded = await getFormSubmissionsByIds("form-1", [id2, id1, id1]);
+    expect(loaded).toHaveLength(1);
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining(`ids=${encodeURIComponent(`${id1},${id2}`)}`),
+      expect.objectContaining({ method: "GET" })
+    );
+  });
+
+  it("useFormSubmissionsByIdsQuery는 ID 목록이 있을 때만 배치 조회를 수행하고 결과를 반환해야 한다", async () => {
+    const id1 = "11111111-1111-4111-a111-111111111111";
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({
+        success: true,
+        data: {
+          items: [{ ...mockSubmissions[0], id: id1 }],
+          page: 1,
+          limit: 20,
+          totalCount: 1,
+          totalPages: 1,
+          hasMore: false,
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const { result: disabledResult } = renderHook(
+      () => useFormSubmissionsByIdsQuery("form-1", []),
+      {
+        wrapper: createWrapper(queryClient),
+      }
+    );
+    expect(disabledResult.current.fetchStatus).toBe("idle");
+    expect(mockFetch).not.toHaveBeenCalled();
+
+    const { result } = renderHook(() => useFormSubmissionsByIdsQuery("form-1", [id1]), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.[0]?.id).toBe(id1);
   });
 });

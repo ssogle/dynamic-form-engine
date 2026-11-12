@@ -36,9 +36,6 @@ export interface RelationConfig {
   /** 참조 대상 도메인 폼 UUID */
   targetFormId: string;
 
-  /** 콤보박스 선택지 목록에 노출할 대상 폼의 대표 필드 ID */
-  displayField: string;
-
   /** 다중 선택(N:M) 여부 (기본값: false - 단일 선택) */
   multiple?: boolean | undefined;
 }

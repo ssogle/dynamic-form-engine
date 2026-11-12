@@ -271,7 +271,6 @@ describe("Dynamic Form Schema & Validator (entities/form/schema)", () => {
           required: true,
           relationConfig: {
             targetFormId: "123e4567-e89b-12d3-a456-426614174000",
-            displayField: "name",
             multiple: false,
           },
         },

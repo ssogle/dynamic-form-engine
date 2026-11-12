@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validatePrimaryFieldSelection } from "../lib/primary-field";
 
 /**
  * 코어 폼 필드 타입 (9종 순수 도메인 데이터 필드)
@@ -57,13 +58,12 @@ export type SelectOption = z.infer<typeof selectOptionSchema>;
 /**
  * 관계형 필드(type: "relation") 설정 Zod 스키마
  *
- * 타겟 도메인 폼과 대표 노출 필드, 단일/다중 선택 여부를 규정합니다.
+ * 참조할 타깃 도메인 폼과 단일/다중 선택 여부를 규정합니다.
+ * 대표 표기 컬럼은 타깃 도메인 폼 자체가 primaryFieldId로 선언하므로 중복 저장하지 않습니다.
  */
 export const relationConfigSchema = z.object({
   /** 참조할 대상 폼의 불변 UUID */
   targetFormId: z.uuid("참조 대상 폼 ID는 올바른 UUID 형식이어야 합니다."),
-  /** 콤보박스 선택지 목록에 노출할 대상 폼의 대표 필드 ID (예: 'f_project_name') */
-  displayField: z.string().min(1, "대표 노출 필드 ID는 비어있을 수 없습니다."),
   /** 다중 참조 여부 (기본값: false - 단일 레코드 참조) */
   multiple: z.boolean().default(false),
 });
@@ -143,18 +143,33 @@ export type CoreFormField = z.infer<typeof coreFormFieldSchema>;
  * 프리뷰 캔버스에 실시간 렌더링되고 네비게이터가 조작하는 단일 폼의 전체 스냅샷 구조입니다.
  * 슬러그를 배제하고 불변 id와 표시 title을 기준으로 동작합니다.
  */
-export const activeFormSchema = z.object({
-  /**
-   * 폼 고유 식별자 (생성 완료 후 발급되는 불변 UUID)
-   */
-  id: z.uuid().optional(),
-  title: z.string().min(1, "폼 제목을 입력해 주세요."),
-  description: z.string().optional(),
-  fields: z.array(coreFormFieldSchema).default([]),
-  /**
-   * 폼 발행 일시 (미발행/초안 상태 시 null 또는 undefined)
-   */
-  publishedAt: z.union([z.date(), z.string()]).nullable().optional(),
-});
+export const activeFormSchema = z
+  .object({
+    /**
+     * 폼 고유 식별자 (생성 완료 후 발급되는 불변 UUID)
+     */
+    id: z.uuid().optional(),
+    title: z.string().min(1, "폼 제목을 입력해 주세요."),
+    description: z.string().optional(),
+    /** 이 폼의 각 데이터 행을 대표하는 필수 식별 필드 ID */
+    primaryFieldId: z.string().trim().min(1).optional(),
+    fields: z.array(coreFormFieldSchema).default([]),
+    /**
+     * 폼 발행 일시 (미발행/초안 상태 시 null 또는 undefined)
+     */
+    publishedAt: z.union([z.date(), z.string()]).nullable().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.primaryFieldId !== undefined) {
+      const check = validatePrimaryFieldSelection(val.fields, val.primaryFieldId);
+      if (!check.isValid) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["primaryFieldId"],
+          message: check.reason ?? "유효하지 않은 대표 필드 지정입니다.",
+        });
+      }
+    }
+  });
 
 export type ActiveForm = z.infer<typeof activeFormSchema>;

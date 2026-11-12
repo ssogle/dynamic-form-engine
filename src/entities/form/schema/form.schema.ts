@@ -1,6 +1,8 @@
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { forms } from "@/shared/tables";
+import { coreFormFieldSchema } from "./form-field.schema";
+import { validatePrimaryFieldSelection } from "../lib/primary-field";
 
 /**
  * 폼 메타데이터 테이블 (forms) re-export
@@ -34,9 +36,36 @@ const systemManagedFields = {
  * drizzle-zod를 통해 forms 테이블 정의로부터 자동 파생되며,
  * 시스템 전유 필드 5종을 엄격히 제외하고 순수 비즈니스 필드만 수신합니다.
  */
+/**
+ * 폼 도메인 스키마 정의(schema_definition) JSONB 검증 스키마
+ *
+ * 모든 도메인 폼은 최소 1개 이상의 필드를 가져야 하며,
+ * 데이터를 대표하여 식별/노출할 수 있는 primaryFieldId를 필수로 지정해야 합니다.
+ */
+export const formSchemaDefinitionSchema = z
+  .object({
+    primaryFieldId: z
+      .string({ message: "대표 필드(primaryFieldId) 지정은 필수입니다." })
+      .trim()
+      .min(1, "대표 필드(primaryFieldId) 지정은 필수입니다."),
+    fields: z.array(coreFormFieldSchema).min(1, "최소 1개 이상의 폼 필드가 포함되어야 합니다."),
+  })
+  .catchall(z.unknown())
+  .superRefine((val, ctx) => {
+    const check = validatePrimaryFieldSelection(val.fields, val.primaryFieldId);
+    if (!check.isValid) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["primaryFieldId"],
+        message: check.reason ?? "유효하지 않은 대표 필드입니다.",
+      });
+    }
+  });
+
 export const insertFormSchema = createInsertSchema(forms, {
   title: (schema) =>
     schema.min(1, "폼 제목을 입력해 주세요.").max(255, "폼 제목은 최대 255자까지 가능합니다."),
+  schemaDefinition: formSchemaDefinitionSchema,
 }).omit(systemManagedFields);
 
 /**

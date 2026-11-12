@@ -14,13 +14,15 @@ import {
 import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { TABLE_COLUMN_WIDTH } from "@/shared/lib/virtual-table";
 import type { Form, CoreFormField } from "@/entities/form";
-import { extractActiveFields } from "@/entities/form";
+import { extractActiveFields, extractPrimaryFieldId } from "@/entities/form";
 import {
   useInfiniteFormSubmissionsQuery,
   useDeleteSubmissionMutation,
   type FormSubmission,
 } from "@/entities/form-submission";
 import { formatDateTime } from "@/shared/lib/date";
+import { formatRelationSummaryCell } from "../lib/relation-summary";
+import { useRelationLookup } from "./use-relation-lookup.hook";
 import { ColumnHeaderFilter } from "../ui/column-header-filter";
 import { SubmissionActionCell } from "../ui/submission-action-cell";
 
@@ -69,6 +71,10 @@ export interface UseSubmissionListTableReturn {
    * 폼 활성 필드 목록
    */
   activeFields: CoreFormField[];
+  /**
+   * 현재 폼의 도메인 대표 식별 필드 ID
+   */
+  primaryFieldId: string | undefined;
   /**
    * 현재 적용 중인 컬럼 필터 개수
    */
@@ -164,7 +170,9 @@ export function useSubmissionListTable({
   }, [data]);
 
   const totalCount = data?.pages[0]?.totalCount ?? flatSubmissions.length;
-  const activeFields = extractActiveFields(form);
+  const activeFields = React.useMemo(() => extractActiveFields(form), [form]);
+  const primaryFieldId = extractPrimaryFieldId(form);
+  const { lookupMap: relationLookupMap } = useRelationLookup(activeFields, flatSubmissions);
 
   // 단일 컬럼 필터 갱신 핸들러
   const handleSetFieldFilter = React.useCallback((fieldId: string, value: string) => {
@@ -212,12 +220,14 @@ export function useSubmissionListTable({
 
     // 폼 활성 필드별 동적 컬럼 생성
     activeFields.forEach((field: CoreFormField) => {
+      const isPrimary = field.id === primaryFieldId;
       cols.push({
         id: field.id,
         accessorFn: (row) => row.data?.[field.id],
         header: ({ column }) =>
           React.createElement(ColumnHeaderFilter, {
             label: field.label,
+            isPrimary,
             isSorted: column.getIsSorted(),
             onToggleSort: (e: React.MouseEvent) => {
               column.toggleSorting(undefined, e.shiftKey);
@@ -227,12 +237,24 @@ export function useSubmissionListTable({
           }),
         cell: (info) => {
           const rawVal = info.getValue();
-          const displayVal =
-            rawVal !== undefined && rawVal !== null && rawVal !== "" ? String(rawVal) : "-";
+          let displayVal = "-";
+
+          if (field.type === "relation") {
+            displayVal = formatRelationSummaryCell(rawVal, field, relationLookupMap);
+          } else if (typeof rawVal === "boolean") {
+            displayVal = rawVal ? "예" : "아니오";
+          } else if (Array.isArray(rawVal)) {
+            displayVal = rawVal.length > 0 ? rawVal.join(", ") : "-";
+          } else if (rawVal !== undefined && rawVal !== null && rawVal !== "") {
+            displayVal = String(rawVal);
+          }
+
           return React.createElement(
             "div",
             {
-              className: "max-w-full truncate text-xs whitespace-nowrap",
+              className: isPrimary
+                ? "max-w-full truncate text-xs font-semibold whitespace-nowrap"
+                : "max-w-full truncate text-xs whitespace-nowrap",
               title: displayVal,
             },
             displayVal
@@ -358,7 +380,16 @@ export function useSubmissionListTable({
     });
 
     return cols;
-  }, [activeFields, columnFilters, handleSetFieldFilter, form.id, deletingId, handleDelete]);
+  }, [
+    activeFields,
+    primaryFieldId,
+    relationLookupMap,
+    columnFilters,
+    handleSetFieldFilter,
+    form.id,
+    deletingId,
+    handleDelete,
+  ]);
 
   // 5. TanStack Table 인스턴스화
   // React Compiler의 자동 메모이제이션 대상에서 TanStack Table 내부 함수가 제외됨에 따른 경고를 억제합니다.
@@ -395,6 +426,7 @@ export function useSubmissionListTable({
     flatSubmissions,
     totalCount,
     activeFields,
+    primaryFieldId,
     activeFilterCount,
     isLoading,
     isError,

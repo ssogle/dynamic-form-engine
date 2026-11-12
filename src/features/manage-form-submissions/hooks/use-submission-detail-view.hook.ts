@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import {
   useFormDetailQuery,
   extractActiveFields,
+  extractPrimaryFieldId,
+  extractPrimaryFieldValue,
   type Form,
   type CoreFormField,
 } from "@/entities/form";
@@ -15,6 +17,8 @@ import {
   type FormSubmission,
   type RelatedSubmissionsGroup,
 } from "@/entities/form-submission";
+import { getRelationDetailRows, type RelationFieldDetailRows } from "../lib/relation-summary";
+import { useRelationLookup } from "./use-relation-lookup.hook";
 
 export interface UseSubmissionDetailViewParams {
   /**
@@ -44,6 +48,18 @@ export interface UseSubmissionDetailViewReturn {
    * 폼 스키마의 소프트 삭제 제외 활성 필드 목록
    */
   activeFields: CoreFormField[];
+  /**
+   * 현재 폼의 도메인 대표 식별 필드 ID
+   */
+  primaryFieldId: string | undefined;
+  /**
+   * 현재 단건 응답 레코드의 대표 필드 표시값
+   */
+  primaryDisplayValue: string | undefined;
+  /**
+   * 정방향 관계형(relation) 필드별 복원된 타깃 폼 및 선택 행 목록
+   */
+  relationDetails: Record<string, RelationFieldDetailRows>;
   /**
    * 제출된 원시 Key-Value 데이터 딕셔너리
    */
@@ -148,15 +164,40 @@ export function useSubmissionDetailView({
     }
   }, [deleteSubmission, submissionId, formId, router]);
 
-  // 5. 활성 필드 및 제출 데이터 파생
+  // 5. 활성 필드, 대표 식별 정보 및 정방향 관계형 상세 행 파생
   const activeFields = React.useMemo(() => extractActiveFields(form), [form]);
-  const submittedData = (submission?.data ?? {}) as Record<string, unknown>;
+  const primaryFieldId = extractPrimaryFieldId(form);
+  const primaryDisplayValue =
+    form && submission ? extractPrimaryFieldValue(form, submission) : undefined;
+  const submittedData = React.useMemo(
+    () => (submission?.data ?? {}) as Record<string, unknown>,
+    [submission]
+  );
+
+  const submissionListForLookup = React.useMemo(
+    () => (submission ? [submission] : []),
+    [submission]
+  );
+  const { lookupMap: relationLookupMap } = useRelationLookup(activeFields, submissionListForLookup);
+
+  const relationDetails = React.useMemo(() => {
+    const map: Record<string, RelationFieldDetailRows> = {};
+    for (const field of activeFields) {
+      if (field.type === "relation") {
+        map[field.id] = getRelationDetailRows(submittedData[field.id], field, relationLookupMap);
+      }
+    }
+    return map;
+  }, [activeFields, submittedData, relationLookupMap]);
 
   return {
     form,
     submission,
     relatedGroups,
     activeFields,
+    primaryFieldId,
+    primaryDisplayValue,
+    relationDetails,
     submittedData,
     isLoading,
     isError,

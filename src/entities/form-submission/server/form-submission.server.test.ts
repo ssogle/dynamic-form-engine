@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   findSubmissionById,
   findSubmissionsByFormId,
+  findSubmissionsPaginated,
   hasSubmissionsByFormId,
   insertSubmission,
   softDeleteSubmissionById,
@@ -263,7 +264,6 @@ describe("Form Submission Server Repository (entities/form-submission/server)", 
                 description: "이 문서를 최초 요청한 담당자를 연결합니다.",
                 relationConfig: {
                   targetFormId,
-                  displayField: "name",
                   multiple: false,
                 },
               },
@@ -275,7 +275,6 @@ describe("Form Submission Server Repository (entities/form-submission/server)", 
                 description: "이 문서를 최종 결재하는 승인자를 연결합니다.",
                 relationConfig: {
                   targetFormId,
-                  displayField: "name",
                   multiple: false,
                 },
               },
@@ -310,6 +309,38 @@ describe("Form Submission Server Repository (entities/form-submission/server)", 
       // 불필요한 레거시 컬럼이 포함되지 않았는지 검증
       const insertedRows = mockValues.mock.calls[0]?.[0] as Array<Record<string, unknown>>;
       expect(Object.keys(insertedRows[0] ?? {})).toEqual(["sourceId", "targetId", "fieldId"]);
+    });
+  });
+
+  describe("findSubmissionsPaginated (ids 배치 필터)", () => {
+    it("유효하지 않은 UUID만 포함된 ids 문자열이 전달되면 DB 조회 없이 빈 페이지 결과를 반환해야 한다", async () => {
+      const result = await findSubmissionsPaginated(sampleSubmission.formId, {
+        ids: "not-a-uuid,another-bad-id",
+      } as never);
+
+      expect(mockSelect).not.toHaveBeenCalled();
+      expect(result.items).toEqual([]);
+      expect(result.totalCount).toBe(0);
+    });
+
+    it("유효한 ids가 전달되면 해당 레코드 조건으로 카운트 및 목록 쿼리를 수행해 반환해야 한다", async () => {
+      mockWhere.mockResolvedValueOnce([{ count: 1 }]).mockReturnValueOnce({
+        orderBy: mockOrderBy,
+      });
+      const mockOffset = vi.fn().mockResolvedValueOnce([sampleSubmission]);
+      mockOrderBy.mockReturnValueOnce({
+        limit: vi.fn().mockReturnValueOnce({
+          offset: mockOffset,
+        }),
+      });
+
+      const result = await findSubmissionsPaginated(sampleSubmission.formId, {
+        ids: sampleSubmission.id,
+      } as never);
+
+      expect(mockSelect).toHaveBeenCalledTimes(2);
+      expect(result.totalCount).toBe(1);
+      expect(result.items).toEqual([sampleSubmission]);
     });
   });
 });

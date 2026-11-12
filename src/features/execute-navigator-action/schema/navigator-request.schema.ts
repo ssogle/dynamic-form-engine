@@ -32,6 +32,7 @@ export const navigatorRequestSchema = z.object({
           title: z.string(),
           description: z.string().optional(),
           isPublished: z.boolean().optional(),
+          primaryFieldId: z.string().optional(),
           fields: z.array(coreFormFieldSchema).default([]),
         })
         .optional(),

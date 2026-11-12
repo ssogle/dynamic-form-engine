@@ -62,7 +62,7 @@ describe("useFormMutation (엔티티 공용 폼 조작 뮤테이션 훅)", () =>
 
       const input = {
         title: "샘플 폼",
-        schemaDefinition: { fields: [] },
+        schemaDefinition: { primaryFieldId: "f_title", fields: [] },
       };
 
       const result = await createForm(input);
@@ -94,7 +94,7 @@ describe("useFormMutation (엔티티 공용 폼 조작 뮤테이션 훅)", () =>
       await act(async () => {
         await result.current.mutateAsync({
           title: "샘플 폼",
-          schemaDefinition: { fields: [] },
+          schemaDefinition: { primaryFieldId: "f_title", fields: [] },
         });
       });
 

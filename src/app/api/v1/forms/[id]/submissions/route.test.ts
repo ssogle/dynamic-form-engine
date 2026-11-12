@@ -104,6 +104,40 @@ describe("Route Handler: /api/v1/forms/[id]/submissions", () => {
       });
     });
 
+    it("ids 쿼리 파라미터가 전달되면 findSubmissionsPaginated에 ids 필터 옵션을 전달해야 한다", async () => {
+      const targetSubId1 = "11111111-1111-4111-a111-111111111111";
+      const targetSubId2 = "22222222-2222-4222-a222-222222222222";
+      mockFindFormById.mockResolvedValueOnce(mockForm);
+      mockFindSubmissionsPaginated.mockResolvedValueOnce({
+        items: [
+          {
+            id: targetSubId1,
+            formId,
+            data: { applicantName: "김철수" },
+            createdAt: new Date("2026-01-02T00:00:00Z"),
+          },
+        ],
+        page: 1,
+        limit: 20,
+        totalCount: 1,
+        totalPages: 1,
+        hasMore: false,
+      });
+
+      const request = new NextRequest(
+        `http://localhost:3000/api/v1/forms/${formId}/submissions?ids=${targetSubId1},${targetSubId2}`
+      );
+      const response = await GET(request, mockContext);
+
+      expect(response.status).toBe(200);
+      expect(mockFindSubmissionsPaginated).toHaveBeenCalledWith(formId, {
+        page: 1,
+        limit: 20,
+        sort: "createdAt:desc",
+        ids: `${targetSubId1},${targetSubId2}`,
+      });
+    });
+
     it("유효하지 않은 쿼리 파라미터가 들어온 경우 400 Bad Request를 반환해야 한다", async () => {
       mockFindFormById.mockResolvedValueOnce(mockForm);
 

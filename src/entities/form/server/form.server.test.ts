@@ -123,7 +123,7 @@ describe("Form Server Repository (entities/form/server)", () => {
       const inputData = {
         title: "새로운 폼",
         description: "새로운 폼 설명",
-        schemaDefinition: { fields: [] },
+        schemaDefinition: { primaryFieldId: "f_title", fields: [] },
       };
 
       mockReturning.mockResolvedValueOnce([sampleForm]);
@@ -142,7 +142,7 @@ describe("Form Server Repository (entities/form/server)", () => {
       await expect(
         insertForm({
           title: "깨진 삽입",
-          schemaDefinition: { fields: [] },
+          schemaDefinition: { primaryFieldId: "f_title", fields: [] },
         })
       ).rejects.toThrow("폼 데이터베이스 삽입 결과가 반환되지 않았습니다.");
     });

@@ -4,6 +4,8 @@ import { jsonb, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-c
  * 폼 엔티티의 JSON 스키마 필드 정의 타입
  */
 export interface FormSchemaDefinition {
+  /** 이 데이터 도메인 폼의 각 레코드를 대표하는 필수 식별 필드 ID */
+  primaryFieldId?: string | undefined;
   fields: Array<Record<string, unknown>>;
   [key: string]: unknown;
 }

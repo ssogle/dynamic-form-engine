@@ -27,17 +27,25 @@ describe("builder-prompt (features/execute-navigator-action/lib/prompts)", () =>
     expect(BUILDER_NAVIGATOR_SYSTEM_PROMPT).toContain("1문장");
   });
 
-  it("formatBuilderContextPrompt는 현재 열려있는 폼의 발행 상태(isPublished)를 컨텍스트에 포함해야 한다", () => {
+  it("시스템 프롬프트에 primaryFieldId 필수 규격, SET_PRIMARY_FIELD 오퍼레이션이 포함되고 displayField 안내는 제거되어야 한다", () => {
+    expect(BUILDER_NAVIGATOR_SYSTEM_PROMPT).toContain("primaryFieldId");
+    expect(BUILDER_NAVIGATOR_SYSTEM_PROMPT).toContain("SET_PRIMARY_FIELD");
+    expect(BUILDER_NAVIGATOR_SYSTEM_PROMPT).not.toContain("displayField");
+  });
+
+  it("formatBuilderContextPrompt는 현재 열려있는 폼의 발행 상태(isPublished)와 primaryFieldId를 컨텍스트에 포함해야 한다", () => {
     const prompt = formatBuilderContextPrompt("옵션 수정해줘", {
       currentPath: "/builder/forms/form-1",
       currentForm: {
         id: "form-1",
         title: "비용 정산서",
         isPublished: true,
+        primaryFieldId: "f_title",
         fields: [],
       },
     });
 
     expect(prompt).toContain('"isPublished":true');
+    expect(prompt).toContain('"primaryFieldId":"f_title"');
   });
 });

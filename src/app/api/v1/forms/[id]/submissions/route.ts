@@ -33,11 +33,14 @@ export const GET = withErrorHandler(async (req: NextRequest, context: RouteConte
 
   // 2. 쿼리 파라미터 유효성 검증
   const searchParams = req.nextUrl.searchParams;
+  const filtersParam = searchParams.get("filters");
+  const idsParam = searchParams.get("ids");
   const rawQuery = {
     page: searchParams.get("page") ?? undefined,
     limit: searchParams.get("limit") ?? undefined,
     sort: searchParams.get("sort") ?? undefined,
-    filters: searchParams.get("filters") ?? undefined,
+    ...(filtersParam !== null ? { filters: filtersParam } : {}),
+    ...(idsParam !== null ? { ids: idsParam } : {}),
   };
   const parsed = submissionQuerySchema.safeParse(rawQuery);
 
