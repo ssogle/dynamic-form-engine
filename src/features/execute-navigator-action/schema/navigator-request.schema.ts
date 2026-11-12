@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { coreFormFieldSchema, selectOptionsInputSchema } from "@/entities/form";
+import { coreFormFieldSchema, selectOptionSchema } from "@/entities/form";
 
 const visibleItemSchema = z.object({
   id: z.string(),
@@ -31,6 +31,7 @@ export const navigatorRequestSchema = z.object({
           id: z.string(),
           title: z.string(),
           description: z.string().optional(),
+          isPublished: z.boolean().optional(),
           fields: z.array(coreFormFieldSchema).default([]),
         })
         .optional(),
@@ -45,7 +46,8 @@ export const navigatorRequestSchema = z.object({
             label: z.string(),
             type: z.string(),
             required: z.boolean().optional(),
-            options: selectOptionsInputSchema.optional(),
+            description: z.string().optional(),
+            options: z.array(selectOptionSchema).optional(),
           })
         )
         .optional(),

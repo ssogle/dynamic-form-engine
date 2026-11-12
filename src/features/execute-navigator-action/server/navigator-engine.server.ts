@@ -9,7 +9,10 @@ import {
   publishFormById,
   softDeleteFormsByIds,
 } from "@/entities/form/server";
-import { softDeleteSubmissionsByIds } from "@/entities/form-submission/server";
+import {
+  hasSubmissionsByFormId,
+  softDeleteSubmissionsByIds,
+} from "@/entities/form-submission/server";
 import type { Form } from "@/entities/form";
 import { getAiModel } from "@/shared/lib/ai";
 import { createBuilderTools } from "../lib/tools/builder-tools";
@@ -97,6 +100,7 @@ const NAVIGATOR_MODE_REGISTRY: Record<NavigatorMode, ModeConfigFactory> = {
     tools: {
       ...createBuilderTools({
         findFormById,
+        hasSubmissionsByFormId,
         insertForm,
         updateFormById,
         publishFormById,

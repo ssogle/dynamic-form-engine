@@ -19,7 +19,6 @@ export {
   coreFormFieldSchema,
   activeFormSchema,
   selectOptionSchema,
-  selectOptionsInputSchema,
   relationConfigSchema,
   type CoreFieldType,
   type CoreFormField,
@@ -29,6 +28,7 @@ export {
 } from "./schema/form-field.schema";
 
 export { extractActiveFields } from "./lib/extract-active-fields";
+export { mergeOptionsWithPreservation } from "./lib/merge-options-with-preservation";
 
 export { buildDynamicFormSchema, validateSubmissionData } from "./schema/dynamic-form.schema";
 export type { SubmissionValidationResult } from "./types/dynamic-form.types";

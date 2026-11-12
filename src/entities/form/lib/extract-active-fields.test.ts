@@ -9,6 +9,7 @@ describe("extractActiveFields (entities/form/lib)", () => {
     label: "제목",
     type: "text",
     required: true,
+    description: "문서의 제목을 입력합니다.",
   };
 
   const deletedField: CoreFormField = {
@@ -16,6 +17,7 @@ describe("extractActiveFields (entities/form/lib)", () => {
     label: "과거 필드",
     type: "text",
     required: false,
+    description: "더 이상 사용하지 않는 필드입니다.",
     deletedAt: "2026-01-01T00:00:00.000Z",
   };
 

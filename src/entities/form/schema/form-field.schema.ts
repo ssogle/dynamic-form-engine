@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * 코어 폼 필드 타입 (8종 입력 필드 + 1종 레이아웃 요소)
+ * 코어 폼 필드 타입 (9종 순수 도메인 데이터 필드)
  *
  * - text: 단문 텍스트 입력
  * - textarea: 장문 설명 입력
@@ -12,7 +12,6 @@ import { z } from "zod";
  * - date: 순수 달력 날짜 선택기 (YYYY-MM-DD)
  * - switch: 참/거짓 모던 토글 스위치 (boolean)
  * - relation: 타겟 데이터 도메인(타 폼 서브미션) 검색/선택 콤보박스
- * - section: 서식 구획 구분선 및 섹션 안내 제목 레이아웃 블록
  */
 export const coreFieldTypeSchema = z.enum([
   "text",
@@ -24,7 +23,6 @@ export const coreFieldTypeSchema = z.enum([
   "date",
   "switch",
   "relation",
-  "section",
 ]);
 export type CoreFieldType = z.infer<typeof coreFieldTypeSchema>;
 
@@ -36,31 +34,25 @@ export type CoreFieldType = z.infer<typeof coreFieldTypeSchema>;
  */
 export const selectOptionSchema = z.object({
   /** 화면에 표시되는 옵션 라벨 */
-  label: z.string().min(1, "옵션 라벨은 비어있을 수 없습니다."),
+  label: z
+    .string()
+    .min(1, "옵션 라벨은 비어있을 수 없습니다.")
+    .describe("화면에 표시되는 옵션 라벨 (예: '높음', '식대')"),
   /** DB에 저장되는 실제 코드/식별값 */
-  value: z.string().min(1, "옵션 값은 비어있을 수 없습니다."),
+  value: z
+    .string()
+    .min(1, "옵션 값은 비어있을 수 없습니다.")
+    .describe("DB에 저장되는 실제 코드/식별값 (예: 'HIGH', 'MEAL')"),
+  /** 해당 옵션의 의미, 선택 기준 및 업무 규칙을 안내하는 필수 설명 (긴 글 허용) */
+  description: z
+    .string()
+    .trim()
+    .min(1, "옵션 설명은 필수입니다.")
+    .describe("옵션의 구체적인 선택 기준, 적용 조건, 업무 규칙 등을 안내하는 필수 상세 설명"),
   /** 소프트 비활성화 여부 (과거 라벨 보존 및 신규 선택 방지) */
-  disabled: z.boolean().default(false),
+  disabled: z.boolean().default(false).describe("소프트 비활성화 여부 (신규 생성 시 기본값 false)"),
 });
 export type SelectOption = z.infer<typeof selectOptionSchema>;
-
-/**
- * 하위 호환성을 지원하는 정규화 옵션 입력 스키마
- *
- * 과거 레거시 문자열 배열(["신규", "유지보수"])이 유입되더라도
- * 자동으로 [{ label: "신규", value: "신규", disabled: false }, ...] 형태의
- * 객체 배열로 안전하게 자동 변환(transform)합니다.
- */
-export const selectOptionsInputSchema = z.array(
-  z.union([
-    selectOptionSchema,
-    z.string().transform((str) => ({
-      label: str,
-      value: str,
-      disabled: false,
-    })),
-  ])
-);
 
 /**
  * 관계형 필드(type: "relation") 설정 Zod 스키마
@@ -95,7 +87,7 @@ export const coreFormFieldSchema = z.object({
   label: z.string().min(1, "필드 라벨을 입력해 주세요."),
 
   /**
-   * 필드 입력 유형 (8종 입력 + 1종 레이아웃)
+   * 필드 입력 유형 (9종 순수 데이터 도메인 필드)
    */
   type: coreFieldTypeSchema,
 
@@ -105,14 +97,19 @@ export const coreFormFieldSchema = z.object({
   placeholder: z.string().optional(),
 
   /**
-   * 필수 입력 여부 (기본값: false, section 레이아웃은 무관)
+   * 필수 입력 여부 (기본값: false)
    */
   required: z.boolean().default(false),
 
   /**
    * 정형 선택지 목록 (select, radio, checkbox 전용)
    */
-  options: selectOptionsInputSchema.optional(),
+  options: z
+    .array(selectOptionSchema)
+    .optional()
+    .describe(
+      "선택형 필드(select, radio, checkbox) 전용 옵션 목록. 반드시 { label, value, disabled } 객체 배열 규격이어야 합니다."
+    ),
 
   /**
    * 관계형 필드 전용 설정 메타데이터 (relation 전용)
@@ -120,9 +117,16 @@ export const coreFormFieldSchema = z.object({
   relationConfig: relationConfigSchema.optional(),
 
   /**
-   * 필드 하단에 표시되는 부가 설명 문구
+   * 필드의 도메인 의미 및 입력 안내 설명 (필수)
+   * 사용자 입력 가이드는 물론 AI 컨텍스트 매핑(특히 relation 필드의 연결 의미 파악)에 활용됩니다.
    */
-  description: z.string().optional(),
+  description: z
+    .string()
+    .trim()
+    .min(1, "필드 설명은 필수입니다.")
+    .describe(
+      "필드의 도메인 의미와 입력 기준을 설명하는 1문장. 특히 relation 필드는 타깃 폼과 어떤 의미로 연결되는지 명시해야 합니다."
+    ),
 
   /**
    * 필드 소프트 삭제 일시 (ISO 문자열, 미삭제 시 undefined)

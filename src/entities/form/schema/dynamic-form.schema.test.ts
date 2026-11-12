@@ -8,35 +8,55 @@ describe("Dynamic Form Schema & Validator (entities/form/schema)", () => {
       id: "f1",
       label: "지원자 이름",
       type: "text",
+      description: "지원자의 실명",
       required: true,
     },
     {
       id: "f2",
       label: "경력 연수",
       type: "number",
+      description: "총 경력 연수(년)",
       required: true,
     },
     {
       id: "f3",
       label: "지원 직무",
       type: "select",
+      description: "지원 희망 직무 분류",
       required: true,
       options: [
-        { label: "Frontend", value: "Frontend", disabled: false },
-        { label: "Backend", value: "Backend", disabled: false },
-        { label: "Fullstack", value: "Fullstack", disabled: false },
+        {
+          label: "Frontend",
+          value: "Frontend",
+          description: "웹/앱 프론트엔드 개발",
+          disabled: false,
+        },
+        {
+          label: "Backend",
+          value: "Backend",
+          description: "서버/API/DB 백엔드 개발",
+          disabled: false,
+        },
+        {
+          label: "Fullstack",
+          value: "Fullstack",
+          description: "프론트엔드 및 백엔드 통합 개발",
+          disabled: false,
+        },
       ],
     },
     {
       id: "f4",
       label: "포트폴리오 링크",
       type: "text",
+      description: "GitHub 또는 개인 포트폴리오 URL",
       required: false,
     },
     {
       id: "f5",
       label: "삭제된 필드",
       type: "text",
+      description: "과거에 사용되었던 비활성 필드",
       required: true,
       deletedAt: "2026-11-08T00:00:00.000Z",
     },
@@ -179,6 +199,7 @@ describe("Dynamic Form Schema & Validator (entities/form/schema)", () => {
           id: "custom_1",
           label: "커스텀 색상",
           type: "color" as unknown as CoreFormField["type"],
+          description: "커스텀 색상 코드",
           required: true,
         },
       ];
@@ -194,56 +215,65 @@ describe("Dynamic Form Schema & Validator (entities/form/schema)", () => {
       expect(passResult.success).toBe(true);
     });
 
-    it("신규 필드(radio, checkbox, date, switch, relation, section)에 대한 스키마 빌드 및 유효성 검증이 정확히 동작해야 한다", () => {
+    it("신규 필드(radio, checkbox, date, switch, relation)에 대한 스키마 빌드 및 유효성 검증이 정확히 동작해야 한다", () => {
       const newFields: CoreFormField[] = [
         {
           id: "f_radio",
           label: "우선순위",
           type: "radio",
+          description: "작업 처리 우선순위",
           required: true,
           options: [
-            { label: "상", value: "high", disabled: false },
-            { label: "하", value: "low", disabled: false },
+            { label: "상", value: "high", description: "최우선 처리 대상", disabled: false },
+            { label: "하", value: "low", description: "일반 후순위 처리 대상", disabled: false },
           ],
         },
         {
           id: "f_checkbox",
           label: "관심 기술",
           type: "checkbox",
+          description: "보유 또는 관심 있는 기술 스택 다중 선택",
           required: true,
           options: [
-            { label: "React", value: "React", disabled: false },
-            { label: "Node.js", value: "Node.js", disabled: false },
+            {
+              label: "React",
+              value: "React",
+              description: "React 생태계 프레임워크",
+              disabled: false,
+            },
+            {
+              label: "Node.js",
+              value: "Node.js",
+              description: "Node.js 서버 런타임",
+              disabled: false,
+            },
           ],
         },
         {
           id: "f_date",
           label: "시작일자",
           type: "date",
+          description: "프로젝트 시작 기준 일자",
           required: true,
         },
         {
           id: "f_switch",
           label: "알림 수신",
           type: "switch",
+          description: "알림 수신 동의 여부",
           required: false,
         },
         {
           id: "f_rel",
           label: "연결 프로젝트",
           type: "relation",
+          description: "관련 상위 프로젝트 레코드 연결",
           required: true,
           relationConfig: {
             targetFormId: "123e4567-e89b-12d3-a456-426614174000",
             displayField: "name",
             multiple: false,
           },
-        },
-        {
-          id: "f_sec",
-          label: "섹션 구분선",
-          type: "section",
-          required: false,
         },
       ];
 
@@ -284,19 +314,63 @@ describe("Dynamic Form Schema & Validator (entities/form/schema)", () => {
 
     it("모든 필드가 선택(required: false)일 때 빈 객체나 누락된 키로 제출해도 정상 통과해야 한다", () => {
       const allOptionalFields: CoreFormField[] = [
-        { id: "project_name", type: "text", label: "프로젝트명", required: false },
-        { id: "project_desc", type: "textarea", label: "프로젝트 개요", required: false },
+        {
+          id: "project_name",
+          type: "text",
+          label: "프로젝트명",
+          description: "프로젝트 공식 명칭",
+          required: false,
+        },
+        {
+          id: "project_desc",
+          type: "textarea",
+          label: "프로젝트 개요",
+          description: "프로젝트 상세 설명",
+          required: false,
+        },
         {
           id: "status",
           type: "select",
           label: "진행 상태",
-          options: [{ label: "계획 중", value: "planning", disabled: false }],
+          description: "현재 프로젝트 진행 단계",
+          options: [
+            {
+              label: "계획 중",
+              value: "planning",
+              description: "기획 및 예산 수립 단계",
+              disabled: false,
+            },
+          ],
           required: false,
         },
-        { id: "budget", type: "number", label: "예산", required: false },
-        { id: "start_date", type: "date", label: "시작일", required: false },
-        { id: "is_urgent", type: "switch", label: "긴급 여부", required: false },
-        { id: "agree", type: "checkbox", label: "단일 동의", required: false },
+        {
+          id: "budget",
+          type: "number",
+          label: "예산",
+          description: "프로젝트 배정 총 예산(원)",
+          required: false,
+        },
+        {
+          id: "start_date",
+          type: "date",
+          label: "시작일",
+          description: "프로젝트 착수 일자",
+          required: false,
+        },
+        {
+          id: "is_urgent",
+          type: "switch",
+          label: "긴급 여부",
+          description: "긴급 처리 대상 여부",
+          required: false,
+        },
+        {
+          id: "agree",
+          type: "checkbox",
+          label: "단일 동의",
+          description: "약관 동의 여부",
+          required: false,
+        },
       ];
 
       // 1. 빈 객체 제출 시 통과

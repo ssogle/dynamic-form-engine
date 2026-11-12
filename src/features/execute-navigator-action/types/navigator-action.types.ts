@@ -123,6 +123,7 @@ export interface NavigatorClientContext {
         id: string;
         title: string;
         description?: string | undefined;
+        isPublished?: boolean | undefined;
         fields: CoreFormField[];
       }
     | undefined;
@@ -141,7 +142,8 @@ export interface NavigatorClientContext {
         label: string;
         type: string;
         required?: boolean | undefined;
-        options?: (string | SelectOption)[] | undefined;
+        description?: string | undefined;
+        options?: SelectOption[] | undefined;
       }>
     | undefined;
   /** 현재 응답자가 작성 중인 임시 필드값 (draftValues) */

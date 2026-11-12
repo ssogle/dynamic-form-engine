@@ -194,6 +194,7 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
             id: cachedForm.id,
             title: cachedForm.title,
             description: cachedForm.description ?? undefined,
+            isPublished: Boolean(cachedForm.publishedAt),
             fields,
           };
         }
@@ -225,6 +226,7 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
             label: f.label,
             type: f.type,
             required: f.required ?? false,
+            description: f.description,
             options: f.options ?? undefined,
           }));
         }

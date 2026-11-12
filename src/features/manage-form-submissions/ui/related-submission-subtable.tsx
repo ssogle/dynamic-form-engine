@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
-import { extractActiveFields, type Form, type CoreFormField } from "@/entities/form";
+import { extractActiveFields, type Form } from "@/entities/form";
 import type { RelatedSubmissionsGroup } from "@/entities/form-submission";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/shared/ui/table";
 import { Button } from "@/shared/ui/button";
@@ -39,13 +39,13 @@ function formatFieldValue(value: unknown): string {
 /**
  * 역참조된 서브미션 목록을 표시하는 서브 테이블 컴포넌트
  *
- * 소스 폼의 스키마를 기반으로 섹션 필드를 제외한 주요 컬럼을 추출하여
+ * 소스 폼의 스키마를 기반으로 주요 도메인 컬럼을 추출하여
  * 연결된 각 서브미션 레코드의 요약 정보와 상세 페이지 바로가기 링크를 렌더링합니다.
  */
 export function RelatedSubmissionSubtable({ group }: RelatedSubmissionSubtableProps) {
   const { sourceForm, submissions } = group;
 
-  // 1. 소스 폼의 활성 필드 추출 (단락 구분용 section 필드는 테이블 컬럼에서 제외)
+  // 1. 소스 폼의 활성 필드 추출
   const columns = React.useMemo(() => {
     const rawForm = {
       schemaDefinition: sourceForm.schemaDefinition,
@@ -53,7 +53,7 @@ export function RelatedSubmissionSubtable({ group }: RelatedSubmissionSubtablePr
 
     const allActive = extractActiveFields(rawForm);
     // 최대 4개의 주요 데이터 컬럼만 노출하여 테이블 가독성 유지
-    return allActive.filter((f: CoreFormField) => f.type !== "section").slice(0, 4);
+    return allActive.slice(0, 4);
   }, [sourceForm.schemaDefinition]);
 
   if (!submissions || submissions.length === 0) {

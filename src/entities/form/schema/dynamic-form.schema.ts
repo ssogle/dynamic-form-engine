@@ -4,11 +4,10 @@ import type { SubmissionValidationResult } from "../types/dynamic-form.types";
 
 /**
  * 필드의 options 정의로부터 유효한 value 목록을 추출합니다.
- * 객체 배열({ label, value }) 및 레거시 문자열 배열을 모두 지원합니다.
  */
-function extractOptionValues(options?: (SelectOption | string)[]): string[] {
+function extractOptionValues(options?: SelectOption[]): string[] {
   if (!options || options.length === 0) return [];
-  return options.map((opt) => (typeof opt === "string" ? opt : opt.value));
+  return options.map((opt) => opt.value);
 }
 
 /**
@@ -318,14 +317,6 @@ export function buildDynamicFormSchema(
 
       case "relation":
         fieldSchema = createRelationFieldSchema(field);
-        break;
-
-      case "section":
-        // section은 순수 레이아웃 구획이므로 데이터 검증에서 항상 undefined로 소멸
-        fieldSchema = z
-          .any()
-          .optional()
-          .transform(() => undefined);
         break;
 
       default:

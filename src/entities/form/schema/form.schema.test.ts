@@ -8,7 +8,15 @@ describe("Form Schema Validation Engine", () => {
         title: "일일 업무 보고서",
         description: "일일 업무 내역을 기록하는 폼입니다.",
         schemaDefinition: {
-          fields: [{ id: "taskName", type: "text", label: "업무명", required: true }],
+          fields: [
+            {
+              id: "taskName",
+              type: "text",
+              label: "업무명",
+              required: true,
+              description: "수행한 업무의 제목을 입력합니다.",
+            },
+          ],
         },
       };
 

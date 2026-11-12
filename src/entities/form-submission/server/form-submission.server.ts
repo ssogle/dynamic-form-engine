@@ -64,20 +64,11 @@ export async function syncSubmissionRelations(submission: FormSubmission): Promi
         ? [rawVal]
         : [];
 
-    const relConfig = (field.relationConfig ?? {}) as Record<string, unknown>;
-
     for (const targetId of targetIds) {
       newEdges.push({
         sourceId: submission.id,
-        sourceType: "SUBMISSION",
         targetId,
-        targetType: "SUBMISSION",
-        relationType: "LINKED_TO",
-        metadata: {
-          fieldId,
-          targetFormId: relConfig.targetFormId,
-          sourceFormId: submission.formId,
-        },
+        fieldId,
       });
     }
   }
@@ -128,6 +119,27 @@ export const findSubmissionsByFormId = async (formId: string): Promise<FormSubmi
     .from(formSubmissions)
     .where(and(eq(formSubmissions.formId, formId), isNull(formSubmissions.deletedAt)))
     .orderBy(desc(formSubmissions.createdAt));
+};
+
+/**
+ * 특정 폼 ID에 귀속된 제출 응답(소프트 삭제 이력 포함)이 1건 이상 존재하는지 경량 조회합니다.
+ * 발행 취소 후에도 과거 응답 데이터가 남아있는 폼의 필드/옵션 물리 삭제를 차단하기 위해 사용합니다.
+ *
+ * @param formId 조회 대상 폼 고유 식별자(UUID)
+ * @returns 응답 존재 여부 (true: 1건 이상 존재, false: 응답 없음)
+ */
+export const hasSubmissionsByFormId = async (formId: string): Promise<boolean> => {
+  if (!UUID_REGEX.test(formId)) {
+    return false;
+  }
+
+  const [row] = await db
+    .select({ id: formSubmissions.id })
+    .from(formSubmissions)
+    .where(eq(formSubmissions.formId, formId))
+    .limit(1);
+
+  return Boolean(row);
 };
 
 /**

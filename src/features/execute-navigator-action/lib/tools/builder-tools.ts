@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   coreFormFieldSchema,
   extractActiveFields,
+  mergeOptionsWithPreservation,
   selectOptionSchema,
   type CoreFormField,
   type Form,
@@ -49,10 +50,35 @@ function matchesTargetField(field: CoreFormField, targetIdentifier?: string): bo
  */
 export interface BuilderToolsDependencies {
   findFormById: (id: string) => Promise<Form | undefined>;
+  hasSubmissionsByFormId?: (formId: string) => Promise<boolean>;
   insertForm: (input: InsertForm) => Promise<Form>;
   updateFormById: (id: string, updates: UpdateForm) => Promise<Form | undefined>;
   publishFormById: (id: string, isPublished: boolean) => Promise<Form | undefined>;
   softDeleteFormsByIds: (ids: string[]) => Promise<Form[]>;
+}
+
+/**
+ * 대상 폼이 과거 응답 데이터 무결성 보호 대상인지 판별합니다.
+ *
+ * 현재 공식 발행 상태(publishedAt !== null)이거나,
+ * 발행 취소 후라도 이미 제출된 응답 데이터가 1건 이상 존재하면 true를 반환하여
+ * 필드 및 옵션의 물리 삭제를 원천 차단하고 소프트 삭제/비활성화로 보존합니다.
+ *
+ * @param form 검사 대상 폼 엔티티
+ * @param deps 저장소 의존성
+ * @returns 보호 대상 여부 (true: 소프트 보존 강제, false: 초기 초안 물리 삭제 허용)
+ */
+async function isFormHistoryProtected(
+  form: Form,
+  deps: BuilderToolsDependencies
+): Promise<boolean> {
+  if (form.publishedAt !== null && form.publishedAt !== undefined) {
+    return true;
+  }
+  if (deps.hasSubmissionsByFormId) {
+    return await deps.hasSubmissionsByFormId(form.id);
+  }
+  return false;
 }
 
 // 1. navigate 입력 스키마
@@ -68,7 +94,7 @@ export const createFormInputSchema = z.object({
   fields: z
     .array(coreFormFieldSchema)
     .describe(
-      "생성할 초기 필드 배열 (text, textarea, number, select, radio, checkbox, date, switch, relation, section)"
+      "생성할 초기 필드 배열 (text, textarea, number, select, radio, checkbox, date, switch, relation — 모든 필드에 description 필수)"
     ),
 });
 
@@ -130,7 +156,13 @@ export const addRelationFieldInputSchema = z.object({
     .default(false)
     .describe("다중 선택 허용 여부 (기본값: false - 단일 레코드 참조)"),
   required: z.boolean().default(false).describe("필수 선택 여부"),
-  description: z.string().optional().describe("필드 부가 설명"),
+  description: z
+    .string()
+    .trim()
+    .min(1, "관계형 필드의 연결 의미 설명은 필수입니다.")
+    .describe(
+      "이 관계형 필드가 타깃 폼과 어떤 비즈니스 의미로 연결되는지 설명하는 1문장 (예: '이 업무를 요청한 담당자를 연결합니다.')"
+    ),
 });
 
 // 7. updateFieldOptions 입력 스키마
@@ -235,6 +267,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
       }
 
       const currentFields = extractFieldsFromForm(existing);
+      const isProtected = await isFormHistoryProtected(existing, deps);
       let updatedFields: CoreFormField[] = [...currentFields];
 
       if (operation === "SET_ALL_FIELDS") {
@@ -245,23 +278,57 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
           };
         }
 
-        const nowIso = nowUtcIso();
-        const newFieldIdSet = new Set(newFieldsList.map((f) => f.id));
+        const currentFieldMap = new Map(currentFields.map((f) => [f.id, f]));
 
-        // 기존 필드 중 newFieldsList에 누락된 필드들을 소프트 삭제(deletedAt) 상태로 보존하여 과거 데이터 무결성을 유지합니다.
-        const preservedDeletedFields: CoreFormField[] = currentFields
-          .filter((oldField) => !newFieldIdSet.has(oldField.id))
-          .map((oldField) => ({
-            ...oldField,
-            deletedAt: oldField.deletedAt ?? nowIso,
-          }));
+        // 보호 대상 폼(발행 이후 또는 기제출 응답 보유)에서는 선택형 필드의 누락된 기존 옵션도 disabled: true로 보존 병합합니다.
+        const mergedNewFields: CoreFormField[] = newFieldsList.map((newField) => {
+          if (!isProtected) {
+            return newField;
+          }
+          const existingField = currentFieldMap.get(newField.id);
+          if (
+            existingField &&
+            (newField.type === "select" ||
+              newField.type === "radio" ||
+              newField.type === "checkbox") &&
+            existingField.options
+          ) {
+            return {
+              ...newField,
+              options: mergeOptionsWithPreservation(existingField.options, newField.options),
+            };
+          }
+          return newField;
+        });
 
-        updatedFields = [...newFieldsList, ...preservedDeletedFields];
+        if (isProtected) {
+          const nowIso = nowUtcIso();
+          const newFieldIdSet = new Set(mergedNewFields.map((f) => f.id));
+
+          // 보호 대상 폼에서는 누락된 기존 필드를 물리 삭제하지 않고 deletedAt을 부여하여 영구 보존합니다.
+          const preservedDeletedFields: CoreFormField[] = currentFields
+            .filter((oldField) => !newFieldIdSet.has(oldField.id))
+            .map((oldField) => ({
+              ...oldField,
+              deletedAt: oldField.deletedAt ?? nowIso,
+            }));
+
+          updatedFields = [...mergedNewFields, ...preservedDeletedFields];
+        } else {
+          // 미발행 초기 빌드 상태(응답 0건)에서는 누락된 기존 필드를 깔끔하게 물리 삭제합니다.
+          updatedFields = mergedNewFields;
+        }
       } else if (operation === "ADD_FIELD") {
-        if (!fieldData || !fieldData.label || !fieldData.type) {
+        if (
+          !fieldData ||
+          !fieldData.label ||
+          !fieldData.type ||
+          !fieldData.description ||
+          fieldData.description.trim().length === 0
+        ) {
           return {
             success: false,
-            error: "필드 추가 시 label, type은 필수입니다.",
+            error: "필드 추가 시 label, type, description은 필수입니다.",
           };
         }
         const newField: CoreFormField = {
@@ -270,7 +337,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
           type: fieldData.type,
           required: fieldData.required ?? false,
           placeholder: fieldData.placeholder ?? undefined,
-          description: fieldData.description ?? undefined,
+          description: fieldData.description.trim(),
           options: fieldData.options ?? undefined,
           relationConfig: fieldData.relationConfig ?? undefined,
         };
@@ -283,26 +350,39 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
           };
         }
 
-        const nowIso = nowUtcIso();
-        let targetFound = false;
+        if (isProtected) {
+          const nowIso = nowUtcIso();
+          let targetFound = false;
 
-        // 과거 기제출 데이터의 라벨 무결성 보존을 위해 물리 삭제 대신 소프트 삭제(deletedAt)로 처리합니다.
-        updatedFields = updatedFields.map((f) => {
-          if (matchesTargetField(f, targetFieldId) && !f.deletedAt) {
-            targetFound = true;
+          // 보호 대상 폼에서는 과거 데이터의 라벨 무결성 보존을 위해 물리 삭제 대신 소프트 삭제(deletedAt)로 처리합니다.
+          updatedFields = updatedFields.map((f) => {
+            if (matchesTargetField(f, targetFieldId) && !f.deletedAt) {
+              targetFound = true;
+              return {
+                ...f,
+                deletedAt: nowIso,
+              };
+            }
+            return f;
+          });
+
+          if (!targetFound) {
             return {
-              ...f,
-              deletedAt: nowIso,
+              success: false,
+              error: `삭제 대상 필드('${targetFieldId}')를 찾을 수 없거나 이미 소프트 삭제된 필드입니다.`,
             };
           }
-          return f;
-        });
+        } else {
+          // 미발행 초기 빌드 상태(응답 0건)에서는 대상 필드를 물리 삭제합니다.
+          const initialLength = updatedFields.length;
+          updatedFields = updatedFields.filter((f) => !matchesTargetField(f, targetFieldId));
 
-        if (!targetFound) {
-          return {
-            success: false,
-            error: `삭제 대상 필드('${targetFieldId}')를 찾을 수 없거나 이미 소프트 삭제된 필드입니다.`,
-          };
+          if (updatedFields.length === initialLength) {
+            return {
+              success: false,
+              error: `삭제 대상 필드('${targetFieldId}')를 찾을 수 없습니다.`,
+            };
+          }
         }
       } else if (operation === "MODIFY_FIELD") {
         if (!targetFieldId || !fieldData) {
@@ -314,6 +394,15 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
 
         updatedFields = updatedFields.map((f): CoreFormField => {
           if (!matchesTargetField(f, targetFieldId)) return f;
+
+          let resolvedOptions = f.options;
+          if (fieldData.options !== undefined) {
+            // 보호 대상 폼에서는 옵션 수정 시 누락된 기존 옵션을 disabled: true로 보존 병합합니다.
+            resolvedOptions = isProtected
+              ? mergeOptionsWithPreservation(f.options, fieldData.options)
+              : fieldData.options;
+          }
+
           return {
             ...f,
             ...fieldData,
@@ -324,7 +413,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
               fieldData.placeholder !== undefined ? fieldData.placeholder : f.placeholder,
             description:
               fieldData.description !== undefined ? fieldData.description : f.description,
-            options: fieldData.options !== undefined ? fieldData.options : f.options,
+            options: resolvedOptions,
             relationConfig:
               fieldData.relationConfig !== undefined ? fieldData.relationConfig : f.relationConfig,
             id: f.id,
@@ -501,7 +590,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
         label,
         type: "relation",
         required: required ?? false,
-        description: description ?? `'${targetForm.title}' 폼을 참조하는 관계형 필드`,
+        description: description.trim(),
         relationConfig: {
           targetFormId: targetForm.id,
           displayField: resolvedDisplayField,
@@ -580,12 +669,16 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
         };
       }
 
-      // 기존 옵션 목록을 SelectOption[] 형태로 정규화
-      const existingOptions: SelectOption[] = (targetField.options ?? []).map((opt) =>
-        typeof opt === "string"
-          ? { label: opt, value: opt, disabled: false }
-          : { label: opt.label, value: opt.value, disabled: Boolean(opt.disabled) }
-      );
+      const isProtected = await isFormHistoryProtected(existing, deps);
+
+      // 기존 옵션 목록을 SelectOption[] 형태로 정리 (설명 필드 포함 정규화)
+      const normalizeOption = (opt: SelectOption): SelectOption => ({
+        label: opt.label,
+        value: opt.value,
+        description: opt.description,
+        disabled: Boolean(opt.disabled),
+      });
+      const existingOptions: SelectOption[] = (targetField.options ?? []).map(normalizeOption);
 
       let updatedOptions: SelectOption[] = [...existingOptions];
 
@@ -642,11 +735,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
           const existingValues = new Set(updatedOptions.map((o) => o.value));
           for (const opt of newOptionsInput) {
             if (!existingValues.has(opt.value)) {
-              updatedOptions.push({
-                label: opt.label,
-                value: opt.value,
-                disabled: Boolean(opt.disabled),
-              });
+              updatedOptions.push(normalizeOption(opt));
               existingValues.add(opt.value);
             }
           }
@@ -654,6 +743,14 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
         }
 
         case "REMOVE_OPTION": {
+          // 보호 대상 폼(발행 이후 또는 기제출 응답 보유)에서는 옵션 물리 삭제를 원천 차단합니다.
+          if (isProtected) {
+            return {
+              success: false,
+              error:
+                "이미 발행되었거나 제출 응답이 존재하는 폼의 옵션은 과거 데이터 무결성을 보존하기 위해 삭제할 수 없습니다. 대신 'DISABLE_OPTION'(소프트 비활성화)을 사용해 주세요.",
+            };
+          }
           if (!targetOptionValue) {
             return {
               success: false,
@@ -675,11 +772,10 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
               error: "전체 교체할 옵션 목록(options)을 전달해 주세요.",
             };
           }
-          updatedOptions = newOptionsInput.map((opt) => ({
-            label: opt.label,
-            value: opt.value,
-            disabled: Boolean(opt.disabled),
-          }));
+          // 보호 대상 폼에서는 새 목록에서 누락된 기존 옵션을 disabled: true로 보존 병합합니다.
+          updatedOptions = isProtected
+            ? mergeOptionsWithPreservation(existingOptions, newOptionsInput)
+            : newOptionsInput.map(normalizeOption);
           break;
         }
       }

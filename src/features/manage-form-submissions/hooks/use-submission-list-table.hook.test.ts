@@ -41,6 +41,7 @@ describe("useSubmissionListTable (features/manage-form-submissions/hooks)", () =
           label: "이름",
           type: "text",
           required: true,
+          description: "응답자의 성명을 기록합니다.",
           order: 0,
         },
       ],

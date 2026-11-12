@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   findSubmissionById,
   findSubmissionsByFormId,
+  hasSubmissionsByFormId,
   insertSubmission,
   softDeleteSubmissionById,
   softDeleteSubmissionsByIds,
+  syncSubmissionRelations,
   updateSubmissionById,
 } from "./form-submission.server";
 
@@ -226,6 +228,88 @@ describe("Form Submission Server Repository (entities/form-submission/server)", 
 
       expect(mockUpdate).toHaveBeenCalledTimes(1);
       expect(result).toEqual(deletedList);
+    });
+  });
+
+  describe("hasSubmissionsByFormId", () => {
+    it("유효하지 않은 UUID 폼 ID 전달 시 DB 쿼리 없이 false를 반환해야 한다", async () => {
+      const result = await hasSubmissionsByFormId("not-a-uuid");
+      expect(mockSelect).not.toHaveBeenCalled();
+      expect(result).toBe(false);
+    });
+
+    it("활성 응답이 1건 이상 존재하면 true를 반환해야 한다", async () => {
+      mockLimit.mockResolvedValueOnce([{ id: sampleSubmission.id }]);
+      const result = await hasSubmissionsByFormId(sampleSubmission.formId);
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+      expect(result).toBe(true);
+    });
+  });
+
+  describe("syncSubmissionRelations", () => {
+    it("단순화된 relations 스키마({ sourceId, targetId, fieldId })만 삽입하고 동일 타깃을 참조하는 서로 다른 관계 필드를 모두 보존해야 한다", async () => {
+      const targetSubmissionId = "00000000-0000-0000-0000-000000000099";
+      const targetFormId = "00000000-0000-0000-0000-000000000088";
+
+      mockLimit.mockResolvedValueOnce([
+        {
+          schemaDefinition: {
+            fields: [
+              {
+                id: "rel_requester",
+                label: "요청 담당자",
+                type: "relation",
+                required: true,
+                description: "이 문서를 최초 요청한 담당자를 연결합니다.",
+                relationConfig: {
+                  targetFormId,
+                  displayField: "name",
+                  multiple: false,
+                },
+              },
+              {
+                id: "rel_approver",
+                label: "최종 승인자",
+                type: "relation",
+                required: false,
+                description: "이 문서를 최종 결재하는 승인자를 연결합니다.",
+                relationConfig: {
+                  targetFormId,
+                  displayField: "name",
+                  multiple: false,
+                },
+              },
+            ],
+          },
+        },
+      ]);
+
+      await syncSubmissionRelations({
+        ...sampleSubmission,
+        data: {
+          rel_requester: targetSubmissionId,
+          rel_approver: targetSubmissionId,
+        },
+      });
+
+      expect(mockDelete).toHaveBeenCalledTimes(1);
+      expect(mockInsert).toHaveBeenCalledTimes(1);
+      expect(mockValues).toHaveBeenCalledWith([
+        {
+          sourceId: sampleSubmission.id,
+          targetId: targetSubmissionId,
+          fieldId: "rel_requester",
+        },
+        {
+          sourceId: sampleSubmission.id,
+          targetId: targetSubmissionId,
+          fieldId: "rel_approver",
+        },
+      ]);
+
+      // 불필요한 레거시 컬럼이 포함되지 않았는지 검증
+      const insertedRows = mockValues.mock.calls[0]?.[0] as Array<Record<string, unknown>>;
+      expect(Object.keys(insertedRows[0] ?? {})).toEqual(["sourceId", "targetId", "fieldId"]);
     });
   });
 });

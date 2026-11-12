@@ -105,6 +105,7 @@ describe("Route Handler: /api/v1/forms", () => {
               type: "text",
               label: "만족도 의견",
               required: true,
+              description: "서비스 이용에 대한 종합 의견을 입력합니다.",
             },
           ],
         },

@@ -2,14 +2,13 @@
 
 import * as React from "react";
 import { Controller, useFormContext } from "react-hook-form";
-import type { CoreFormField } from "@/entities/form";
+import type { CoreFormField, SelectOption } from "@/entities/form";
 import { Input } from "@/shared/ui/input";
 import { Textarea } from "@/shared/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { Switch } from "@/shared/ui/switch";
-import { Separator } from "@/shared/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 import { Calendar } from "@/shared/ui/calendar";
 import { Button } from "@/shared/ui/button";
@@ -66,6 +65,80 @@ function parseYmdToDate(ymd?: string | unknown): Date | undefined {
 }
 
 /**
+ * 선택형 옵션(radio/checkbox)의 라벨과 필수 상세 설명을 함께 렌더링하는 보조 컴포넌트입니다.
+ * 긴 설명 문구도 줄바꿈을 유지하여 프로토타입 화면에서 즉시 읽을 수 있도록 구성합니다.
+ */
+function OptionLabelDescription({ htmlFor, opt }: { htmlFor: string; opt: SelectOption }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <Label
+        htmlFor={htmlFor}
+        className={cn(
+          "cursor-pointer text-sm leading-snug font-normal",
+          opt.disabled && "text-muted-foreground line-through"
+        )}
+      >
+        {opt.label}
+        {opt.disabled && " (비활성화됨)"}
+      </Label>
+      <p className="text-muted-foreground text-xs leading-relaxed whitespace-pre-wrap">
+        {opt.description}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * 드롭다운(select) 하단에 모든 활성 옵션의 선택 기준(description)을 상시 표시하는 가이드 목록입니다.
+ * Radix SelectItem 내부에 긴 설명을 넣으면 선택된 트리거(SelectValue) 레이아웃이 깨지므로,
+ * 드롭다운 바깥쪽에 전체 옵션의 상세 설명을 직접 노출합니다.
+ */
+function SelectOptionsGuideList({ options }: { options: SelectOption[] }) {
+  if (options.length === 0) return null;
+
+  return (
+    <div className="bg-muted/30 space-y-2 rounded-md border p-2.5 text-xs">
+      {options.map((opt) => (
+        <div key={opt.value} className="space-y-0.5">
+          <p
+            className={cn(
+              "text-foreground font-medium",
+              opt.disabled && "text-muted-foreground line-through"
+            )}
+          >
+            {opt.label}
+            {opt.disabled && " (비활성화됨)"}
+          </p>
+          <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
+            {opt.description}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * 드롭다운(SelectContent) 내부에 표시할 옵션 아이템 목록을 생성하는 공통 렌더러입니다.
+ */
+function renderSelectOptionItems(visibleOptions: SelectOption[]) {
+  if (visibleOptions.length === 0) {
+    return (
+      <SelectItem value="__empty__" disabled>
+        선택 옵션 없음
+      </SelectItem>
+    );
+  }
+
+  return visibleOptions.map((opt) => (
+    <SelectItem key={opt.value} value={opt.value} disabled={opt.disabled}>
+      {opt.label}
+      {opt.disabled && " (비활성화됨)"}
+    </SelectItem>
+  ));
+}
+
+/**
  * 폼 필드 렌더러 컴포넌트 (DynamicField)
  *
  * 필드의 type 속성(코어 8종 입력 + 1종 레이아웃)에 따라
@@ -92,26 +165,7 @@ export function DynamicField({
   const formError = formContext?.formState?.errors?.[id]?.message;
   const displayError = (typeof formError === "string" ? formError : undefined) ?? propError;
 
-  // 1. 레이아웃 전용 구분선(section) 필드 분기 (데이터 입력 컨트롤이 아님)
-  if (type === "section") {
-    return (
-      <div
-        className={cn(
-          "space-y-2 pt-6 pb-2 transition-all",
-          isSelected && "ring-ring/50 rounded-md p-2 ring-2 ring-offset-2"
-        )}
-        onClick={() => onFieldClick?.(id)}
-      >
-        <div className="flex flex-col gap-0.5">
-          <h3 className="text-foreground text-base font-semibold tracking-tight">{label}</h3>
-          {description && <p className="text-muted-foreground text-xs">{description}</p>}
-        </div>
-        <Separator className="mt-2" />
-      </div>
-    );
-  }
-
-  // 2. 입력 컨트롤 렌더링
+  // 입력 컨트롤 렌더링
   const renderControl = () => {
     // A. React Hook Form 컨텍스트가 주입된 경우 (실제 제출 / 수정 모드)
     if (formContext) {
@@ -149,8 +203,6 @@ export function DynamicField({
           );
 
         case "select": {
-          const rawOptions = options && options.length > 0 ? options : ["선택 옵션 없음"];
-
           return (
             <Controller
               name={id}
@@ -158,26 +210,22 @@ export function DynamicField({
               render={({ field: controllerField }) => {
                 const currentValue =
                   typeof controllerField.value === "string" ? controllerField.value : "";
-                const visibleOptions = filterSingleSelectOptions(rawOptions, currentValue);
+                const visibleOptions = filterSingleSelectOptions(options, currentValue);
 
                 return (
-                  <Select
-                    value={currentValue}
-                    onValueChange={controllerField.onChange}
-                    disabled={disabled}
-                  >
-                    <SelectTrigger id={id} className="w-full">
-                      <SelectValue placeholder={placeholder || "선택해 주세요"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {visibleOptions.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value} disabled={opt.disabled}>
-                          {opt.label}
-                          {opt.disabled && " (비활성화됨)"}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-2">
+                    <Select
+                      value={currentValue}
+                      onValueChange={controllerField.onChange}
+                      disabled={disabled}
+                    >
+                      <SelectTrigger id={id} className="w-full">
+                        <SelectValue placeholder={placeholder || "선택해 주세요"} />
+                      </SelectTrigger>
+                      <SelectContent>{renderSelectOptionItems(visibleOptions)}</SelectContent>
+                    </Select>
+                    <SelectOptionsGuideList options={visibleOptions} />
+                  </div>
                 );
               }}
             />
@@ -185,8 +233,6 @@ export function DynamicField({
         }
 
         case "radio": {
-          const rawOptions = options && options.length > 0 ? options : ["옵션 없음"];
-
           return (
             <Controller
               name={id}
@@ -194,32 +240,30 @@ export function DynamicField({
               render={({ field: controllerField }) => {
                 const currentValue =
                   typeof controllerField.value === "string" ? controllerField.value : "";
-                const visibleOptions = filterSingleSelectOptions(rawOptions, currentValue);
+                const visibleOptions = filterSingleSelectOptions(options, currentValue);
+
+                if (visibleOptions.length === 0) {
+                  return (
+                    <p className="text-muted-foreground text-xs">선택 가능한 옵션이 없습니다.</p>
+                  );
+                }
 
                 return (
                   <RadioGroup
                     value={currentValue}
                     onValueChange={controllerField.onChange}
                     disabled={disabled}
-                    className="flex flex-col gap-2 pt-1"
+                    className="flex flex-col gap-3 pt-1"
                   >
                     {visibleOptions.map((opt) => (
-                      <div key={opt.value} className="flex items-center gap-2">
+                      <div key={opt.value} className="flex items-start gap-2">
                         <RadioGroupItem
                           id={`${id}-${opt.value}`}
                           value={opt.value}
                           disabled={opt.disabled || disabled}
+                          className="mt-0.5"
                         />
-                        <Label
-                          htmlFor={`${id}-${opt.value}`}
-                          className={cn(
-                            "cursor-pointer text-sm font-normal",
-                            opt.disabled && "text-muted-foreground line-through"
-                          )}
-                        >
-                          {opt.label}
-                          {opt.disabled && " (비활성화됨)"}
-                        </Label>
+                        <OptionLabelDescription htmlFor={`${id}-${opt.value}`} opt={opt} />
                       </div>
                     ))}
                   </RadioGroup>
@@ -251,11 +295,11 @@ export function DynamicField({
                   };
 
                   return (
-                    <div className="flex flex-col gap-2 pt-1">
+                    <div className="flex flex-col gap-3 pt-1">
                       {visibleOptions.map((opt) => {
                         const isChecked = selectedValues.includes(opt.value);
                         return (
-                          <div key={opt.value} className="flex items-center gap-2">
+                          <div key={opt.value} className="flex items-start gap-2">
                             <Checkbox
                               id={`${id}-${opt.value}`}
                               checked={isChecked}
@@ -263,17 +307,9 @@ export function DynamicField({
                                 handleToggle(opt.value, Boolean(checked))
                               }
                               disabled={opt.disabled || disabled}
+                              className="mt-0.5"
                             />
-                            <Label
-                              htmlFor={`${id}-${opt.value}`}
-                              className={cn(
-                                "cursor-pointer text-sm font-normal",
-                                opt.disabled && "text-muted-foreground line-through"
-                              )}
-                            >
-                              {opt.label}
-                              {opt.disabled && " (비활성화됨)"}
-                            </Label>
+                            <OptionLabelDescription htmlFor={`${id}-${opt.value}`} opt={opt} />
                           </div>
                         );
                       })}
@@ -451,44 +487,36 @@ export function DynamicField({
         );
 
       case "select": {
-        const rawOptions = options && options.length > 0 ? options : ["선택 옵션 없음"];
-        const selectOptions = filterSingleSelectOptions(rawOptions, undefined);
+        const selectOptions = filterSingleSelectOptions(options, undefined);
         return (
-          <Select disabled={disabled}>
-            <SelectTrigger id={id} className="w-full">
-              <SelectValue placeholder={placeholder || "선택해 주세요"} />
-            </SelectTrigger>
-            <SelectContent>
-              {selectOptions.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value} disabled={opt.disabled}>
-                  {opt.label}
-                  {opt.disabled && " (비활성화됨)"}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="space-y-2">
+            <Select disabled={disabled}>
+              <SelectTrigger id={id} className="w-full">
+                <SelectValue placeholder={placeholder || "선택해 주세요"} />
+              </SelectTrigger>
+              <SelectContent>{renderSelectOptionItems(selectOptions)}</SelectContent>
+            </Select>
+            <SelectOptionsGuideList options={selectOptions} />
+          </div>
         );
       }
 
       case "radio": {
-        const rawOptions = options && options.length > 0 ? options : ["옵션 없음"];
-        const radioOptions = filterSingleSelectOptions(rawOptions, undefined);
+        const radioOptions = filterSingleSelectOptions(options, undefined);
+        if (radioOptions.length === 0) {
+          return <p className="text-muted-foreground text-xs">선택 가능한 옵션이 없습니다.</p>;
+        }
         return (
-          <RadioGroup disabled={disabled} className="flex flex-col gap-2 pt-1">
+          <RadioGroup disabled={disabled} className="flex flex-col gap-3 pt-1">
             {radioOptions.map((opt) => (
-              <div key={opt.value} className="flex items-center gap-2">
+              <div key={opt.value} className="flex items-start gap-2">
                 <RadioGroupItem
                   id={`${id}-${opt.value}`}
                   value={opt.value}
                   disabled={opt.disabled}
+                  className="mt-0.5"
                 />
-                <Label
-                  htmlFor={`${id}-${opt.value}`}
-                  className="cursor-pointer text-sm font-normal"
-                >
-                  {opt.label}
-                  {opt.disabled && " (비활성화됨)"}
-                </Label>
+                <OptionLabelDescription htmlFor={`${id}-${opt.value}`} opt={opt} />
               </div>
             ))}
           </RadioGroup>
@@ -499,17 +527,15 @@ export function DynamicField({
         const checkOptions = filterMultiSelectOptions(options, []);
         if (checkOptions.length > 0) {
           return (
-            <div className="flex flex-col gap-2 pt-1">
+            <div className="flex flex-col gap-3 pt-1">
               {checkOptions.map((opt) => (
-                <div key={opt.value} className="flex items-center gap-2">
-                  <Checkbox id={`${id}-${opt.value}`} disabled={opt.disabled || disabled} />
-                  <Label
-                    htmlFor={`${id}-${opt.value}`}
-                    className="cursor-pointer text-sm font-normal"
-                  >
-                    {opt.label}
-                    {opt.disabled && " (비활성화됨)"}
-                  </Label>
+                <div key={opt.value} className="flex items-start gap-2">
+                  <Checkbox
+                    id={`${id}-${opt.value}`}
+                    disabled={opt.disabled || disabled}
+                    className="mt-0.5"
+                  />
+                  <OptionLabelDescription htmlFor={`${id}-${opt.value}`} opt={opt} />
                 </div>
               ))}
             </div>

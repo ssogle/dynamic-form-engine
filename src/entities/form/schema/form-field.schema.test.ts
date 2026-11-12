@@ -5,12 +5,11 @@ import {
   coreFormFieldSchema,
   relationConfigSchema,
   selectOptionSchema,
-  selectOptionsInputSchema,
 } from "./form-field.schema";
 
 describe("Form Field Schema Validation Engine (src/entities/form/schema/form-field.schema.ts)", () => {
   describe("coreFieldTypeSchema (필드 유형 열거형 검증)", () => {
-    it("확장된 10가지 코어 필드 타입(8종 입력 + 1종 레이아웃)을 정상 통과시켜야 한다", () => {
+    it("확장된 9가지 순수 데이터 코어 필드 타입을 정상 통과시켜야 한다", () => {
       const validTypes = [
         "text",
         "textarea",
@@ -21,7 +20,6 @@ describe("Form Field Schema Validation Engine (src/entities/form/schema/form-fie
         "date",
         "switch",
         "relation",
-        "section",
       ];
 
       for (const type of validTypes) {
@@ -30,8 +28,8 @@ describe("Form Field Schema Validation Engine (src/entities/form/schema/form-fie
       }
     });
 
-    it("지원하지 않는 임의의 필드 타입은 파싱에 실패해야 한다", () => {
-      const invalidTypes = ["tags", "file", "unknown", "slider", "multiselect"];
+    it("지원하지 않는 임의의 필드 타입(section 포함)은 파싱에 실패해야 한다", () => {
+      const invalidTypes = ["section", "tags", "file", "unknown", "slider", "multiselect"];
 
       for (const type of invalidTypes) {
         const result = coreFieldTypeSchema.safeParse(type);
@@ -40,11 +38,12 @@ describe("Form Field Schema Validation Engine (src/entities/form/schema/form-fie
     });
   });
 
-  describe("selectOptionSchema & selectOptionsInputSchema (인라인 옵션 거버넌스)", () => {
+  describe("selectOptionSchema (인라인 옵션 단일 규격 검증)", () => {
     it("객체 형태의 옵션을 정상 파싱하고 disabled 미지정 시 기본값 false를 할당해야 한다", () => {
       const optionPayload = {
         label: "신규 개발",
         value: "new_dev",
+        description: "신규 기능 및 신규 프로젝트 개발 업무에 선택합니다.",
       };
 
       const result = selectOptionSchema.safeParse(optionPayload);
@@ -52,6 +51,7 @@ describe("Form Field Schema Validation Engine (src/entities/form/schema/form-fie
       if (result.success) {
         expect(result.data.label).toBe("신규 개발");
         expect(result.data.value).toBe("new_dev");
+        expect(result.data.description).toBe("신규 기능 및 신규 프로젝트 개발 업무에 선택합니다.");
         expect(result.data.disabled).toBe(false);
       }
     });
@@ -60,6 +60,7 @@ describe("Form Field Schema Validation Engine (src/entities/form/schema/form-fie
       const deprecatedOption = {
         label: "레거시 유지보수",
         value: "legacy_maint",
+        description: "기존 구버전 시스템 유지보수 분류로 현재는 신규 선택 불가입니다.",
         disabled: true,
       };
 
@@ -70,31 +71,25 @@ describe("Form Field Schema Validation Engine (src/entities/form/schema/form-fie
       }
     });
 
-    it("레거시 문자열 배열이 유입되면 하위 호환성을 위해 객체 배열로 자동 변환해야 한다", () => {
-      const legacyOptions = ["상", "중", "하"];
+    it("옵션 description이 누락되거나 공백만 있으면 파싱에 실패해야 한다", () => {
+      const missingDescription = {
+        label: "신규 개발",
+        value: "new_dev",
+      };
+      const blankDescription = {
+        label: "신규 개발",
+        value: "new_dev",
+        description: "   ",
+      };
 
-      const result = selectOptionsInputSchema.safeParse(legacyOptions);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual([
-          { label: "상", value: "상", disabled: false },
-          { label: "중", value: "중", disabled: false },
-          { label: "하", value: "하", disabled: false },
-        ]);
-      }
+      expect(selectOptionSchema.safeParse(missingDescription).success).toBe(false);
+      expect(selectOptionSchema.safeParse(blankDescription).success).toBe(false);
     });
 
-    it("문자열과 객체가 혼합된 배열도 안전하게 정규화해야 한다", () => {
-      const mixedOptions = ["일반", { label: "긴급", value: "urgent", disabled: true }];
-
-      const result = selectOptionsInputSchema.safeParse(mixedOptions);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual([
-          { label: "일반", value: "일반", disabled: false },
-          { label: "긴급", value: "urgent", disabled: true },
-        ]);
-      }
+    it("단순 문자열 옵션이 유입되면 객체 규격 위반으로 파싱에 실패해야 한다", () => {
+      const stringOption = "신규 개발";
+      const result = selectOptionSchema.safeParse(stringOption);
+      expect(result.success).toBe(false);
     });
   });
 
@@ -137,11 +132,12 @@ describe("Form Field Schema Validation Engine (src/entities/form/schema/form-fie
   });
 
   describe("coreFormFieldSchema (개별 폼 필드 정의 검증)", () => {
-    it("필수 항목(id, label, type)이 모두 제공된 정상 텍스트 필드를 파싱해야 한다", () => {
+    it("필수 항목(id, label, type, description)이 모두 제공된 정상 텍스트 필드를 파싱해야 한다", () => {
       const validField = {
         id: "f_applicant_name",
         label: "지원자 성명",
         type: "text",
+        description: "지원자의 실명(한글 성명)을 입력받는 항목",
       };
 
       const result = coreFormFieldSchema.safeParse(validField);
@@ -150,35 +146,90 @@ describe("Form Field Schema Validation Engine (src/entities/form/schema/form-fie
         expect(result.data.id).toBe("f_applicant_name");
         expect(result.data.label).toBe("지원자 성명");
         expect(result.data.type).toBe("text");
+        expect(result.data.description).toBe("지원자의 실명(한글 성명)을 입력받는 항목");
         expect(result.data.required).toBe(false);
       }
     });
 
-    it("라디오(radio) 및 체크박스(checkbox) 필드의 options를 객체 배열로 정규화하여 수용해야 한다", () => {
-      const radioField = {
+    it("필드 설명(description)이 누락되거나 공백 문자열이면 검증에 실패해야 한다", () => {
+      const missingDescription = {
+        id: "f_applicant_name",
+        label: "지원자 성명",
+        type: "text",
+      };
+      const emptyDescription = {
+        id: "f_applicant_name",
+        label: "지원자 성명",
+        type: "text",
+        description: "   ",
+      };
+
+      expect(coreFormFieldSchema.safeParse(missingDescription).success).toBe(false);
+      expect(coreFormFieldSchema.safeParse(emptyDescription).success).toBe(false);
+    });
+
+    it("라디오(radio) 및 체크박스(checkbox) 필드의 options는 SelectOption 객체 배열만 허용하고 문자열 배열은 거부해야 한다", () => {
+      const validRadioField = {
         id: "f_priority",
         label: "우선순위",
         type: "radio",
+        description: "업무 처리의 긴급도를 구분하는 선택 값",
+        options: [
+          { label: "높음", value: "HIGH", description: "당일 내 즉시 처리가 필요한 긴급 건" },
+          { label: "보통", value: "MEDIUM", description: "일반 일정에 따라 순차 처리하는 건" },
+          {
+            label: "낮음",
+            value: "LOW",
+            description: "여유 일정으로 배정하는 비긴급 건",
+            disabled: true,
+          },
+        ],
+      };
+
+      const validResult = coreFormFieldSchema.safeParse(validRadioField);
+      expect(validResult.success).toBe(true);
+      if (validResult.success) {
+        expect(validResult.data.options).toEqual([
+          {
+            label: "높음",
+            value: "HIGH",
+            description: "당일 내 즉시 처리가 필요한 긴급 건",
+            disabled: false,
+          },
+          {
+            label: "보통",
+            value: "MEDIUM",
+            description: "일반 일정에 따라 순차 처리하는 건",
+            disabled: false,
+          },
+          {
+            label: "낮음",
+            value: "LOW",
+            description: "여유 일정으로 배정하는 비긴급 건",
+            disabled: true,
+          },
+        ]);
+      }
+
+      const legacyStringOptionsField = {
+        id: "f_priority_legacy",
+        label: "우선순위",
+        type: "radio",
+        description: "업무 처리의 긴급도",
         options: ["높음", "보통", "낮음"],
       };
 
-      const result = coreFormFieldSchema.safeParse(radioField);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.options?.[0]).toEqual({
-          label: "높음",
-          value: "높음",
-          disabled: false,
-        });
-      }
+      const legacyResult = coreFormFieldSchema.safeParse(legacyStringOptionsField);
+      expect(legacyResult.success).toBe(false);
     });
 
-    it("관계형(relation) 필드의 relationConfig를 정상 수용해야 한다", () => {
+    it("관계형(relation) 필드의 relationConfig와 도메인 연결 설명(description)을 정상 수용해야 한다", () => {
       const relationField = {
         id: "f_parent_project",
         label: "소속 프로젝트",
         type: "relation",
         required: true,
+        description: "이 비용 집행이 귀속되는 상위 프로젝트 도메인 레코드 연결",
         relationConfig: {
           targetFormId: "123e4567-e89b-12d3-a456-426614174000",
           displayField: "f_title",
@@ -196,11 +247,20 @@ describe("Form Field Schema Validation Engine (src/entities/form/schema/form-fie
       }
     });
 
-    it("날짜(date), 스위치(switch), 섹션(section) 필드를 정상 파싱해야 한다", () => {
+    it("날짜(date), 스위치(switch) 필드를 정상 파싱해야 한다", () => {
       const fields = [
-        { id: "f_date", label: "계약일자", type: "date" },
-        { id: "f_switch", label: "공개 여부", type: "switch" },
-        { id: "f_section", label: "1. 세부 사항", type: "section" },
+        {
+          id: "f_date",
+          label: "계약일자",
+          type: "date",
+          description: "계약 효력이 발생하는 기준 일자",
+        },
+        {
+          id: "f_switch",
+          label: "공개 여부",
+          type: "switch",
+          description: "외부 포털 노출 여부를 제어하는 불리언 상태",
+        },
       ];
 
       for (const field of fields) {
@@ -213,11 +273,13 @@ describe("Form Field Schema Validation Engine (src/entities/form/schema/form-fie
       const missingId = {
         label: "이름",
         type: "text",
+        description: "사용자 성명",
       };
       const emptyId = {
         id: "",
         label: "이름",
         type: "text",
+        description: "사용자 성명",
       };
 
       expect(coreFormFieldSchema.safeParse(missingId).success).toBe(false);
@@ -233,11 +295,13 @@ describe("Form Field Schema Validation Engine (src/entities/form/schema/form-fie
       const missingLabel = {
         id: "f_1",
         type: "text",
+        description: "사용자 성명",
       };
       const emptyLabel = {
         id: "f_1",
         label: "",
         type: "text",
+        description: "사용자 성명",
       };
 
       expect(coreFormFieldSchema.safeParse(missingLabel).success).toBe(false);
@@ -262,6 +326,7 @@ describe("Form Field Schema Validation Engine (src/entities/form/schema/form-fie
             label: "이름",
             type: "text",
             required: true,
+            description: "지원자의 실명",
           },
         ],
         publishedAt: "2026-11-10T00:00:00.000Z",

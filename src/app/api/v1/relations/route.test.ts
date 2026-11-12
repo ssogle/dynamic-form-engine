@@ -50,11 +50,8 @@ describe("Route Handler: GET /api/v1/relations", () => {
     const mockEdges = [
       {
         sourceId: sourceSubmissionId,
-        sourceType: "SUBMISSION",
         targetId,
-        targetType: "SUBMISSION",
-        relationType: "LINKED_TO",
-        metadata: { fieldId: "f_rel" },
+        fieldId: "f_rel",
         createdAt: new Date(),
       },
     ];

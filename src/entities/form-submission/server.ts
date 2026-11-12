@@ -8,6 +8,7 @@ import "server-only";
 export {
   insertSubmission,
   findSubmissionsByFormId,
+  hasSubmissionsByFormId,
   findSubmissionsPaginated,
   findSubmissionById,
   updateSubmissionById,

@@ -17,7 +17,14 @@ vi.mock("@/entities/form/server", () => ({
       id: "form-uuid-2",
       title: "개발자 채용 지원서",
       schemaDefinition: {
-        fields: [{ id: "f1", label: "이름", type: "text" }],
+        fields: [
+          {
+            id: "f1",
+            label: "이름",
+            type: "text",
+            description: "지원자의 성명을 입력합니다.",
+          },
+        ],
       },
       publishedAt: new Date("2026-01-01T00:00:00Z"),
     },
@@ -30,6 +37,7 @@ vi.mock("@/entities/form/server", () => ({
 }));
 
 vi.mock("@/entities/form-submission/server", () => ({
+  hasSubmissionsByFormId: vi.fn().mockResolvedValue(false),
   softDeleteSubmissionsByIds: vi.fn(),
 }));
 

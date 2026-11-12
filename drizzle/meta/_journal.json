@@ -43,6 +43,13 @@
       "when": 1794460658898,
       "tag": "0005_large_beast",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794516320409,
+      "tag": "0006_keen_red_ghost",
+      "breakpoints": true
     }
   ]
 }

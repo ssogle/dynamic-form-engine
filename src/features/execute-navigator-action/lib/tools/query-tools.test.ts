@@ -10,8 +10,20 @@ describe("createQueryTools (features/execute-navigator-action/lib/tools)", () =>
       description: "매일 업무 내용을 등록합니다.",
       schemaDefinition: {
         fields: [
-          { id: "f1", label: "작성자", type: "text", required: true },
-          { id: "f2", label: "업무 내용", type: "textarea", required: true },
+          {
+            id: "f1",
+            label: "작성자",
+            type: "text",
+            required: true,
+            description: "보고서 작성자 성명을 입력합니다.",
+          },
+          {
+            id: "f2",
+            label: "업무 내용",
+            type: "textarea",
+            required: true,
+            description: "금일 진행한 주요 업무 내용을 서술합니다.",
+          },
         ],
       },
       publishedAt: new Date("2026-11-01T00:00:00Z"),
@@ -25,8 +37,20 @@ describe("createQueryTools (features/execute-navigator-action/lib/tools)", () =>
       description: "프로젝트 투입 인원 모집",
       schemaDefinition: {
         fields: [
-          { id: "f3", label: "지원자명", type: "text", required: true },
-          { id: "f4", label: "경력", type: "number", required: false },
+          {
+            id: "f3",
+            label: "지원자명",
+            type: "text",
+            required: true,
+            description: "채용 지원자의 이름을 입력합니다.",
+          },
+          {
+            id: "f4",
+            label: "경력",
+            type: "number",
+            required: false,
+            description: "관련 직무 경력 연수를 숫자로 입력합니다.",
+          },
         ],
       },
       publishedAt: null, // 미발행

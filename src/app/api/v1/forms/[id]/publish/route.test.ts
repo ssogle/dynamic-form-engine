@@ -19,7 +19,15 @@ describe("Route Handler: POST /api/v1/forms/[id]/publish", () => {
     title: "개발자 채용 지원서",
     description: "멋진 팀에 합류하세요.",
     schemaDefinition: {
-      fields: [{ id: "f1", type: "text", label: "이름", required: true }],
+      fields: [
+        {
+          id: "f1",
+          type: "text",
+          label: "이름",
+          required: true,
+          description: "지원자의 성명을 입력합니다.",
+        },
+      ],
     },
     publishedAt: null,
     createdAt: new Date("2026-01-01T00:00:00Z"),

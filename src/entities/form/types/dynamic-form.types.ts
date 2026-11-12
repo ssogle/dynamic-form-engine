@@ -22,6 +22,9 @@ export interface SelectOption {
   /** DB에 실제 저장되는 불변 코드값 (예: "new_dev") */
   value: string;
 
+  /** 옵션 선택 기준 및 상세 업무 규칙을 안내하는 필수 설명 */
+  description: string;
+
   /** 소프트 비활성화 여부 (과거 라벨 보존 및 신규 선택 차단) */
   disabled?: boolean | undefined;
 }
