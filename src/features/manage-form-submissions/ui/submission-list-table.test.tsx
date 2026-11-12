@@ -204,4 +204,57 @@ describe("SubmissionListTable (features/manage-form-submissions/ui)", () => {
       `/consumer/forms/${mockForm.id}/submissions/sub-1/edit`
     );
   });
+
+  it("삭제 버튼 클릭 시 확인 팝오버가 표시되고, 삭제 확인 클릭 시 DELETE API가 호출되어야 한다", async () => {
+    let deleteCalled = false;
+    const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === "DELETE") {
+        deleteCalled = true;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ "content-type": "application/json" }),
+          json: async () => ({ success: true }),
+        } as unknown as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => ({
+          success: true,
+          data: {
+            items: mockSubmissions,
+            page: 1,
+            limit: 20,
+            totalCount: 1,
+            totalPages: 1,
+            hasMore: false,
+          },
+        }),
+      } as unknown as Response);
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    renderWithClient(<SubmissionListTable form={mockForm} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("삭제")).toBeDefined();
+    });
+
+    const deleteTrigger = screen.getByRole("button", { name: "삭제" });
+    fireEvent.click(deleteTrigger);
+
+    await waitFor(() => {
+      expect(screen.getByText("응답을 삭제하시겠습니까?")).toBeDefined();
+      expect(screen.getByText("삭제 확인")).toBeDefined();
+    });
+
+    const confirmButton = screen.getByRole("button", { name: "삭제 확인" });
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => {
+      expect(deleteCalled).toBe(true);
+    });
+  });
 });

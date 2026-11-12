@@ -188,6 +188,14 @@ describe("SubmissionDetailView (features/manage-form-submissions/ui)", () => {
     fireEvent.click(deleteBtn);
 
     await waitFor(() => {
+      expect(screen.getByText("응답을 삭제하시겠습니까?")).toBeDefined();
+      expect(screen.getByRole("button", { name: "삭제 확인" })).toBeDefined();
+    });
+
+    const confirmBtn = screen.getByRole("button", { name: "삭제 확인" });
+    fireEvent.click(confirmBtn);
+
+    await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith("/consumer/forms/form-uuid-1");
     });
   });

@@ -16,6 +16,7 @@ UI 요소를 작성할 때는 새로운 기본 HTML 태그(`<button>`, `<input>`
 | 단일 행 텍스트 입력창  | `Input`                 | `@/shared/ui/input`    |
 | 여러 줄 텍스트 입력창  | `Textarea`              | `@/shared/ui/textarea` |
 | 셀렉트 / 드롭다운 선택 | `Select`                | `@/shared/ui/select`   |
+| 인라인 확인 / 팝오버   | `Popover`               | `@/shared/ui/popover`  |
 | 다이얼로그 / 모달 팝업 | `Dialog`                | `@/shared/ui/dialog`   |
 | 폼 필드 라벨           | `Label`                 | `@/shared/ui/label`    |
 | 카드 컨테이너 / 패널   | `Card`, `CardHeader` 등 | `@/shared/ui/card`     |
@@ -27,6 +28,18 @@ UI 요소를 작성할 때는 새로운 기본 HTML 태그(`<button>`, `<input>`
 
 - [Good] `import { Button } from "@/shared/ui/button";`
 - [Bad] `import { Button } from "@/shared/ui";`
+
+### ③ 브라우저 시스템 팝업 사용 전면 금지 (No Native Dialogs)
+
+브라우저 기본 시스템 팝업(`window.alert`, `window.confirm`, `window.prompt`)의 호출을 엄격히 금지합니다.
+이들은 브라우저 메인 스레드를 동기적으로 블로킹하고, 팝업 차단 위험이 있으며, 디자인 시스템의 시각적 일관성을 해칩니다.
+
+모든 사용자 확인 및 피드백 인터랙션은 용도에 맞게 `@/shared/ui` 컴포넌트로 구현합니다:
+
+| 인터랙션 유형             | 권장 컴포넌트                     | 적용 유스케이스 예시                                                             |
+| :------------------------ | :-------------------------------- | :------------------------------------------------------------------------------- |
+| **국소적/인라인 확인**    | `Popover` (`@/shared/ui/popover`) | 테이블 목록 행 삭제, 단건 상세 뷰 삭제 등 버튼 바로 위에서 빠르게 확인하는 액션  |
+| **전역/파괴적 모달 확인** | `Dialog` (`@/shared/ui/dialog`)   | 폼 전체 영구 삭제, 미발행 롤백 등 화면 중앙에서 주의를 환기해야 하는 중대한 액션 |
 
 ---
 

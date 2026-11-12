@@ -13,6 +13,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/sha
 import { Button } from "@/shared/ui/button";
 import { Badge } from "@/shared/ui/badge";
 import { Skeleton } from "@/shared/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 import { formatDateTime } from "@/shared/lib/date";
 
 export interface SubmissionDetailViewProps {
@@ -48,6 +49,7 @@ const FIELD_TYPE_LABELS: Record<string, string> = {
 export function SubmissionDetailView({ formId, submissionId }: SubmissionDetailViewProps) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = React.useState(false);
 
   // 1. 부모 폼 스키마 및 단건 응답 데이터 비동기 쿼리
   const {
@@ -78,17 +80,12 @@ export function SubmissionDetailView({ formId, submissionId }: SubmissionDetailV
 
   // 3. 응답 삭제 핸들러
   const handleDelete = React.useCallback(async () => {
-    if (!window.confirm("정말 이 응답을 삭제하시겠습니까? 삭제 후에는 복구할 수 없습니다.")) {
-      return;
-    }
-
     try {
       setIsDeleting(true);
       await deleteSubmission(submissionId);
       router.push(`/consumer/forms/${formId}`);
     } catch (err) {
       console.error("응답 삭제 실패:", err);
-      alert("응답 삭제에 실패했습니다.");
       setIsDeleting(false);
     }
   }, [deleteSubmission, submissionId, formId, router]);
@@ -165,16 +162,46 @@ export function SubmissionDetailView({ formId, submissionId }: SubmissionDetailV
               수정하기
             </Link>
           </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            className="h-8 gap-1.5 text-xs"
-            onClick={handleDelete}
-            disabled={isDeleting}
-          >
-            <Trash2 className="size-3.5" />
-            {isDeleting ? "삭제 중..." : "삭제하기"}
-          </Button>
+          <Popover open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                disabled={isDeleting}
+              >
+                <Trash2 className="size-3.5" />
+                {isDeleting ? "삭제 중..." : "삭제하기"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-56 space-y-2 p-3 text-left shadow-md">
+              <div className="space-y-1">
+                <p className="text-foreground text-xs font-semibold">응답을 삭제하시겠습니까?</p>
+                <p className="text-muted-foreground text-[11px]">삭제 후에는 복구할 수 없습니다.</p>
+              </div>
+              <div className="flex items-center justify-end gap-1.5 pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={() => setIsDeleteOpen(false)}
+                >
+                  취소
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={async () => {
+                    setIsDeleteOpen(false);
+                    await handleDelete();
+                  }}
+                >
+                  삭제 확인
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 

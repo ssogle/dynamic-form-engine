@@ -189,6 +189,7 @@ export function SubmissionListTable({ form }: SubmissionListTableProps) {
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [columnSizing, setColumnSizing] = React.useState<ColumnSizingState>({});
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  const [openDeleteId, setOpenDeleteId] = React.useState<string | null>(null);
 
   // 1. 다중 정렬 파라미터 직렬화 (예: "f_exp:desc,createdAt:desc")
   const sortQueryString = React.useMemo(() => {
@@ -240,8 +241,6 @@ export function SubmissionListTable({ form }: SubmissionListTableProps) {
 
   const handleDelete = React.useCallback(
     async (submissionId: string) => {
-      if (!window.confirm("정말 이 응답을 삭제하시겠습니까?")) return;
-
       try {
         setDeletingId(submissionId);
         await deleteSubmission(submissionId);
@@ -441,18 +440,59 @@ export function SubmissionListTable({ form }: SubmissionListTableProps) {
             >
               <Link href={`/consumer/forms/${form.id}/submissions/${sub.id}/edit`}>수정</Link>
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2 text-xs"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDelete(sub.id);
-              }}
-              disabled={deletingId === sub.id}
+            <Popover
+              open={openDeleteId === sub.id}
+              onOpenChange={(open) => setOpenDeleteId(open ? sub.id : null)}
             >
-              {deletingId === sub.id ? "삭제 중..." : "삭제"}
-            </Button>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2 text-xs"
+                  onClick={(e) => e.stopPropagation()}
+                  disabled={deletingId === sub.id}
+                >
+                  {deletingId === sub.id ? "삭제 중..." : "삭제"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                className="w-56 space-y-2 p-3 text-left shadow-md"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="space-y-1">
+                  <p className="text-foreground text-xs font-semibold">응답을 삭제하시겠습니까?</p>
+                  <p className="text-muted-foreground text-[11px]">
+                    삭제 후에는 복구할 수 없습니다.
+                  </p>
+                </div>
+                <div className="flex items-center justify-end gap-1.5 pt-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenDeleteId(null);
+                    }}
+                  >
+                    취소
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      setOpenDeleteId(null);
+                      await handleDelete(sub.id);
+                    }}
+                  >
+                    삭제 확인
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         );
       },
@@ -462,7 +502,15 @@ export function SubmissionListTable({ form }: SubmissionListTableProps) {
     });
 
     return cols;
-  }, [activeFields, columnFilters, handleSetFieldFilter, form.id, deletingId, handleDelete]);
+  }, [
+    activeFields,
+    columnFilters,
+    handleSetFieldFilter,
+    form.id,
+    deletingId,
+    handleDelete,
+    openDeleteId,
+  ]);
 
   // 5. TanStack Table 인스턴스화
   // React Compiler의 자동 메모이제이션 대상에서 TanStack Table 내부 함수가 제외됨에 따른 경고를 억제합니다.
