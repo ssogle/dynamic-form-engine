@@ -21,7 +21,7 @@ const createTestQueryClient = () =>
 
 const createWrapper = (queryClient: QueryClient) => {
   return function TestWrapper({ children }: { readonly children: React.ReactNode }) {
-    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    return React.createElement(QueryClientProvider, { client: queryClient }, children);
   };
 };
 

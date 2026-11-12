@@ -25,9 +25,8 @@ describe("useNavigatorMutation (features/execute-navigator-action/queries)", () 
     });
   });
 
-  const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
+  const wrapper = ({ children }: { children: React.ReactNode }) =>
+    React.createElement(QueryClientProvider, { client: queryClient }, children);
 
   it("executeNavigatorAction 성공 시 응답 데이터를 정상 반환해야 한다", async () => {
     const mockResponse: NavigatorExecutionResponse = {

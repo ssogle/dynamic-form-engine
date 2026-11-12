@@ -18,9 +18,14 @@ export {
   coreFieldTypeSchema,
   coreFormFieldSchema,
   activeFormSchema,
+  selectOptionSchema,
+  selectOptionsInputSchema,
+  relationConfigSchema,
   type CoreFieldType,
   type CoreFormField,
   type ActiveForm,
+  type SelectOption,
+  type RelationConfig,
 } from "./schema/form-field.schema";
 
 export { extractActiveFields } from "./lib/extract-active-fields";

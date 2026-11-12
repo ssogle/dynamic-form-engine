@@ -1,10 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { activeFormSchema, coreFieldTypeSchema, coreFormFieldSchema } from "./form-field.schema";
+import {
+  activeFormSchema,
+  coreFieldTypeSchema,
+  coreFormFieldSchema,
+  relationConfigSchema,
+  selectOptionSchema,
+  selectOptionsInputSchema,
+} from "./form-field.schema";
 
 describe("Form Field Schema Validation Engine (src/entities/form/schema/form-field.schema.ts)", () => {
   describe("coreFieldTypeSchema (필드 유형 열거형 검증)", () => {
-    it("지원하는 4가지 코어 필드 타입을 정상 통과시켜야 한다", () => {
-      const validTypes = ["text", "textarea", "number", "select"];
+    it("확장된 10가지 코어 필드 타입(8종 입력 + 1종 레이아웃)을 정상 통과시켜야 한다", () => {
+      const validTypes = [
+        "text",
+        "textarea",
+        "number",
+        "select",
+        "radio",
+        "checkbox",
+        "date",
+        "switch",
+        "relation",
+        "section",
+      ];
 
       for (const type of validTypes) {
         const result = coreFieldTypeSchema.safeParse(type);
@@ -13,7 +31,7 @@ describe("Form Field Schema Validation Engine (src/entities/form/schema/form-fie
     });
 
     it("지원하지 않는 임의의 필드 타입은 파싱에 실패해야 한다", () => {
-      const invalidTypes = ["checkbox", "radio", "date", "file", "unknown"];
+      const invalidTypes = ["tags", "file", "unknown", "slider", "multiselect"];
 
       for (const type of invalidTypes) {
         const result = coreFieldTypeSchema.safeParse(type);
@@ -22,8 +40,104 @@ describe("Form Field Schema Validation Engine (src/entities/form/schema/form-fie
     });
   });
 
+  describe("selectOptionSchema & selectOptionsInputSchema (인라인 옵션 거버넌스)", () => {
+    it("객체 형태의 옵션을 정상 파싱하고 disabled 미지정 시 기본값 false를 할당해야 한다", () => {
+      const optionPayload = {
+        label: "신규 개발",
+        value: "new_dev",
+      };
+
+      const result = selectOptionSchema.safeParse(optionPayload);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.label).toBe("신규 개발");
+        expect(result.data.value).toBe("new_dev");
+        expect(result.data.disabled).toBe(false);
+      }
+    });
+
+    it("disabled: true로 소프트 비활성화된 옵션을 정상 수용해야 한다", () => {
+      const deprecatedOption = {
+        label: "레거시 유지보수",
+        value: "legacy_maint",
+        disabled: true,
+      };
+
+      const result = selectOptionSchema.safeParse(deprecatedOption);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.disabled).toBe(true);
+      }
+    });
+
+    it("레거시 문자열 배열이 유입되면 하위 호환성을 위해 객체 배열로 자동 변환해야 한다", () => {
+      const legacyOptions = ["상", "중", "하"];
+
+      const result = selectOptionsInputSchema.safeParse(legacyOptions);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toEqual([
+          { label: "상", value: "상", disabled: false },
+          { label: "중", value: "중", disabled: false },
+          { label: "하", value: "하", disabled: false },
+        ]);
+      }
+    });
+
+    it("문자열과 객체가 혼합된 배열도 안전하게 정규화해야 한다", () => {
+      const mixedOptions = ["일반", { label: "긴급", value: "urgent", disabled: true }];
+
+      const result = selectOptionsInputSchema.safeParse(mixedOptions);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toEqual([
+          { label: "일반", value: "일반", disabled: false },
+          { label: "긴급", value: "urgent", disabled: true },
+        ]);
+      }
+    });
+  });
+
+  describe("relationConfigSchema (관계형 필드 설정 검증)", () => {
+    it("정상적인 관계형 설정(targetFormId, displayField)을 파싱해야 한다", () => {
+      const validConfig = {
+        targetFormId: "123e4567-e89b-12d3-a456-426614174000",
+        displayField: "f_project_name",
+      };
+
+      const result = relationConfigSchema.safeParse(validConfig);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.targetFormId).toBe("123e4567-e89b-12d3-a456-426614174000");
+        expect(result.data.displayField).toBe("f_project_name");
+        // multiple 미지정 시 기본값 false 할당 검증
+        expect(result.data.multiple).toBe(false);
+      }
+    });
+
+    it("targetFormId가 UUID 형식이 아니면 실패해야 한다", () => {
+      const invalidConfig = {
+        targetFormId: "not-a-uuid",
+        displayField: "f_name",
+      };
+
+      const result = relationConfigSchema.safeParse(invalidConfig);
+      expect(result.success).toBe(false);
+    });
+
+    it("displayField가 비어있으면 실패해야 한다", () => {
+      const emptyFieldConfig = {
+        targetFormId: "123e4567-e89b-12d3-a456-426614174000",
+        displayField: "",
+      };
+
+      const result = relationConfigSchema.safeParse(emptyFieldConfig);
+      expect(result.success).toBe(false);
+    });
+  });
+
   describe("coreFormFieldSchema (개별 폼 필드 정의 검증)", () => {
-    it("필수 항목(id, label, type)이 모두 제공된 정상 필드를 파싱해야 한다", () => {
+    it("필수 항목(id, label, type)이 모두 제공된 정상 텍스트 필드를 파싱해야 한다", () => {
       const validField = {
         id: "f_applicant_name",
         label: "지원자 성명",
@@ -36,29 +150,62 @@ describe("Form Field Schema Validation Engine (src/entities/form/schema/form-fie
         expect(result.data.id).toBe("f_applicant_name");
         expect(result.data.label).toBe("지원자 성명");
         expect(result.data.type).toBe("text");
-        // required 미지정 시 기본값 false 할당 검증
         expect(result.data.required).toBe(false);
       }
     });
 
-    it("모든 선택 속성(placeholder, description, options, deletedAt)이 포함된 필드를 정상 파싱해야 한다", () => {
-      const fullField = {
-        id: "f_career_level",
-        label: "경력 구분",
-        type: "select",
-        required: true,
-        placeholder: "경력을 선택해 주세요",
-        description: "현재 재직 중인 직급 기준입니다.",
-        options: ["신입", "주니어(1~3년)", "미들(4~7년)", "시니어(8년 이상)"],
-        deletedAt: "2026-11-10T00:00:00.000Z",
+    it("라디오(radio) 및 체크박스(checkbox) 필드의 options를 객체 배열로 정규화하여 수용해야 한다", () => {
+      const radioField = {
+        id: "f_priority",
+        label: "우선순위",
+        type: "radio",
+        options: ["높음", "보통", "낮음"],
       };
 
-      const result = coreFormFieldSchema.safeParse(fullField);
+      const result = coreFormFieldSchema.safeParse(radioField);
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.required).toBe(true);
-        expect(result.data.options).toHaveLength(4);
-        expect(result.data.deletedAt).toBe("2026-11-10T00:00:00.000Z");
+        expect(result.data.options?.[0]).toEqual({
+          label: "높음",
+          value: "높음",
+          disabled: false,
+        });
+      }
+    });
+
+    it("관계형(relation) 필드의 relationConfig를 정상 수용해야 한다", () => {
+      const relationField = {
+        id: "f_parent_project",
+        label: "소속 프로젝트",
+        type: "relation",
+        required: true,
+        relationConfig: {
+          targetFormId: "123e4567-e89b-12d3-a456-426614174000",
+          displayField: "f_title",
+          multiple: true,
+        },
+      };
+
+      const result = coreFormFieldSchema.safeParse(relationField);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.relationConfig?.multiple).toBe(true);
+        expect(result.data.relationConfig?.targetFormId).toBe(
+          "123e4567-e89b-12d3-a456-426614174000"
+        );
+      }
+    });
+
+    it("날짜(date), 스위치(switch), 섹션(section) 필드를 정상 파싱해야 한다", () => {
+      const fields = [
+        { id: "f_date", label: "계약일자", type: "date" },
+        { id: "f_switch", label: "공개 여부", type: "switch" },
+        { id: "f_section", label: "1. 세부 사항", type: "section" },
+      ];
+
+      for (const field of fields) {
+        const result = coreFormFieldSchema.safeParse(field);
+        expect(result.success).toBe(true);
       }
     });
 

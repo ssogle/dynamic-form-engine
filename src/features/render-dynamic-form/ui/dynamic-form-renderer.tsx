@@ -1,43 +1,21 @@
 "use client";
 
 import * as React from "react";
-import { useForm, FormProvider } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import type { CoreFormField } from "@/entities/form";
-import {
-  useFormDetailQuery,
-  usePublishFormMutation,
-  extractActiveFields,
-  buildDynamicFormSchema,
-} from "@/entities/form";
+import { FormProvider } from "react-hook-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { cn } from "@/shared/lib/cn";
 import type { DynamicFormRendererProps } from "../types/render-dynamic-form.types";
+import { useDynamicForm } from "../hooks/use-dynamic-form.hook";
 import { DynamicField } from "./dynamic-field";
-
-/**
- * 활성 필드 목록으로부터 React Hook Form의 기본값 객체를 생성합니다.
- */
-function buildDefaultValues(fields: CoreFormField[]): Record<string, unknown> {
-  const defaults: Record<string, unknown> = {};
-  for (const field of fields) {
-    if (field.type === "number") {
-      defaults[field.id] = undefined;
-    } else {
-      defaults[field.id] = "";
-    }
-  }
-  return defaults;
-}
 
 /**
  * 동적 폼 렌더러 통합 컴포넌트 (DynamicFormRenderer)
  *
- * 폼 빌더 미리보기(Preview)와 컨슈머 응답 제출(Submission)을 모두 수용하는 통합 런타임 뷰어입니다.
- * - props.form이 직접 주어지면 즉시 렌더링하고, props.formId가 주어지면 자동으로 React Query 조회를 수행합니다.
+ * 폼 빌더 미리보기(Preview)와 컨슈머 응답 제출(Submission)을 모두 수용하는 순수 프레젠테이션 뷰어입니다.
+ * - 비즈니스 상태/이벤트 오케스트레이션은 useDynamicForm 훅에 전담 위임합니다.
  * - Preview 모드: 마우스 클릭으로 AI 네비게이터 대화 컨텍스트와 상호작용하며 필드 하이라이트를 지원합니다.
  * - Submission 모드: React Hook Form과 동적 Zod 스키마를 결합하여 실시간 유효성 검사 및 안전한 제출을 수행합니다.
  */
@@ -54,74 +32,28 @@ export function DynamicFormRenderer({
   disabled = false,
   className,
 }: DynamicFormRendererProps) {
-  // props.formId가 존재하고 propForm이 없는 경우 TanStack Query로 폼 상세 정보 자동 조회
-  const shouldFetch = Boolean(formId && !propForm);
-  const publishFormMutation = usePublishFormMutation();
   const {
-    data: fetchedForm,
+    activeForm,
+    activeFields,
+    methods,
     isLoading,
     isError,
     error,
-  } = useFormDetailQuery(formId ?? "", { enabled: shouldFetch });
-
-  // 최종 렌더링 대상 폼 데이터 결정
-  const activeForm = propForm ?? fetchedForm;
-
-  // 소프트 삭제 제외된 활성 필드 목록
-  const activeFields = React.useMemo(() => extractActiveFields(activeForm), [activeForm]);
-
-  // 동적 Zod 스키마 조립
-  const validationSchema = React.useMemo(
-    () => buildDynamicFormSchema(activeFields),
-    [activeFields]
-  );
-
-  // 기본값 객체 계산
-  const defaultValues = React.useMemo(() => buildDefaultValues(activeFields), [activeFields]);
-
-  // React Hook Form 인스턴스 초기화
-  const methods = useForm({
-    resolver: zodResolver(validationSchema),
-    defaultValues,
-    mode: "onBlur",
+    isPublished,
+    isPublishPending,
+    handlePublishToggle,
+    handleFormSubmit,
+  } = useDynamicForm({
+    form: propForm,
+    formId,
+    mode,
+    values,
+    submitTriggerCount,
+    onSubmit,
   });
 
-  // 외부 또는 AI Navigator로부터 주입된 필드값 동기화
-  React.useEffect(() => {
-    if (values && Object.keys(values).length > 0) {
-      for (const [key, val] of Object.entries(values)) {
-        if (val !== undefined) {
-          methods.setValue(key, val, { shouldValidate: true, shouldDirty: true });
-        }
-      }
-    } else {
-      methods.reset(defaultValues);
-    }
-  }, [values, methods, defaultValues]);
-
-  // 폼 제출 이벤트 핸들러
-  const handleFormSubmit = methods.handleSubmit(async (data) => {
-    if (mode === "preview" || !onSubmit) return;
-    await onSubmit(data);
-  });
-
-  // AI Navigator 또는 외부 신호에 의한 프로그래밍 방식 폼 제출 트리거
-  const prevSubmitTriggerRef = React.useRef(submitTriggerCount);
-  React.useEffect(() => {
-    if (
-      typeof submitTriggerCount === "number" &&
-      submitTriggerCount > 0 &&
-      submitTriggerCount !== prevSubmitTriggerRef.current
-    ) {
-      prevSubmitTriggerRef.current = submitTriggerCount;
-      handleFormSubmit();
-    }
-  }, [submitTriggerCount, handleFormSubmit]);
-
-  /**
-   * 1. 쿼리 로딩 상태 스켈레톤 렌더링
-   */
-  if (shouldFetch && isLoading) {
+  // 1. 쿼리 로딩 상태 스켈레톤 렌더링
+  if (isLoading) {
     return (
       <div className={cn("mx-auto w-full max-w-3xl space-y-6", className)}>
         <Card className="border-border/60 shadow-xs">
@@ -147,10 +79,8 @@ export function DynamicFormRenderer({
     );
   }
 
-  /**
-   * 2. 쿼리 에러 상태 렌더링
-   */
-  if (shouldFetch && isError) {
+  // 2. 쿼리 에러 상태 렌더링
+  if (isError) {
     return (
       <div className={cn("mx-auto w-full max-w-3xl", className)}>
         <Card className="border-destructive/30 bg-destructive/5 shadow-xs">
@@ -167,9 +97,7 @@ export function DynamicFormRenderer({
     );
   }
 
-  /**
-   * 3. 폼 데이터를 찾을 수 없는 경우
-   */
+  // 3. 폼 데이터를 찾을 수 없는 경우
   if (!activeForm) {
     return (
       <div className={cn("mx-auto w-full max-w-3xl", className)}>
@@ -184,11 +112,7 @@ export function DynamicFormRenderer({
     );
   }
 
-  const isPublished = Boolean(activeForm.publishedAt);
-
-  /**
-   * 4. 정상 폼 렌더링
-   */
+  // 4. 정상 폼 렌더링
   return (
     <FormProvider {...methods}>
       <div className={cn("mx-auto w-full max-w-3xl space-y-6", className)}>
@@ -212,13 +136,8 @@ export function DynamicFormRenderer({
                     type="button"
                     size="xs"
                     variant={isPublished ? "outline" : "default"}
-                    onClick={() =>
-                      publishFormMutation.mutate({
-                        id: formId,
-                        isPublished: !isPublished,
-                      })
-                    }
-                    disabled={publishFormMutation.isPending}
+                    onClick={handlePublishToggle}
+                    disabled={isPublishPending}
                   >
                     {isPublished ? "발행 취소" : "발행하기"}
                   </Button>

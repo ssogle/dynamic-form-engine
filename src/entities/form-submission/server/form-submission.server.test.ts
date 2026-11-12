@@ -23,6 +23,8 @@ const mockValues = vi.fn();
 const mockUpdate = vi.fn();
 const mockSet = vi.fn();
 
+const mockDelete = vi.fn();
+
 const mockReturning = vi.fn();
 
 vi.mock("@/shared/db/server", async (importOriginal) => {
@@ -33,6 +35,7 @@ vi.mock("@/shared/db/server", async (importOriginal) => {
       select: () => mockSelect(),
       insert: (table: unknown) => mockInsert(table),
       update: (table: unknown) => mockUpdate(table),
+      delete: (table: unknown) => mockDelete(table),
     },
   };
 });
@@ -52,19 +55,26 @@ describe("Form Submission Server Repository (entities/form-submission/server)", 
   beforeEach(() => {
     vi.clearAllMocks();
 
+    mockLimit.mockResolvedValue([]);
     mockSelect.mockReturnValue({ from: mockFrom });
     mockFrom.mockReturnValue({ where: mockWhere });
     mockWhere.mockReturnValue({
       orderBy: mockOrderBy,
       limit: mockLimit,
       returning: mockReturning,
+      then: (resolve: (v: unknown) => unknown) => Promise.resolve([]).then(resolve),
     });
 
     mockInsert.mockReturnValue({ values: mockValues });
-    mockValues.mockReturnValue({ returning: mockReturning });
+    mockValues.mockReturnValue({
+      returning: mockReturning,
+      onConflictDoNothing: vi.fn().mockResolvedValue([]),
+    });
 
     mockUpdate.mockReturnValue({ set: mockSet });
     mockSet.mockReturnValue({ where: mockWhere });
+
+    mockDelete.mockReturnValue({ where: mockWhere });
   });
 
   describe("insertSubmission", () => {

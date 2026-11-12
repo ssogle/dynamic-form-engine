@@ -36,6 +36,12 @@ export {
 } from "./queries/use-form-submissions.query";
 
 export {
+  getRelatedSubmissions,
+  useRelatedSubmissionsQuery,
+  type RelatedSubmissionsGroup,
+} from "./queries/use-related-submissions.query";
+
+export {
   submitFormResponse,
   updateFormSubmission,
   deleteFormSubmission,

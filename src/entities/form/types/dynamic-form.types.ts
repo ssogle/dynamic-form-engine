@@ -11,3 +11,31 @@ export interface SubmissionValidationResult {
   /** 정제 및 타입 변환(예: 문자열 -> 숫자)이 완료된 데이터 (성공 시에만 유효) */
   cleanedData?: Record<string, unknown> | undefined;
 }
+
+/**
+ * 정형 인라인 선택지(select, radio, checkbox) 옵션 인터페이스
+ */
+export interface SelectOption {
+  /** 화면에 표시되는 옵션 라벨 (예: "신규 개발") */
+  label: string;
+
+  /** DB에 실제 저장되는 불변 코드값 (예: "new_dev") */
+  value: string;
+
+  /** 소프트 비활성화 여부 (과거 라벨 보존 및 신규 선택 차단) */
+  disabled?: boolean | undefined;
+}
+
+/**
+ * 관계형 필드(relation) 설정 메타데이터 인터페이스
+ */
+export interface RelationConfig {
+  /** 참조 대상 도메인 폼 UUID */
+  targetFormId: string;
+
+  /** 콤보박스 선택지 목록에 노출할 대상 폼의 대표 필드 ID */
+  displayField: string;
+
+  /** 다중 선택(N:M) 여부 (기본값: false - 단일 선택) */
+  multiple?: boolean | undefined;
+}

@@ -1,6 +1,7 @@
 import "server-only";
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/shared/db/server";
+import { forms, relations } from "@/shared/tables";
 import {
   formSubmissions,
   type FormSubmission,
@@ -16,6 +17,78 @@ import {
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
+ * 서브미션 데이터에 포함된 관계형 필드(relation) 값을 분석하여 relations 엣지 테이블을 동기화합니다.
+ *
+ * @param submission 대상 서브미션 객체
+ */
+export async function syncSubmissionRelations(submission: FormSubmission): Promise<void> {
+  // 1. 해당 폼의 스키마 메타데이터 조회
+  const [parentForm] = await db
+    .select({ schemaDefinition: forms.schemaDefinition })
+    .from(forms)
+    .where(eq(forms.id, submission.formId))
+    .limit(1);
+
+  if (
+    !parentForm ||
+    !parentForm.schemaDefinition ||
+    !Array.isArray(parentForm.schemaDefinition.fields)
+  ) {
+    return;
+  }
+
+  // 2. schemaDefinition에서 type === "relation"인 활성 필드 탐색
+  const relationFields = parentForm.schemaDefinition.fields.filter(
+    (f) => f && f.type === "relation" && !f.deletedAt && f.id
+  );
+
+  // 3. 기존 서브미션의 관계 엣지 정리 (Re-sync)
+  await db.delete(relations).where(eq(relations.sourceId, submission.id));
+
+  if (relationFields.length === 0) {
+    return;
+  }
+
+  // 4. 새 엣지 레코드 조립
+  const submissionData = (submission.data ?? {}) as Record<string, unknown>;
+  const newEdges: Array<typeof relations.$inferInsert> = [];
+
+  for (const field of relationFields) {
+    const fieldId = String(field.id);
+    const rawVal = submissionData[fieldId];
+    if (!rawVal) continue;
+
+    const targetIds: string[] = Array.isArray(rawVal)
+      ? rawVal.filter((v): v is string => typeof v === "string" && UUID_REGEX.test(v))
+      : typeof rawVal === "string" && UUID_REGEX.test(rawVal)
+        ? [rawVal]
+        : [];
+
+    const relConfig = (field.relationConfig ?? {}) as Record<string, unknown>;
+
+    for (const targetId of targetIds) {
+      newEdges.push({
+        sourceId: submission.id,
+        sourceType: "SUBMISSION",
+        targetId,
+        targetType: "SUBMISSION",
+        relationType: "LINKED_TO",
+        metadata: {
+          fieldId,
+          targetFormId: relConfig.targetFormId,
+          sourceFormId: submission.formId,
+        },
+      });
+    }
+  }
+
+  // 5. 엣지 레코드 일괄 삽입
+  if (newEdges.length > 0) {
+    await db.insert(relations).values(newEdges).onConflictDoNothing();
+  }
+}
+
+/**
  * 신규 폼 응답(Submission) 데이터를 데이터베이스에 영속화합니다.
  *
  * @param data 유효성 검증을 통과한 신규 응답 데이터
@@ -26,6 +99,13 @@ export const insertSubmission = async (data: InsertFormSubmission): Promise<Form
 
   if (!createdSubmission) {
     throw new Error("응답 데이터베이스 삽입 결과가 반환되지 않았습니다.");
+  }
+
+  // 관계형 필드 엣지 동기화
+  try {
+    await syncSubmissionRelations(createdSubmission);
+  } catch (error) {
+    console.error("서브미션 관계 동기화 실패:", error);
   }
 
   return createdSubmission;
@@ -196,6 +276,14 @@ export const updateSubmissionById = async (
     .where(and(eq(formSubmissions.id, id), isNull(formSubmissions.deletedAt)))
     .returning();
 
+  if (updatedSubmission) {
+    try {
+      await syncSubmissionRelations(updatedSubmission);
+    } catch (error) {
+      console.error("서브미션 관계 수정 동기화 실패:", error);
+    }
+  }
+
   return updatedSubmission;
 };
 
@@ -219,6 +307,14 @@ export const softDeleteSubmissionById = async (id: string): Promise<FormSubmissi
     .where(and(eq(formSubmissions.id, id), isNull(formSubmissions.deletedAt)))
     .returning();
 
+  if (deletedSubmission) {
+    try {
+      await db.delete(relations).where(eq(relations.sourceId, deletedSubmission.id));
+    } catch (error) {
+      console.error("서브미션 관계 단건 삭제 동기화 실패:", error);
+    }
+  }
+
   return deletedSubmission;
 };
 
@@ -234,7 +330,7 @@ export const softDeleteSubmissionsByIds = async (ids: string[]): Promise<FormSub
     return [];
   }
 
-  return await db
+  const deletedSubmissions = await db
     .update(formSubmissions)
     .set({
       deletedAt: sql`now()`,
@@ -242,4 +338,14 @@ export const softDeleteSubmissionsByIds = async (ids: string[]): Promise<FormSub
     })
     .where(and(inArray(formSubmissions.id, validIds), isNull(formSubmissions.deletedAt)))
     .returning();
+
+  if (validIds.length > 0) {
+    try {
+      await db.delete(relations).where(inArray(relations.sourceId, validIds));
+    } catch (error) {
+      console.error("서브미션 관계 일괄 삭제 동기화 실패:", error);
+    }
+  }
+
+  return deletedSubmissions;
 };

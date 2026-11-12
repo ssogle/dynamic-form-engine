@@ -13,5 +13,6 @@ export {
   updateSubmissionById,
   softDeleteSubmissionById,
   softDeleteSubmissionsByIds,
+  syncSubmissionRelations,
   type FindSubmissionsPaginatedOptions,
 } from "./server/form-submission.server";

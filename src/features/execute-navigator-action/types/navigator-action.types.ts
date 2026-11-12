@@ -1,4 +1,4 @@
-import type { ActiveForm, CoreFormField, Form } from "@/entities/form";
+import type { ActiveForm, CoreFormField, Form, SelectOption } from "@/entities/form";
 
 /**
  * 네비게이터 동작 모드 구분
@@ -141,7 +141,7 @@ export interface NavigatorClientContext {
         label: string;
         type: string;
         required?: boolean | undefined;
-        options?: string[] | undefined;
+        options?: (string | SelectOption)[] | undefined;
       }>
     | undefined;
   /** 현재 응답자가 작성 중인 임시 필드값 (draftValues) */

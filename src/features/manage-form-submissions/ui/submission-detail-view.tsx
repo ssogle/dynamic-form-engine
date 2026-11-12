@@ -2,19 +2,16 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, Edit, Trash2, Calendar, Clock, FileText } from "lucide-react";
-import { useFormDetailQuery, extractActiveFields, type CoreFormField } from "@/entities/form";
-import {
-  useFormSubmissionDetailQuery,
-  useDeleteSubmissionMutation,
-} from "@/entities/form-submission";
+import { ArrowLeft, Edit, Trash2, Calendar, Clock, FileText, Link2 } from "lucide-react";
+import type { CoreFormField } from "@/entities/form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 import { Badge } from "@/shared/ui/badge";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 import { formatDateTime } from "@/shared/lib/date";
+import { useSubmissionDetailView } from "../hooks/use-submission-detail-view.hook";
+import { RelatedSubmissionSubtable } from "./related-submission-subtable";
 
 export interface SubmissionDetailViewProps {
   /**
@@ -38,57 +35,29 @@ const FIELD_TYPE_LABELS: Record<string, string> = {
 };
 
 /**
- * 컨슈머 폼 응답 단건 상세 조회 뷰 컴포넌트
+ * 컨슈머 폼 응답 단건 상세 조회 뷰 컴포넌트 (SubmissionDetailView)
  *
- * 제출된 응답 레코드의 메타데이터(제출/수정 일시, 식별자)와
- * 폼 스키마에 정의된 활성 필드별 입력값들을 읽기 전용 카드로 깔끔하게 시각화합니다.
- * 또한 상위 목록 복귀, 수정 전용 워크스페이스 이동, 응답 삭제 인터랙션을 제공합니다.
- *
- * @param props SubmissionDetailViewProps
+ * 제출된 응답 레코드의 메타데이터와 폼 스키마에 정의된 활성 필드별 입력값들을 읽기 전용 카드로 깔끔하게 시각화합니다.
+ * 비즈니스 상태 관리 및 이벤트 오케스트레이션은 useSubmissionDetailView 훅에 전담 위임하는 순수 얇은 뷰(Thin View)입니다.
  */
 export function SubmissionDetailView({ formId, submissionId }: SubmissionDetailViewProps) {
-  const router = useRouter();
-  const [isDeleting, setIsDeleting] = React.useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = React.useState(false);
-
-  // 1. 부모 폼 스키마 및 단건 응답 데이터 비동기 쿼리
   const {
-    data: form,
-    isLoading: isFormLoading,
-    isError: isFormError,
-    error: formError,
-  } = useFormDetailQuery(formId);
-
-  const {
-    data: submission,
-    isLoading: isSubmissionLoading,
-    isError: isSubmissionError,
-    error: submissionError,
-  } = useFormSubmissionDetailQuery(formId, submissionId);
-
-  // 2. 응답 삭제 뮤테이션
-  const { mutateAsync: deleteSubmission } = useDeleteSubmissionMutation(form?.id ?? formId);
-
-  const isLoading = isFormLoading || isSubmissionLoading;
-  const isError = isFormError || isSubmissionError;
-  const errorMessage =
-    formError instanceof Error
-      ? formError.message
-      : submissionError instanceof Error
-        ? submissionError.message
-        : "응답 상세 정보를 불러오지 못했습니다.";
-
-  // 3. 응답 삭제 핸들러
-  const handleDelete = React.useCallback(async () => {
-    try {
-      setIsDeleting(true);
-      await deleteSubmission(submissionId);
-      router.push(`/consumer/forms/${formId}`);
-    } catch (err) {
-      console.error("응답 삭제 실패:", err);
-      setIsDeleting(false);
-    }
-  }, [deleteSubmission, submissionId, formId, router]);
+    form,
+    submission,
+    relatedGroups,
+    activeFields,
+    submittedData,
+    isLoading,
+    isError,
+    errorMessage,
+    isRelatedLoading,
+    isDeleting,
+    isDeleteOpen,
+    setIsDeleteOpen,
+    selectedGroupIndex,
+    setSelectedGroupIndex,
+    handleDelete,
+  } = useSubmissionDetailView({ formId, submissionId });
 
   // 1. 로딩 상태 스켈레톤
   if (isLoading) {
@@ -140,9 +109,6 @@ export function SubmissionDetailView({ formId, submissionId }: SubmissionDetailV
       </div>
     );
   }
-
-  const activeFields = extractActiveFields(form);
-  const submittedData = submission.data ?? {};
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6">
@@ -307,7 +273,69 @@ export function SubmissionDetailView({ formId, submissionId }: SubmissionDetailV
         </CardContent>
       </Card>
 
-      {/* 5. 하단 복귀 버튼 */}
+      {/* 5. 연결된 내역 (역참조 서브미션 목록) 카드 */}
+      <Card className="border-border/60 shadow-xs">
+        <CardHeader className="border-border/40 border-b pb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Link2 className="text-primary size-4" />
+              <CardTitle className="text-base font-bold">연결된 내역</CardTitle>
+            </div>
+            {relatedGroups.length > 0 && (
+              <Badge variant="outline" className="text-xs">
+                총 {relatedGroups.reduce((acc, g) => acc + g.submissions.length, 0)}건
+              </Badge>
+            )}
+          </div>
+          <CardDescription className="text-xs">
+            현재 레코드를 참조하고 있는 다른 폼의 응답 데이터 내역입니다.
+          </CardDescription>
+
+          {/* 소스 폼이 복수일 경우 탭 전환 버튼 제공 */}
+          <div className="flex flex-wrap gap-1.5 pt-2">
+            {relatedGroups.map((grp, idx) => {
+              const isSelected = idx === selectedGroupIndex;
+              return (
+                <Button
+                  key={grp.sourceForm.id}
+                  variant={isSelected ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setSelectedGroupIndex(idx)}
+                >
+                  {grp.sourceForm.title} ({grp.submissions.length})
+                </Button>
+              );
+            })}
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-4 sm:p-5">
+          {isRelatedLoading ? (
+            <div className="space-y-2 py-4">
+              <Skeleton className="h-8 w-full rounded-md" />
+              <Skeleton className="h-8 w-full rounded-md" />
+            </div>
+          ) : relatedGroups.length === 0 ||
+            relatedGroups.every((g) => g.submissions.length === 0) ? (
+            <div className="py-8 text-center">
+              <p className="text-muted-foreground text-xs">
+                이 레코드를 참조하는 연결된 내역이 없습니다.
+              </p>
+            </div>
+          ) : (
+            (() => {
+              const activeGroup = relatedGroups[selectedGroupIndex] ?? relatedGroups[0];
+              if (!activeGroup) {
+                return null;
+              }
+              return <RelatedSubmissionSubtable group={activeGroup} />;
+            })()
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 6. 하단 복귀 버튼 */}
       <div className="flex justify-end pt-2">
         <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs">
           <Link href={`/consumer/forms/${formId}`}>
