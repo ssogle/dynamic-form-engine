@@ -102,7 +102,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | :--------------------------- | :--------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------- |
 | **아키텍처 & 네이밍**        | [.agents/rules/fsd-architecture-rule.md](.agents/rules/fsd-architecture-rule.md)               | FSD 레이어 계층, kebab-case 파일/폴더 네이밍, Public API               |
 | **코딩 패러다임**            | [.agents/rules/coding-paradigm-rule.md](.agents/rules/coding-paradigm-rule.md)                 | 함수형 지향, class/this 금지, { data, error } Result 패턴              |
-| **테스트 전략 (TDD)**        | [.agents/rules/testing-strategy-rule.md](.agents/rules/testing-strategy-rule.md)               | ROI 중심 테스트, 테스트 대상(도메인/인터랙션) vs 제외 대상             |
+| **테스트 전략 (TDD)**        | [.agents/rules/testing-strategy-rule.md](.agents/rules/testing-strategy-rule.md)               | ROI 중심 로직 TDD, UI 테스트 배제 및 비즈니스 로직 단위 검증 집중      |
 | **UI & 스타일링**            | [.agents/rules/ui-and-styling-rule.md](.agents/rules/ui-and-styling-rule.md)                   | shadcn/ui 재사용, Tailwind v4 시맨틱 토큰, 배럴 파일 금지              |
 | **스펙 주도 개발 (SDD)**     | [.agents/rules/spec-driven-development-rule.md](.agents/rules/spec-driven-development-rule.md) | 5단계 SDD 라이프사이클, TEMPLATE 기반 스펙, 아카이브 가드레일          |
 | **Git 워크플로우 & 커밋/PR** | [.agents/rules/git-commit-automation-rule.md](.agents/rules/git-commit-automation-rule.md)     | GitHub Flow, PR 템플릿 준수, 머지 후 브랜치 삭제, Conventional Commits |
@@ -126,7 +126,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 에이전트는 코드 작성을 마친 후 사용자에게 보고하기 전에, 반드시 터미널에서 통합 검증 스크립트를 실행하여 **결함 0건**을 확인해야 합니다:
 
 ```bash
-# [올인원 검증] 타입체크 -> 린트 -> 포맷체크 -> 단위/컴포넌트 테스트 전체 자동 완주
+# [올인원 검증] 타입체크 -> 린트 -> 포맷체크 -> 비즈니스 로직 단위 테스트 전체 자동 완주
 npm run verify
 
 # (참고) 서식 어긋남 발생 시 자동 교정

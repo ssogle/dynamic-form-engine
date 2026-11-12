@@ -87,7 +87,7 @@ sequenceDiagram
 | **아키텍처 경계**      | `eslint-plugin-boundaries`                                              | FSD 레이어 간 단방향 의존성 강제, 세부 구현 직통 import 차단 및 Public API(`index.ts`) 강제                               | [.agents/rules/fsd-architecture-rule.md](.agents/rules/fsd-architecture-rule.md)                                   |
 | **코딩 패러다임**      | ESLint `no-restricted-syntax`                                           | 함수형 지향, `class` 및 `this` 키워드 원천 차단, `{ data, error }` Result 패턴 준수                                       | [.agents/rules/coding-paradigm-rule.md](.agents/rules/coding-paradigm-rule.md)                                     |
 | **파일 컨벤션**        | `eslint-plugin-check-file`                                              | 전역 `kebab-case` 파일/폴더 네이밍 강제 (OS 간 대소문자 경로 불일치 원천 차단)                                            | [.agents/rules/fsd-architecture-rule.md](.agents/rules/fsd-architecture-rule.md)                                   |
-| **테스트 하네스**      | Vitest + React Testing Library                                          | ROI 중심 테스트 전략 (도메인 변환기 및 복합 인터랙션 중심 TDD 루프 확립)                                                  | [.agents/rules/testing-strategy-rule.md](.agents/rules/testing-strategy-rule.md)                                   |
+| **테스트 하네스**      | Vitest + React Testing Library                                          | ROI 중심 테스트 전략 (비즈니스 로직 및 상태 변환 중심 TDD 루프, UI 테스트 배제)                                           | [.agents/rules/testing-strategy-rule.md](.agents/rules/testing-strategy-rule.md)                                   |
 | **UI 거버넌스**        | Tailwind CSS v4 + shadcn/ui                                             | `@/shared/ui` 최우선 재사용, 시맨틱 토큰(`bg-background`, `text-foreground`) 필수화                                       | [.agents/rules/ui-and-styling-rule.md](.agents/rules/ui-and-styling-rule.md)                                       |
 | **스펙 거버넌스**      | Spec-Driven Dev + YAGNI                                                 | [`TEMPLATE.md`](docs/specs/TEMPLATE.md) 기반 Non-Goals 엄격 통제, 추측성 오버엔지니어링 차단 및 검증된 요구사항 중심 구현 | [규칙 문서](.agents/rules/spec-driven-development-rule.md) / [자동화 스킬](.agents/skills/spec-authoring/SKILL.md) |
 | **커밋 거버넌스**      | Husky + lint-staged + Commitlint                                        | Conventional Commits 규격 강제, 빠른 커밋 리듬 유지를 위한 점진적 검증                                                    | [.agents/rules/git-commit-automation-rule.md](.agents/rules/git-commit-automation-rule.md)                         |
@@ -107,7 +107,7 @@ sequenceDiagram
   - [스펙 주도 개발(SDD) 규칙](.agents/rules/spec-driven-development-rule.md) - 5단계 적응형 라이프사이클 및 브랜치 격리
   - [스펙 표준 템플릿](docs/specs/TEMPLATE.md) - 단일 진실 원천(SSOT) 마크다운 양식
   - [스펙 작성 자동화 스킬](.agents/skills/spec-authoring/SKILL.md) - 대화형 초안 생성 및 브랜치 분기 스킬
-  - [ROI 중심 테스트 전략](.agents/rules/testing-strategy-rule.md) - 도메인 런타임 및 핵심 인터랙션 중심 TDD
+  - [ROI 중심 테스트 전략](.agents/rules/testing-strategy-rule.md) - 비즈니스 로직 중심 TDD (UI 테스트 배제)
   - [Git 커밋 자동화 규칙](.agents/rules/git-commit-automation-rule.md) - Conventional Commits 컨벤션
 
 ---
@@ -199,7 +199,7 @@ GEMINI_API_KEY=your_gemini_api_key_here
 | `npm run verify`        | [통합 검증] 타입 검사 + 린트 + 포맷 + 전체 테스트 완주 (결함 점검) |
 | `npm run check`         | [정적 검사] 타입 검사 + 린트 + 포맷 일치 여부 검사                 |
 | `npm run fix`           | [자동 교정] Prettier 코드 포맷팅 및 ESLint 자동 수정               |
-| `npm test`              | Vitest 기반 전체 단위/컴포넌트 테스트 1회 실행                     |
+| `npm test`              | Vitest 기반 전체 비즈니스 로직 단위 테스트 1회 실행                |
 | `npm run test:watch`    | 파일 변경 감지 실시간 TDD 루프 실행                                |
 | `npm run test:coverage` | V8 엔진 기반 테스트 커버리지 리포트 생성                           |
 | `npm run typecheck`     | TypeScript 전체 정적 타입 검사 (`tsc --noEmit`)                    |
