@@ -94,8 +94,10 @@ export function DynamicFormRenderer({
           methods.setValue(key, val, { shouldValidate: true, shouldDirty: true });
         }
       }
+    } else {
+      methods.reset(defaultValues);
     }
-  }, [values, methods]);
+  }, [values, methods, defaultValues]);
 
   // 폼 제출 이벤트 핸들러
   const handleFormSubmit = methods.handleSubmit(async (data) => {

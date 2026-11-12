@@ -67,7 +67,7 @@ export const consumerDeleteSubmissionsInputSchema = z.object({
 export function createConsumerTools(deps: ConsumerToolsDependencies) {
   const navigateTool = tool({
     description:
-      "컨슈머 포털 내의 다른 화면으로 이동합니다. 특정 폼 작성 페이지(/consumer/forms/[id]), 폼 목록(/consumer/forms), 제출 응답 목록(/consumer/forms/[id]/submissions) 등으로 이동할 때 호출합니다.",
+      "컨슈머 포털 내의 다른 화면으로 이동합니다. 특정 폼의 데이터 목록 페이지(/consumer/forms/[id]), 신규 작성 페이지(/consumer/forms/[id]/new), 단건 응답 상세 페이지(/consumer/forms/[id]/submissions/[submissionId]), 응답 수정 페이지(/consumer/forms/[id]/submissions/[submissionId]/edit), 전체 폼 메뉴(/consumer/forms) 등으로 이동할 때 호출합니다.",
     inputSchema: consumerNavigateInputSchema,
     execute: async ({ targetPath, reason }: z.infer<typeof consumerNavigateInputSchema>) => {
       const normalized = normalizeConsumerPath(targetPath);

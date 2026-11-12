@@ -6,6 +6,7 @@ import {
   getFormSubmissions,
   getFormSubmissionDetail,
   useFormSubmissionsQuery,
+  useInfiniteFormSubmissionsQuery,
   useFormSubmissionDetailQuery,
 } from "./use-form-submissions.query";
 
@@ -132,6 +133,46 @@ describe("useFormSubmissionsQuery (특정 폼의 응답 목록 조회 훅)", () 
     expect(mockFetch).toHaveBeenCalledWith(
       "/api/v1/forms/daily-report/submissions/sub-1",
       expect.objectContaining({ method: "GET" })
+    );
+  });
+
+  it("useInfiniteFormSubmissionsQuery가 페이지 파라미터와 함께 무한 스크롤 데이터를 페칭해야 한다", async () => {
+    const mockPaginated = {
+      items: mockSubmissions,
+      page: 1,
+      limit: 20,
+      totalCount: 1,
+      totalPages: 1,
+      hasMore: false,
+    };
+
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({
+        success: true,
+        data: mockPaginated,
+      }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const { result } = renderHook(
+      () =>
+        useInfiniteFormSubmissionsQuery("form-1", {
+          sort: "f_exp:desc",
+          filters: JSON.stringify({ f_role: "frontend" }),
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      }
+    );
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.pages[0]).toEqual(mockPaginated);
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining("sort=f_exp%3Adesc"),
+      expect.anything()
     );
   });
 });

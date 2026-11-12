@@ -1,47 +1,123 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { httpClient } from "@/shared/lib/http";
 import type { FormSubmission } from "../schema/form-submission.schema";
+import type { PaginatedSubmissionsResponse } from "../schema/submission-query.schema";
 import { formSubmissionsKeys } from "./form-submissions.keys";
 
 /**
- * 특정 폼의 응답 목록을 조회하는 순수 비동기 함수
- *
- * @param formIdOrSlug 조회할 폼의 UUID 식별자 또는 슬러그
- * @returns FormSubmission[] 응답 목록 배열
+ * 페이징 조회 요청 파라미터 타입 (exactOptionalPropertyTypes 준수)
  */
-export async function getFormSubmissions(formIdOrSlug: string): Promise<FormSubmission[]> {
-  const response = await httpClient.get<FormSubmission[]>(
-    `/api/v1/forms/${formIdOrSlug}/submissions`
-  );
+export interface GetPaginatedSubmissionsParams {
+  page?: number | undefined;
+  limit?: number | undefined;
+  sort?: string | undefined;
+  filters?: string | undefined;
+}
+
+/**
+ * 폼 응답 목록을 페이지네이션, 멀티 정렬, 컬럼 필터와 함께 조회하는 순수 비동기 함수
+ *
+ * @param formId 조회할 폼의 UUID 식별자
+ * @param params 페이징 및 정렬, 필터 쿼리 파라미터
+ * @returns PaginatedSubmissionsResponse 객체 반환
+ */
+export async function getPaginatedFormSubmissions(
+  formId: string,
+  params: GetPaginatedSubmissionsParams = {}
+): Promise<PaginatedSubmissionsResponse> {
+  const query = new URLSearchParams();
+  if (params.page !== undefined) query.set("page", String(params.page));
+  if (params.limit !== undefined) query.set("limit", String(params.limit));
+  if (params.sort) query.set("sort", params.sort);
+  if (params.filters) query.set("filters", params.filters);
+
+  const queryString = query.toString();
+  const endpoint = `/api/v1/forms/${formId}/submissions${queryString ? `?${queryString}` : ""}`;
+  const response = await httpClient.get<PaginatedSubmissionsResponse>(endpoint);
   return response;
 }
 
 /**
- * 특정 폼의 응답 목록을 조회하는 TanStack Query 커스텀 훅
+ * 특정 폼의 응답 목록을 단일 배열로 조회하는 하위 호환용 비동기 함수 (최대 100건)
  *
- * @param formIdOrSlug 조회할 폼의 UUID 식별자 또는 슬러그
+ * @param formId 조회할 폼의 UUID 식별자
+ * @returns FormSubmission[] 응답 목록 배열
  */
-export function useFormSubmissionsQuery(formIdOrSlug: string) {
+export async function getFormSubmissions(formId: string): Promise<FormSubmission[]> {
+  const response = await httpClient.get<PaginatedSubmissionsResponse | FormSubmission[]>(
+    `/api/v1/forms/${formId}/submissions`
+  );
+  if (Array.isArray(response)) {
+    return response;
+  }
+  return response.items ?? [];
+}
+
+/**
+ * 특정 폼의 응답 목록을 단순 조회하는 TanStack Query 훅 (기존 컴포넌트 호환용)
+ *
+ * @param formId 조회할 폼의 UUID 식별자
+ */
+export function useFormSubmissionsQuery(formId: string) {
   return useQuery({
-    queryKey: formSubmissionsKeys.byForm(formIdOrSlug),
-    queryFn: () => getFormSubmissions(formIdOrSlug),
-    enabled: Boolean(formIdOrSlug),
+    queryKey: formSubmissionsKeys.byForm(formId),
+    queryFn: () => getFormSubmissions(formId),
+    enabled: Boolean(formId),
+  });
+}
+
+/**
+ * 무한 스크롤 쿼리 옵션 인터페이스
+ */
+export interface UseInfiniteFormSubmissionsQueryOptions {
+  sort?: string | undefined;
+  filters?: string | undefined;
+  limit?: number | undefined;
+}
+
+/**
+ * 특정 폼의 응답 목록을 무한 스크롤(가상화 그리드 연동)로 조회하는 TanStack Query 커스텀 훅
+ *
+ * 정렬(sort)이나 필터(filters)가 변경되면 쿼리 키가 자동으로 변경되어
+ * 기존 데이터가 1페이지부터 새롭게 자동 리셋 페칭됩니다.
+ *
+ * @param formId 조회 대상 폼 고유 식별자 (UUID)
+ * @param options 멀티 정렬, 컬럼 필터, 페이지당 건수 옵션
+ */
+export function useInfiniteFormSubmissionsQuery(
+  formId: string,
+  options: UseInfiniteFormSubmissionsQueryOptions = {}
+) {
+  const { sort, filters, limit = 20 } = options;
+
+  return useInfiniteQuery({
+    queryKey: formSubmissionsKeys.infinite(formId, { sort, filters, limit }),
+    queryFn: ({ pageParam }) =>
+      getPaginatedFormSubmissions(formId, {
+        page: pageParam,
+        limit,
+        sort,
+        filters,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.page + 1 : undefined),
+    enabled: Boolean(formId),
   });
 }
 
 /**
  * 특정 폼의 단건 응답 상세 데이터를 조회하는 순수 비동기 함수
  *
- * @param formIdOrSlug 조회할 폼의 UUID 식별자 또는 슬러그
+ * @param formId 조회할 폼의 UUID 식별자
  * @param submissionId 조회할 응답 식별자
  * @returns FormSubmission 단건 응답 객체
  */
 export async function getFormSubmissionDetail(
-  formIdOrSlug: string,
+  formId: string,
   submissionId: string
 ): Promise<FormSubmission> {
   const response = await httpClient.get<FormSubmission>(
-    `/api/v1/forms/${formIdOrSlug}/submissions/${submissionId}`
+    `/api/v1/forms/${formId}/submissions/${submissionId}`
   );
   return response;
 }
@@ -49,13 +125,13 @@ export async function getFormSubmissionDetail(
 /**
  * 특정 폼의 단건 응답 상세 데이터를 조회하는 TanStack Query 커스텀 훅
  *
- * @param formIdOrSlug 조회할 폼의 UUID 식별자 또는 슬러그
+ * @param formId 조회할 폼의 UUID 식별자
  * @param submissionId 조회할 응답 식별자
  */
-export function useFormSubmissionDetailQuery(formIdOrSlug: string, submissionId: string) {
+export function useFormSubmissionDetailQuery(formId: string, submissionId: string) {
   return useQuery({
     queryKey: formSubmissionsKeys.detail(submissionId),
-    queryFn: () => getFormSubmissionDetail(formIdOrSlug, submissionId),
-    enabled: Boolean(formIdOrSlug && submissionId),
+    queryFn: () => getFormSubmissionDetail(formId, submissionId),
+    enabled: Boolean(formId && submissionId),
   });
 }

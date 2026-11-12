@@ -267,4 +267,13 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
       expect(result.action.deletedIds).toEqual(["sub-1", "sub-2"]);
     }
   });
+
+  it("지원하지 않는 모드가 전달되면 명시적인 오류를 던져야 한다", async () => {
+    await expect(
+      runNavigatorEngine({
+        mode: "unknown_mode" as unknown as "builder",
+        prompt: "테스트",
+      })
+    ).rejects.toThrow('지원하지 않는 네비게이터 모드입니다: "unknown_mode"');
+  });
 });

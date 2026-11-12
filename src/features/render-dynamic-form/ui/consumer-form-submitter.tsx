@@ -41,10 +41,15 @@ export function ConsumerFormSubmitter({ formId }: ConsumerFormSubmitterProps) {
   const draftValues = useConsumerFormDraftStore((state) => state.draftValues);
   const submitTriggerCount = useConsumerFormDraftStore((state) => state.submitTriggerCount);
   const setCurrentFormId = useConsumerFormDraftStore((state) => state.setCurrentFormId);
+  const resetDraft = useConsumerFormDraftStore((state) => state.resetDraft);
 
   React.useEffect(() => {
     setCurrentFormId(formId);
-  }, [formId, setCurrentFormId]);
+    resetDraft();
+    return () => {
+      resetDraft();
+    };
+  }, [formId, setCurrentFormId, resetDraft]);
 
   const activeDraftValues = currentDraftFormId === formId ? draftValues : undefined;
   const activeSubmitTriggerCount = currentDraftFormId === formId ? submitTriggerCount : undefined;
@@ -55,6 +60,7 @@ export function ConsumerFormSubmitter({ formId }: ConsumerFormSubmitterProps) {
   const handleSubmit = async (cleanedData: Record<string, unknown>) => {
     try {
       await submitResponse(cleanedData);
+      resetDraft();
       setIsSuccessSubmitted(true);
     } catch (err) {
       console.error("폼 제출 실패:", err);
@@ -138,11 +144,18 @@ export function ConsumerFormSubmitter({ formId }: ConsumerFormSubmitterProps) {
             </CardDescription>
           </CardHeader>
           <CardFooter className="flex justify-center gap-3 pt-4">
-            <Button variant="outline" size="sm" onClick={() => setIsSuccessSubmitted(false)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                resetDraft();
+                setIsSuccessSubmitted(false);
+              }}
+            >
               새로운 응답 작성하기
             </Button>
             <Button asChild size="sm">
-              <Link href={`/consumer/forms/${formId}/submissions`}>제출된 내역 확인하기</Link>
+              <Link href={`/consumer/forms/${formId}`}>제출된 목록 확인하기</Link>
             </Button>
           </CardFooter>
         </Card>

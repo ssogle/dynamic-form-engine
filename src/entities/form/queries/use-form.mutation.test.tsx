@@ -61,7 +61,6 @@ describe("useFormMutation (엔티티 공용 폼 조작 뮤테이션 훅)", () =>
       vi.stubGlobal("fetch", mockFetch);
 
       const input = {
-        slug: "sample-form",
         title: "샘플 폼",
         schemaDefinition: { fields: [] },
       };

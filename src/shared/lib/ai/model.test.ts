@@ -26,22 +26,30 @@ describe("AI Model Provider (shared/lib/ai)", () => {
     process.env.GEMINI_API_KEY = originalApiKey;
   });
 
-  it("AI_MODELS 상수에 범용 모델 티어가 정의되어 있어야 한다", () => {
+  it("AI_MODELS 상수에 범용 모델 티어(DEFAULT, NORMAL, LITE)가 정의되어 있어야 한다", () => {
     expect(AI_MODELS.DEFAULT).toBeDefined();
-    expect(AI_MODELS.FAST).toBeDefined();
+    expect(AI_MODELS.NORMAL).toBeDefined();
+    expect(AI_MODELS.LITE).toBeDefined();
   });
 
-  it("인자 없이 getAiModel 호출 시 기본 고성능 모델을 반환해야 한다", () => {
+  it("인자 없이 getAiModel 호출 시 기본 모델(DEFAULT)을 반환해야 한다", () => {
     const model = getAiModel();
 
     expect(model).toBeDefined();
     expect(model.modelId).toBe(AI_MODELS.DEFAULT);
   });
 
-  it("FAST 티어를 지정하여 호출 시 경량 고속 모델을 반환해야 한다", () => {
-    const model = getAiModel(AI_MODELS.FAST);
+  it("NORMAL 티어를 지정하여 호출 시 표준/고성능 모델을 반환해야 한다", () => {
+    const model = getAiModel(AI_MODELS.NORMAL);
 
     expect(model).toBeDefined();
-    expect(model.modelId).toBe(AI_MODELS.FAST);
+    expect(model.modelId).toBe(AI_MODELS.NORMAL);
+  });
+
+  it("LITE 티어를 지정하여 호출 시 초경량 고속 모델을 반환해야 한다", () => {
+    const model = getAiModel(AI_MODELS.LITE);
+
+    expect(model).toBeDefined();
+    expect(model.modelId).toBe(AI_MODELS.LITE);
   });
 });

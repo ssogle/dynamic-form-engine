@@ -7,7 +7,7 @@ import { formKeys } from "./form.keys";
 /**
  * 신규 폼 등록 API 호출 순수 함수
  *
- * @param input 폼 생성 요청 데이터 (slug, title, description 등)
+ * @param input 폼 생성 요청 데이터 (title, description, schemaDefinition 등)
  * @returns 생성된 Form 엔티티 프로미스
  */
 export const createForm = (input: InsertForm): Promise<Form> =>

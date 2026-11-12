@@ -14,13 +14,25 @@ export {
   type UpdateFormSubmission,
 } from "./schema/form-submission.schema";
 
+export {
+  submissionQuerySchema,
+  parseSortParam,
+  parseFiltersParam,
+  type SubmissionQueryParams,
+  type SortItem,
+  type PaginatedSubmissionsResponse,
+} from "./schema/submission-query.schema";
+
 export { formSubmissionsKeys } from "./queries/form-submissions.keys";
 
 export {
   getFormSubmissions,
+  getPaginatedFormSubmissions,
   getFormSubmissionDetail,
   useFormSubmissionsQuery,
+  useInfiniteFormSubmissionsQuery,
   useFormSubmissionDetailQuery,
+  type UseInfiniteFormSubmissionsQueryOptions,
 } from "./queries/use-form-submissions.query";
 
 export {

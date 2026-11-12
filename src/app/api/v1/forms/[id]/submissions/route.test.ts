@@ -4,7 +4,7 @@ import { GET, POST } from "./route";
 
 // Drizzle 서버 모킹
 const mockFindFormById = vi.fn();
-const mockFindSubmissionsByFormId = vi.fn();
+const mockFindSubmissionsPaginated = vi.fn();
 const mockInsertSubmission = vi.fn();
 
 vi.mock("@/entities/form/server", () => ({
@@ -12,7 +12,8 @@ vi.mock("@/entities/form/server", () => ({
 }));
 
 vi.mock("@/entities/form-submission/server", () => ({
-  findSubmissionsByFormId: (formId: string) => mockFindSubmissionsByFormId(formId),
+  findSubmissionsPaginated: (formId: string, options: unknown) =>
+    mockFindSubmissionsPaginated(formId, options),
   insertSubmission: (data: unknown) => mockInsertSubmission(data),
 }));
 
@@ -62,26 +63,57 @@ describe("Route Handler: /api/v1/forms/[id]/submissions", () => {
       expect(json.error.code).toBe("NOT_FOUND");
     });
 
-    it("폼이 존재하는 경우 해당 폼의 응답 목록과 함께 200 OK를 반환해야 한다", async () => {
+    it("폼이 존재하는 경우 해당 폼의 페이지네이션 응답과 함께 200 OK를 반환해야 한다", async () => {
       mockFindFormById.mockResolvedValueOnce(mockForm);
-      const mockSubmissions = [
-        {
-          id: "sub-1",
-          formId,
-          data: { applicantName: "홍길동", yearsOfExperience: 5 },
-          createdAt: new Date("2026-01-02T00:00:00Z"),
-        },
-      ];
-      mockFindSubmissionsByFormId.mockResolvedValueOnce(mockSubmissions);
+      const mockPaginatedResult = {
+        items: [
+          {
+            id: "sub-1",
+            formId,
+            data: { applicantName: "홍길동", yearsOfExperience: 5 },
+            createdAt: new Date("2026-01-02T00:00:00Z"),
+          },
+        ],
+        page: 1,
+        limit: 20,
+        totalCount: 1,
+        totalPages: 1,
+        hasMore: false,
+      };
+      mockFindSubmissionsPaginated.mockResolvedValueOnce(mockPaginatedResult);
 
-      const request = new NextRequest(`http://localhost:3000/api/v1/forms/${formId}/submissions`);
+      const request = new NextRequest(
+        `http://localhost:3000/api/v1/forms/${formId}/submissions?page=1&limit=20&sort=f_exp:desc&filters={"f_applicant":"홍길동"}`
+      );
       const response = await GET(request, mockContext);
 
       expect(response.status).toBe(200);
       const json = await response.json();
       expect(json.success).toBe(true);
-      expect(json.data).toHaveLength(1);
-      expect(json.data[0].id).toBe("sub-1");
+      expect(json.data.items).toHaveLength(1);
+      expect(json.data.items[0].id).toBe("sub-1");
+      expect(json.data.page).toBe(1);
+      expect(json.data.totalCount).toBe(1);
+      expect(mockFindSubmissionsPaginated).toHaveBeenCalledWith(formId, {
+        page: 1,
+        limit: 20,
+        sort: "f_exp:desc",
+        filters: '{"f_applicant":"홍길동"}',
+      });
+    });
+
+    it("유효하지 않은 쿼리 파라미터가 들어온 경우 400 Bad Request를 반환해야 한다", async () => {
+      mockFindFormById.mockResolvedValueOnce(mockForm);
+
+      const request = new NextRequest(
+        `http://localhost:3000/api/v1/forms/${formId}/submissions?page=0`
+      );
+      const response = await GET(request, mockContext);
+
+      expect(response.status).toBe(400);
+      const json = await response.json();
+      expect(json.success).toBe(false);
+      expect(json.error.code).toBe("BAD_REQUEST");
     });
   });
 

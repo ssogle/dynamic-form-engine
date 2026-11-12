@@ -3,24 +3,15 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePublishedFormsQuery } from "@/entities/form";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-} from "@/shared/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
-import { Badge } from "@/shared/ui/badge";
 import { Skeleton } from "@/shared/ui/skeleton";
-import { formatDate } from "@/shared/lib/date";
 
 /**
  * 컨슈머 발행된 폼 목록 화면 (/consumer/forms)
  *
  * 공식 발행된 활성 폼 목록을 카드 그리드로 표시하며,
- * 각 폼으로 이동하여 신규 응답을 작성하거나 기존 제출 내역을 확인할 수 있습니다.
+ * 카드를 클릭하여 해당 폼의 데이터 목록(/consumer/forms/[id])으로 즉시 이동합니다.
  */
 export default function ConsumerFormsPage() {
   const { data: publishedForms, isLoading, isError, error } = usePublishedFormsQuery();
@@ -30,8 +21,9 @@ export default function ConsumerFormsPage() {
       <div className="flex flex-col gap-2">
         <h1 className="text-foreground text-2xl font-bold tracking-tight">참여 가능한 폼 목록</h1>
         <p className="text-muted-foreground text-sm/relaxed">
-          공식 발행되어 응답 제출이 가능한 폼 목록입니다. 원하는 폼을 선택하여 직접 작성하거나, 좌측
-          AI Navigator에게 원하는 설문 내용을 말씀해 주시면 자율 입력을 도와드립니다.
+          공식 발행되어 응답 제출이 가능한 폼 목록입니다. 원하는 폼 카드를 선택하여 데이터 목록을
+          확인하거나, 좌측 AI Navigator에게 원하는 설문 내용을 말씀해 주시면 자율 입력을
+          도와드립니다.
         </p>
       </div>
 
@@ -41,12 +33,9 @@ export default function ConsumerFormsPage() {
           {Array.from({ length: 4 }).map((_, idx) => (
             <Card key={idx} className="border-border/60 shadow-xs">
               <CardHeader className="space-y-2">
-                <Skeleton className="h-5 w-3/4 rounded-md" />
+                <Skeleton className="h-6 w-3/4 rounded-md" />
                 <Skeleton className="h-4 w-full rounded-md" />
               </CardHeader>
-              <CardFooter className="pt-2">
-                <Skeleton className="h-9 w-full rounded-md" />
-              </CardFooter>
             </Card>
           ))}
         </div>
@@ -85,44 +74,28 @@ export default function ConsumerFormsPage() {
         </Card>
       )}
 
-      {/* 4. 정상 폼 목록 카드 그리드 */}
+      {/* 4. 정상 폼 목록 카드 그리드 (카드 클릭 시 해당 폼의 데이터 목록으로 이동) */}
       {!isLoading && !isError && publishedForms && publishedForms.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {publishedForms.map((form) => (
-            <Card
+            <Link
               key={form.id}
-              className="border-border/60 hover:border-border flex flex-col justify-between shadow-xs transition-colors"
+              href={`/consumer/forms/${form.id}`}
+              className="group block focus-visible:outline-hidden"
             >
-              <CardHeader className="space-y-2 pb-3">
-                <div className="flex items-center justify-between gap-2">
-                  <Badge variant="default" className="text-[10px]">
-                    발행됨
-                  </Badge>
-                  <span className="text-muted-foreground font-mono text-xs">
-                    ID: {form.id.slice(0, 8)}...
-                  </span>
-                </div>
-                <CardTitle className="text-lg font-bold tracking-tight">{form.title}</CardTitle>
-                {form.description && (
-                  <CardDescription className="line-clamp-2 text-xs/relaxed">
-                    {form.description}
-                  </CardDescription>
-                )}
-              </CardHeader>
-
-              <CardContent className="text-muted-foreground pb-3 text-xs">
-                발행일시: {formatDate(form.publishedAt)}
-              </CardContent>
-
-              <CardFooter className="flex items-center gap-2">
-                <Button asChild className="flex-1 font-medium" size="sm">
-                  <Link href={`/consumer/forms/${form.id}`}>응답 작성하기</Link>
-                </Button>
-                <Button asChild variant="outline" size="sm">
-                  <Link href={`/consumer/forms/${form.id}/submissions`}>응답 내역</Link>
-                </Button>
-              </CardFooter>
-            </Card>
+              <Card className="border-border/60 group-hover:border-primary/50 group-hover:bg-muted/30 flex h-full flex-col justify-between shadow-xs transition-all">
+                <CardHeader className="space-y-1.5">
+                  <CardTitle className="group-hover:text-primary text-lg font-bold tracking-tight transition-colors">
+                    {form.title}
+                  </CardTitle>
+                  {form.description && (
+                    <CardDescription className="line-clamp-2 text-xs/relaxed">
+                      {form.description}
+                    </CardDescription>
+                  )}
+                </CardHeader>
+              </Card>
+            </Link>
           ))}
         </div>
       )}

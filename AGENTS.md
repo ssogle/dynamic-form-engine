@@ -43,10 +43,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - 코드를 작성하거나 수정할 때는 주요 인터페이스, 함수, 클래스, 복잡한 비즈니스 분기에 대해 **동작 원리와 목적을 설명하는 상세한 주석(JSDoc 및 인라인 설명)**을 반드시 포함하세요.
 - 다른 개발자나 사용자가 코드만 보고도 의도와 역할을 즉시 이해할 수 있도록 명확하게 서술하세요.
 
-### 5) UI 컴포넌트 재사용 원칙
+### 5) UI 컴포넌트 재사용 및 시스템 팝업 금지 원칙
 
 - 새로운 태그나 임의의 UI를 바로 작성하지 말고, 반드시 `@/shared/ui` 디렉터리에 이미 존재하는 컴포넌트(shadcn/ui 기반)를 최우선으로 재사용하세요.
 - 필요한 컴포넌트(예: Slider, Popover 등)가 없다면 임의로 만들지 말고, 사용자에게 `npx shadcn@latest add [컴포넌트명]` 실행을 먼저 제안하세요.
+- **브라우저 기본 시스템 팝업(`window.alert`, `window.confirm`, `window.prompt`)의 사용을 엄격히 금지**하며, 사용자 확인/알림 인터랙션은 반드시 `@/shared/ui`의 `Popover`(국소적/인라인 확인) 또는 `Dialog`(전역/모달 확인) 컴포넌트를 사용하세요.
 
 ### 6) FSD 기능 우선(Feature-First) 및 진화적 라이프사이클 준수
 
