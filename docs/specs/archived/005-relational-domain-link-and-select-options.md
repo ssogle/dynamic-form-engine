@@ -1,11 +1,16 @@
+> [!WARNING]
+> **ARCHIVED SPECIFICATION (READ-ONLY)**
+> 본 문서는 구현 완료 후 동결된 과거 기록입니다.
+> 현재 시스템의 구현 규격은 `/src` 실제 코드를 참조하세요. AI 에이전트는 이 문서를 최신 코드로 인용하지 마십시오.
+
 # [Spec-005] Relational Domain Links, Primary Field Governance & Comprehensive Form Field Expansion
 
 > [!NOTE]
 >
-> - **상태 (Status)**: Active (구현 완료 및 최종 검증 진행)
+> - **상태 (Status)**: Archived (구현 완료 및 동결)
 > - **브랜치 (Branch)**: `feat/spec-005-relational-domain-link-and-select-options`
 > - **작성일 (Created)**: 2026-11-12
-> - **완료일 (Archived)**: -
+> - **완료일 (Archived)**: 2026-11-13
 
 ---
 
