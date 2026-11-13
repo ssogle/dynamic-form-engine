@@ -26,17 +26,15 @@ export async function getPaginatedFormSubmissions(
   formId: string,
   params: GetPaginatedSubmissionsParams = {}
 ): Promise<PaginatedSubmissionsResponse> {
-  const query = new URLSearchParams();
-  if (params.page !== undefined) query.set("page", String(params.page));
-  if (params.limit !== undefined) query.set("limit", String(params.limit));
-  if (params.sort) query.set("sort", params.sort);
-  if (params.filters) query.set("filters", params.filters);
-  if (params.ids) query.set("ids", params.ids);
-
-  const queryString = query.toString();
-  const endpoint = `/api/v1/forms/${formId}/submissions${queryString ? `?${queryString}` : ""}`;
-  const response = await httpClient.get<PaginatedSubmissionsResponse>(endpoint);
-  return response;
+  return await httpClient.get<PaginatedSubmissionsResponse>(`/api/v1/forms/${formId}/submissions`, {
+    params: {
+      page: params.page,
+      limit: params.limit,
+      sort: params.sort || undefined,
+      filters: params.filters || undefined,
+      ids: params.ids || undefined,
+    },
+  });
 }
 
 /**

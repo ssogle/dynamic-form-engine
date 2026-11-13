@@ -4,7 +4,10 @@ import {
   coreFormFieldSchema,
   extractActiveFields,
   extractPrimaryFieldId,
+  extractRawFields,
   mergeOptionsWithPreservation,
+  normalizeSelectOption,
+  normalizeSelectOptions,
   selectOptionSchema,
   validatePrimaryFieldSelection,
   type CoreFormField,
@@ -20,14 +23,7 @@ import type { NavigatorBuilderAction, SchemaOperation } from "../../types/naviga
  * 폼 엔티티의 schemaDefinition 내부에서 CoreFormField 배열을 안전하게 추출하는 유틸리티
  */
 export function extractFieldsFromForm(form?: Form | null): CoreFormField[] {
-  if (!form || !form.schemaDefinition || typeof form.schemaDefinition !== "object") {
-    return [];
-  }
-  const schema = form.schemaDefinition as { fields?: unknown };
-  if (Array.isArray(schema.fields)) {
-    return schema.fields as CoreFormField[];
-  }
-  return [];
+  return extractRawFields(form);
 }
 
 /**
@@ -772,13 +768,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
       const isProtected = await isFormHistoryProtected(existing, deps);
 
       // 기존 옵션 목록을 SelectOption[] 형태로 정리 (설명 필드 포함 정규화)
-      const normalizeOption = (opt: SelectOption): SelectOption => ({
-        label: opt.label,
-        value: opt.value,
-        description: opt.description,
-        disabled: Boolean(opt.disabled),
-      });
-      const existingOptions: SelectOption[] = (targetField.options ?? []).map(normalizeOption);
+      const existingOptions = normalizeSelectOptions(targetField.options);
 
       let updatedOptions: SelectOption[] = [...existingOptions];
 
@@ -835,7 +825,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
           const existingValues = new Set(updatedOptions.map((o) => o.value));
           for (const opt of newOptionsInput) {
             if (!existingValues.has(opt.value)) {
-              updatedOptions.push(normalizeOption(opt));
+              updatedOptions.push(normalizeSelectOption(opt));
               existingValues.add(opt.value);
             }
           }
@@ -875,7 +865,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
           // 보호 대상 폼에서는 새 목록에서 누락된 기존 옵션을 disabled: true로 보존 병합합니다.
           updatedOptions = isProtected
             ? mergeOptionsWithPreservation(existingOptions, newOptionsInput)
-            : newOptionsInput.map(normalizeOption);
+            : normalizeSelectOptions(newOptionsInput);
           break;
         }
       }

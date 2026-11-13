@@ -23,14 +23,28 @@ describe("Route Handler: GET /api/v1/relations", () => {
     mockFrom.mockReturnValue({ where: mockWhere });
   });
 
-  it("targetId가 누락되었거나 UUID 형식이 아닌 경우 400 에러를 반환해야 한다", async () => {
-    const req = new NextRequest("http://localhost/api/v1/relations");
-    const response = await GET(req, {});
+  it("targetId가 누락되었거나 유효한 UUID 형식이 아닌 경우 400 에러를 반환해야 한다", async () => {
+    const missingReq = new NextRequest("http://localhost/api/v1/relations");
+    const missingRes = await GET(missingReq, {});
 
-    expect(response.status).toBe(400);
-    const body = (await response.json()) as { success: boolean; error: { message: string } };
-    expect(body.success).toBe(false);
-    expect(body.error.message).toContain("올바른 targetId(UUID)");
+    expect(missingRes.status).toBe(400);
+    const missingBody = (await missingRes.json()) as {
+      success: boolean;
+      error: { message: string; details?: Record<string, string[]> };
+    };
+    expect(missingBody.success).toBe(false);
+    expect(missingBody.error.message).toContain("올바른 targetId(UUID)");
+
+    const nonRfcReq = new NextRequest(
+      "http://localhost/api/v1/relations?targetId=00000000-0000-0000-0000-000000000001"
+    );
+    const nonRfcRes = await GET(nonRfcReq, {});
+    expect(nonRfcRes.status).toBe(400);
+    const nonRfcBody = (await nonRfcRes.json()) as {
+      success: boolean;
+      error: { message: string; details?: Record<string, string[]> };
+    };
+    expect(nonRfcBody.error.details?.targetId).toBeDefined();
   });
 
   it("연결된 엣지가 없을 경우 빈 배열을 반환해야 한다", async () => {

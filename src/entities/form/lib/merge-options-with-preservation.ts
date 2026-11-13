@@ -1,4 +1,5 @@
 import type { SelectOption } from "../schema/form-field.schema";
+import { normalizeSelectOptions } from "./select-options";
 
 /**
  * 발행 이후(또는 기제출 응답이 존재하는) 폼의 옵션 변경 시 기존 옵션을 보존 병합합니다.
@@ -15,19 +16,8 @@ export function mergeOptionsWithPreservation(
   existingOptions?: SelectOption[] | null,
   nextOptions?: SelectOption[] | null
 ): SelectOption[] {
-  const existingList: SelectOption[] = (existingOptions ?? []).map((opt) => ({
-    label: opt.label,
-    value: opt.value,
-    description: opt.description,
-    disabled: Boolean(opt.disabled),
-  }));
-
-  const nextList: SelectOption[] = (nextOptions ?? []).map((opt) => ({
-    label: opt.label,
-    value: opt.value,
-    description: opt.description,
-    disabled: Boolean(opt.disabled),
-  }));
+  const existingList = normalizeSelectOptions(existingOptions);
+  const nextList = normalizeSelectOptions(nextOptions);
 
   const nextValueSet = new Set(nextList.map((opt) => opt.value));
 

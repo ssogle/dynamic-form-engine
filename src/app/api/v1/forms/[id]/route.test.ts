@@ -78,6 +78,16 @@ describe("Route Handler: /api/v1/forms/[id]", () => {
       expect(json.success).toBe(false);
       expect(json.error.code).toBe("NOT_FOUND");
     });
+
+    it("경로 파라미터 id가 유효한 UUID가 아니면 DB 조회 없이 400 Bad Request를 반환해야 한다", async () => {
+      const request = new NextRequest("http://localhost:3000/api/v1/forms/invalid-id");
+      const response = await GET(request, {
+        params: Promise.resolve({ id: "invalid-id" }),
+      });
+
+      expect(response.status).toBe(400);
+      expect(mockSelect).not.toHaveBeenCalled();
+    });
   });
 
   describe("PATCH /api/v1/forms/[id] (폼 정보 수정)", () => {
@@ -130,6 +140,21 @@ describe("Route Handler: /api/v1/forms/[id]", () => {
       expect(json.success).toBe(false);
       expect(json.error.code).toBe("NOT_FOUND");
     });
+
+    it("경로 파라미터 id가 유효한 UUID가 아니면 DB 수정 없이 400 Bad Request를 반환해야 한다", async () => {
+      const request = new NextRequest("http://localhost:3000/api/v1/forms/invalid-id", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "수정 시도" }),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: "invalid-id" }),
+      });
+
+      expect(response.status).toBe(400);
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
   });
 
   describe("DELETE /api/v1/forms/[id] (폼 소프트 삭제)", () => {
@@ -178,6 +203,19 @@ describe("Route Handler: /api/v1/forms/[id]", () => {
 
       expect(json.success).toBe(false);
       expect(json.error.code).toBe("NOT_FOUND");
+    });
+
+    it("경로 파라미터 id가 유효한 UUID가 아니면 DB 삭제 없이 400 Bad Request를 반환해야 한다", async () => {
+      const request = new NextRequest("http://localhost:3000/api/v1/forms/invalid-id", {
+        method: "DELETE",
+      });
+
+      const response = await DELETE(request, {
+        params: Promise.resolve({ id: "invalid-id" }),
+      });
+
+      expect(response.status).toBe(400);
+      expect(mockUpdate).not.toHaveBeenCalled();
     });
   });
 });

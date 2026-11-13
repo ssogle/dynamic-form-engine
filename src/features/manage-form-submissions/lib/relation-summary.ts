@@ -1,5 +1,6 @@
 import { extractPrimaryFieldValue, type CoreFormField, type Form } from "@/entities/form";
 import type { FormSubmission } from "@/entities/form-submission";
+import { normalizeStringIds } from "@/shared/lib/normalize";
 
 /**
  * 특정 부모 폼과 서브미션 목록에서 참조된 타깃 폼 및 타깃 레코드 ID 집합 규격
@@ -30,31 +31,6 @@ export interface RelationFieldDetailRows {
 }
 
 /**
- * 관계형 필드에 저장된 단일 UUID 또는 다중 UUID 배열을 ID 문자열 배열로 정규화합니다.
- */
-function normalizeRelationValueToIds(rawVal: unknown): string[] {
-  if (typeof rawVal === "string") {
-    const trimmed = rawVal.trim();
-    return trimmed.length > 0 ? [trimmed] : [];
-  }
-  if (Array.isArray(rawVal)) {
-    const unique: string[] = [];
-    const seen = new Set<string>();
-    for (const item of rawVal) {
-      if (typeof item === "string") {
-        const trimmed = item.trim();
-        if (trimmed.length > 0 && !seen.has(trimmed)) {
-          seen.add(trimmed);
-          unique.push(trimmed);
-        }
-      }
-    }
-    return unique;
-  }
-  return [];
-}
-
-/**
  * 활성 필드와 서브미션 행들을 순회하며, 배치 조회가 필요한 타깃 폼 ID 및
  * 해당 폼에서 참조된 중복 제거 서브미션 ID 목록을 추출합니다.
  *
@@ -81,7 +57,7 @@ export function extractRelationTargets(
 
     for (const sub of submissions) {
       const dataObj = (sub.data as Record<string, unknown>) ?? {};
-      const ids = normalizeRelationValueToIds(dataObj[field.id]);
+      const ids = normalizeStringIds(dataObj[field.id]);
       for (const id of ids) {
         idSet.add(id);
       }
@@ -144,14 +120,14 @@ export function buildRelationLookupMap(
  * - 미선택 / 빈 값: `"-"`
  * - 단일 선택 또는 1건 선택: 타깃 레코드의 대표 필드 값 (예: `"차세대 ERP 구축"`)
  * - 다중 선택(2건 이상): `"첫 번째 대표값 외 N건"` (예: `"차세대 ERP 구축 외 2건"`)
- * - 미조회 / 로딩 중 / 삭제된 참조: 축약 UUID 폴백 (예: `"cccc3333..."`)
+ * - 미조회 / 로딩 중 / 삭제된 참조: 원본 전체 ID 폴백 (예: `"cccc3333-3333-4333-a333-333333333333"`)
  */
 export function formatRelationSummaryCell(
   rawVal: unknown,
   field: CoreFormField,
   lookupMap: RelationLookupMap
 ): string {
-  const ids = normalizeRelationValueToIds(rawVal);
+  const ids = normalizeStringIds(rawVal);
   if (ids.length === 0) {
     return "-";
   }
@@ -159,7 +135,7 @@ export function formatRelationSummaryCell(
   const targetFormId = field.relationConfig?.targetFormId;
   const labelsById = targetFormId ? lookupMap[targetFormId]?.labelsById : undefined;
   const firstId = ids[0]!;
-  const primaryLabel = labelsById?.[firstId] ?? `${firstId.slice(0, 8)}...`;
+  const primaryLabel = labelsById?.[firstId] ?? firstId;
 
   if (ids.length === 1) {
     return primaryLabel;
@@ -177,7 +153,7 @@ export function getRelationDetailRows(
 ): RelationFieldDetailRows {
   const targetFormId = field.relationConfig?.targetFormId;
   const entry = targetFormId ? lookupMap[targetFormId] : undefined;
-  const ids = normalizeRelationValueToIds(rawVal);
+  const ids = normalizeStringIds(rawVal);
 
   const rows: FormSubmission[] = [];
   const missingIds: string[] = [];

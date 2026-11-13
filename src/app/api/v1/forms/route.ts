@@ -1,8 +1,7 @@
 import type { NextRequest } from "next/server";
-import { z } from "zod";
 import { insertFormSchema } from "@/entities/form";
 import { findActiveForms, findPublishedForms, insertForm } from "@/entities/form/server";
-import { apiResponse, badRequest, withErrorHandler } from "@/shared/lib/http";
+import { apiResponse, parseRequestData, withErrorHandler } from "@/shared/lib/http";
 
 /**
  * GET /api/v1/forms
@@ -31,16 +30,13 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
  */
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const body: unknown = await req.json();
-  const parsed = insertFormSchema.safeParse(body);
+  const parsedData = parseRequestData(
+    insertFormSchema,
+    body,
+    "폼 생성 요청 형식이 올바르지 않습니다."
+  );
 
-  if (!parsed.success) {
-    throw badRequest(
-      "폼 생성 요청 형식이 올바르지 않습니다.",
-      z.flattenError(parsed.error).fieldErrors
-    );
-  }
-
-  const createdForm = await insertForm(parsed.data);
+  const createdForm = await insertForm(parsedData);
 
   return apiResponse.created(createdForm);
 });

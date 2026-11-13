@@ -4,6 +4,7 @@ import type { CoreFormField } from "../schema/form-field.schema";
 import {
   extractPrimaryFieldId,
   extractPrimaryFieldValue,
+  orderFieldsWithPrimaryFirst,
   validatePrimaryFieldSelection,
 } from "./primary-field";
 
@@ -210,6 +211,46 @@ describe("primary-field (entities/form/lib)", () => {
       });
 
       expect(text).toBe("레코드 (12345678)");
+    });
+  });
+
+  describe("orderFieldsWithPrimaryFirst", () => {
+    it("활성 필드 중 primaryFieldId에 해당하는 컬럼을 항상 첫 번째 위치로 이동시켜 반환해야 한다", () => {
+      const formWithSecondPrimary: Form = {
+        ...sampleForm,
+        schemaDefinition: {
+          ...sampleForm.schemaDefinition,
+          primaryFieldId: "f_status",
+        },
+      };
+
+      const ordered = orderFieldsWithPrimaryFirst(formWithSecondPrimary);
+      expect(ordered.map((f) => f.id)).toEqual([
+        "f_status",
+        "f_code",
+        "f_is_urgent",
+        "f_tags",
+        "f_parent",
+      ]);
+    });
+
+    it("유효한 primaryFieldId가 없으면 일반 활성 필드 순서를 유지하고 폼이 없으면 빈 배열을 반환해야 한다", () => {
+      const brokenPrimaryForm: Form = {
+        ...sampleForm,
+        schemaDefinition: {
+          ...sampleForm.schemaDefinition,
+          primaryFieldId: "f_deleted",
+        },
+      };
+
+      expect(orderFieldsWithPrimaryFirst(brokenPrimaryForm).map((f) => f.id)).toEqual([
+        "f_code",
+        "f_status",
+        "f_is_urgent",
+        "f_tags",
+        "f_parent",
+      ]);
+      expect(orderFieldsWithPrimaryFirst(null)).toEqual([]);
     });
   });
 });

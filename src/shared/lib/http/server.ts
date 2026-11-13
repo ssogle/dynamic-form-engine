@@ -1,5 +1,30 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { isHttpError } from "./errors";
+import { z } from "zod";
+import { badRequest, isHttpError } from "./errors";
+
+/**
+ * API 경계(Route Handler 등)에서 경로 파라미터, 쿼리 파라미터 또는 요청 본문을 Zod 스키마로 일괄 파싱합니다.
+ *
+ * 검증에 성공하면 스키마 타입이 좁혀진 안전한 데이터를 반환하고,
+ * 실패하면 필드별 오류 상세(details)가 포함된 400 Bad Request(HttpErrorObject)를 즉시 던져
+ * 내부 서비스/DB 계층으로 잘못된 입력이 흘러들어가지 않도록 차단합니다.
+ *
+ * @param schema 적용할 Zod 검증 스키마
+ * @param input 파싱할 미검증 원시 입력값
+ * @param errorMessage 검증 실패 시 클라이언트에 반환할 대표 오류 메시지
+ * @returns 검증 및 변환이 완료된 타입 안전 데이터
+ */
+export const parseRequestData = <TSchema extends z.ZodType>(
+  schema: TSchema,
+  input: unknown,
+  errorMessage: string = "요청 형식이 올바르지 않습니다."
+): z.infer<TSchema> => {
+  const parsed = schema.safeParse(input);
+  if (!parsed.success) {
+    throw badRequest(errorMessage, z.flattenError(parsed.error).fieldErrors);
+  }
+  return parsed.data;
+};
 
 /**
  * 서버(BFF Route Handler)에서 일관된 JSON 응답을 만들기 위한 유틸리티 헬퍼

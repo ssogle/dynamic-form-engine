@@ -1,16 +1,4 @@
-import type { SelectOption } from "@/entities/form";
-
-/**
- * SelectOption 객체를 표준 불리언 disabled 상태 및 필수 설명(description) 포함 형태로 정규화하는 내부 헬퍼입니다.
- */
-function normalizeSelectOption(opt: SelectOption): SelectOption {
-  return {
-    label: opt.label,
-    value: opt.value,
-    description: opt.description,
-    disabled: Boolean(opt.disabled),
-  };
-}
+import { normalizeSelectOption, type SelectOption } from "@/entities/form";
 
 /**
  * 단일 선택(select, radio) 컴포넌트를 위한 옵션 필터링 순수 함수

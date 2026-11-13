@@ -2,11 +2,18 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { updateFormSchema } from "@/entities/form";
 import { findFormById, softDeleteFormById, updateFormById } from "@/entities/form/server";
-import { apiResponse, badRequest, notFound, withErrorHandler } from "@/shared/lib/http";
+import { apiResponse, notFound, parseRequestData, withErrorHandler } from "@/shared/lib/http";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
+
+/**
+ * 동적 라우트 경로 파라미터 검증 스키마
+ */
+const formRouteParamsSchema = z.object({
+  id: z.uuid("올바른 폼 ID(UUID) 형식이 아닙니다."),
+});
 
 /**
  * GET /api/v1/forms/[id]
@@ -18,7 +25,11 @@ interface RouteContext {
  * @returns 200 OK와 함께 Form 객체 반환, 없을 경우 404 Not Found
  */
 export const GET = withErrorHandler<RouteContext>(async (_req: NextRequest, context) => {
-  const { id } = await context.params;
+  const { id } = parseRequestData(
+    formRouteParamsSchema,
+    await context.params,
+    "올바른 폼 ID(UUID) 형식이 아닙니다."
+  );
   const form = await findFormById(id);
 
   if (!form) {
@@ -39,18 +50,19 @@ export const GET = withErrorHandler<RouteContext>(async (_req: NextRequest, cont
  * @returns 200 OK와 함께 수정 완료된 Form 객체 반환
  */
 export const PATCH = withErrorHandler<RouteContext>(async (req: NextRequest, context) => {
-  const { id } = await context.params;
+  const { id } = parseRequestData(
+    formRouteParamsSchema,
+    await context.params,
+    "올바른 폼 ID(UUID) 형식이 아닙니다."
+  );
   const body: unknown = await req.json();
-  const parsed = updateFormSchema.safeParse(body);
+  const parsedData = parseRequestData(
+    updateFormSchema,
+    body,
+    "폼 수정 요청 형식이 올바르지 않습니다."
+  );
 
-  if (!parsed.success) {
-    throw badRequest(
-      "폼 수정 요청 형식이 올바르지 않습니다.",
-      z.flattenError(parsed.error).fieldErrors
-    );
-  }
-
-  const updatedForm = await updateFormById(id, parsed.data);
+  const updatedForm = await updateFormById(id, parsedData);
 
   if (!updatedForm) {
     throw notFound("수정 대상 폼이 존재하지 않거나 이미 삭제되었습니다.");
@@ -70,7 +82,11 @@ export const PATCH = withErrorHandler<RouteContext>(async (req: NextRequest, con
  * @returns 200 OK와 함께 소프트 삭제된 Form 객체 반환
  */
 export const DELETE = withErrorHandler<RouteContext>(async (_req: NextRequest, context) => {
-  const { id } = await context.params;
+  const { id } = parseRequestData(
+    formRouteParamsSchema,
+    await context.params,
+    "올바른 폼 ID(UUID) 형식이 아닙니다."
+  );
 
   const deletedForm = await softDeleteFormById(id);
 

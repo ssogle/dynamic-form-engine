@@ -1,10 +1,9 @@
 import { NextRequest } from "next/server";
-import { z } from "zod";
 import {
   runNavigatorEngine,
   navigatorRequestSchema,
 } from "@/features/execute-navigator-action/server";
-import { apiResponse, badRequest, withErrorHandler } from "@/shared/lib/http";
+import { apiResponse, parseRequestData, withErrorHandler } from "@/shared/lib/http";
 
 /**
  * AI Navigator 통합 HTTP 엔드포인트 핸들러 (POST /api/v1/navigator)
@@ -14,15 +13,12 @@ import { apiResponse, badRequest, withErrorHandler } from "@/shared/lib/http";
  */
 export const POST = withErrorHandler(async (request: NextRequest) => {
   const json: unknown = await request.json().catch(() => null);
-  const parsedRequest = navigatorRequestSchema.safeParse(json);
+  const parsedRequest = parseRequestData(
+    navigatorRequestSchema,
+    json,
+    "요청 페이로드가 올바르지 않습니다."
+  );
 
-  if (!parsedRequest.success) {
-    throw badRequest(
-      "요청 페이로드가 올바르지 않습니다.",
-      z.flattenError(parsedRequest.error).fieldErrors
-    );
-  }
-
-  const result = await runNavigatorEngine(parsedRequest.data);
+  const result = await runNavigatorEngine(parsedRequest);
   return apiResponse.ok(result);
 });

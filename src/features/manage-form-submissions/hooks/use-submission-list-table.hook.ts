@@ -14,7 +14,11 @@ import {
 import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { TABLE_COLUMN_WIDTH } from "@/shared/lib/virtual-table";
 import type { Form, CoreFormField } from "@/entities/form";
-import { extractActiveFields, extractPrimaryFieldId } from "@/entities/form";
+import {
+  extractActiveFields,
+  extractPrimaryFieldId,
+  formatFieldDisplayValue,
+} from "@/entities/form";
 import {
   useInfiniteFormSubmissionsQuery,
   useDeleteSubmissionMutation,
@@ -237,17 +241,10 @@ export function useSubmissionListTable({
           }),
         cell: (info) => {
           const rawVal = info.getValue();
-          let displayVal = "-";
-
-          if (field.type === "relation") {
-            displayVal = formatRelationSummaryCell(rawVal, field, relationLookupMap);
-          } else if (typeof rawVal === "boolean") {
-            displayVal = rawVal ? "예" : "아니오";
-          } else if (Array.isArray(rawVal)) {
-            displayVal = rawVal.length > 0 ? rawVal.join(", ") : "-";
-          } else if (rawVal !== undefined && rawVal !== null && rawVal !== "") {
-            displayVal = String(rawVal);
-          }
+          const displayVal =
+            field.type === "relation"
+              ? formatRelationSummaryCell(rawVal, field, relationLookupMap)
+              : formatFieldDisplayValue(rawVal, field);
 
           return React.createElement(
             "div",

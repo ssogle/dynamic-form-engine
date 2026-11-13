@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest";
 import type { Form } from "../schema/form.schema";
 import type { ActiveForm, CoreFormField } from "../schema/form-field.schema";
-import { extractActiveFields } from "./extract-active-fields";
+import {
+  extractActiveFields,
+  extractRawFields,
+  readFormSchemaParts,
+} from "./extract-active-fields";
 
 describe("extractActiveFields (entities/form/lib)", () => {
   const sampleField: CoreFormField = {
@@ -72,5 +76,27 @@ describe("extractActiveFields (entities/form/lib)", () => {
     } as unknown as Form;
 
     expect(extractActiveFields(malformedForm)).toEqual([]);
+  });
+
+  it("readFormSchemaParts 및 extractRawFields는 소프트 삭제 필드를 포함한 전체 필드와 선언된 primaryFieldId를 추출해야 한다", () => {
+    const dbForm: Form = {
+      id: "form-uuid-1",
+      title: "DB 저장 폼",
+      description: null,
+      schemaDefinition: {
+        primaryFieldId: "f1",
+        fields: [sampleField, deletedField],
+      },
+      publishedAt: new Date("2026-01-01T00:00:00.000Z"),
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      deletedAt: null,
+    };
+
+    const parts = readFormSchemaParts(dbForm);
+    expect(parts.rawPrimaryFieldId).toBe("f1");
+    expect(parts.rawFields).toHaveLength(2);
+    expect(extractRawFields(dbForm)).toHaveLength(2);
+    expect(readFormSchemaParts(null)).toEqual({ rawFields: [], rawPrimaryFieldId: undefined });
   });
 });

@@ -144,9 +144,7 @@ export function DynamicFormRenderer({
                   </Button>
                 )}
                 {formId ? (
-                  <span className="text-muted-foreground font-mono text-xs">
-                    ID: {formId.slice(0, 8)}...
-                  </span>
+                  <span className="text-muted-foreground font-mono text-xs">ID: {formId}</span>
                 ) : null}
               </div>
             </div>

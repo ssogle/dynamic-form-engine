@@ -28,13 +28,21 @@ export {
   type RelationConfig,
 } from "./schema/form-field.schema";
 
-export { extractActiveFields } from "./lib/extract-active-fields";
+export {
+  extractActiveFields,
+  extractRawFields,
+  readFormSchemaParts,
+  type FormSchemaParts,
+} from "./lib/extract-active-fields";
 export { mergeOptionsWithPreservation } from "./lib/merge-options-with-preservation";
+export { normalizeSelectOption, normalizeSelectOptions } from "./lib/select-options";
+export { formatFieldDisplayValue } from "./lib/format-field-value";
 export {
   PRIMARY_FIELD_DISALLOWED_TYPES,
   validatePrimaryFieldSelection,
   extractPrimaryFieldId,
   extractPrimaryFieldValue,
+  orderFieldsWithPrimaryFirst,
   type PrimaryFieldValidationResult,
 } from "./lib/primary-field";
 export { PrimaryFieldBadge, type PrimaryFieldBadgeProps } from "./ui/primary-field-badge";

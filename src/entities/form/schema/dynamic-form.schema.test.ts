@@ -289,12 +289,17 @@ describe("Dynamic Form Schema & Validator (entities/form/schema)", () => {
       const validResult = schema.safeParse(validData);
       expect(validResult.success).toBe(true);
 
-      // 날짜 포맷 오류 검증
+      // 날짜 포맷 및 달력 유효성(윤년/월말 초과) 오류 검증
       const invalidDateResult = schema.safeParse({
         ...validData,
         f_date: "invalid-date",
       });
       expect(invalidDateResult.success).toBe(false);
+
+      expect(schema.safeParse({ ...validData, f_date: "2026-02-30" }).success).toBe(false);
+      expect(schema.safeParse({ ...validData, f_date: "2026-02-29" }).success).toBe(false);
+      expect(schema.safeParse({ ...validData, f_date: "2026-13-01" }).success).toBe(false);
+      expect(schema.safeParse({ ...validData, f_date: "2024-02-29" }).success).toBe(true);
 
       // 체크박스 미선택 필수 오류 검증
       const invalidCheckboxResult = schema.safeParse({

@@ -2,11 +2,24 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { extractActiveFields } from "@/entities/form";
 import { findFormById, publishFormById } from "@/entities/form/server";
-import { apiResponse, badRequest, notFound, withErrorHandler } from "@/shared/lib/http";
+import {
+  apiResponse,
+  badRequest,
+  notFound,
+  parseRequestData,
+  withErrorHandler,
+} from "@/shared/lib/http";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
+
+/**
+ * 폼 발행 라우트 경로 파라미터 검증 스키마
+ */
+const publishRouteParamsSchema = z.object({
+  id: z.uuid("올바른 폼 ID(UUID) 형식이 아닙니다."),
+});
 
 /**
  * 폼 발행 요청 본문 유효성 검증 스키마
@@ -33,7 +46,11 @@ const publishRequestBodySchema = z.object({
  * @returns 200 OK와 함께 상태 전이된 Form 객체 반환
  */
 export const POST = withErrorHandler<RouteContext>(async (req: NextRequest, context) => {
-  const { id } = await context.params;
+  const { id } = parseRequestData(
+    publishRouteParamsSchema,
+    await context.params,
+    "올바른 폼 ID(UUID) 형식이 아닙니다."
+  );
 
   // 1. 요청 본문 파싱 (본문이 비어있거나 올바르지 않은 JSON이어도 safeParse로 유연하게 처리)
   let rawBody: unknown = {};
@@ -46,15 +63,11 @@ export const POST = withErrorHandler<RouteContext>(async (req: NextRequest, cont
     throw badRequest("요청 본문이 올바른 JSON 형식이 아닙니다.");
   }
 
-  const parsed = publishRequestBodySchema.safeParse(rawBody);
-  if (!parsed.success) {
-    throw badRequest(
-      "발행 요청 형식이 올바르지 않습니다.",
-      z.flattenError(parsed.error).fieldErrors
-    );
-  }
-
-  const { isPublished } = parsed.data;
+  const { isPublished } = parseRequestData(
+    publishRequestBodySchema,
+    rawBody,
+    "발행 요청 형식이 올바르지 않습니다."
+  );
 
   // 2. 대상 폼 존재 및 소프트 삭제 여부 확인
   const existingForm = await findFormById(id);

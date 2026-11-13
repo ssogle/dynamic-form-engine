@@ -15,6 +15,7 @@ import { Button } from "@/shared/ui/button";
 import { Label } from "@/shared/ui/label";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
+import { formatDateToYmd, parseYmdToDate } from "@/shared/lib/date";
 import { filterSingleSelectOptions, filterMultiSelectOptions } from "../lib/filter-select-options";
 import { FormFieldWrapper } from "./form-field-wrapper";
 import { RelationFieldInput } from "./relation-field-input";
@@ -40,31 +41,6 @@ export interface DynamicFieldProps {
 
   /** 비활성화 여부 */
   disabled?: boolean | undefined;
-}
-
-/**
- * Date 객체에서 타임존 왜곡 없이 'YYYY-MM-DD' 순수 일자 문자열을 추출하는 유틸리티
- */
-function formatDateToYmd(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-/**
- * 'YYYY-MM-DD' 문자열을 로컬 Date 객체로 안전하게 파싱하는 유틸리티
- */
-function parseYmdToDate(ymd?: string | unknown): Date | undefined {
-  if (typeof ymd !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
-    return undefined;
-  }
-  const [yearStr, monthStr, dayStr] = ymd.split("-");
-  const year = Number(yearStr);
-  const month = Number(monthStr);
-  const day = Number(dayStr);
-  if (!year || !month || !day) return undefined;
-  return new Date(year, month - 1, day);
 }
 
 /**
@@ -587,9 +563,7 @@ export function DynamicField({
               <span>
                 연결 도메인:{" "}
                 <strong className="text-foreground font-medium">
-                  {relationConfig?.targetFormId
-                    ? `${relationConfig.targetFormId.slice(0, 8)}...`
-                    : "미지정"}
+                  {relationConfig?.targetFormId || "미지정"}
                 </strong>
               </span>
               <span className="border-border bg-background rounded border px-2 py-0.5 text-[11px]">

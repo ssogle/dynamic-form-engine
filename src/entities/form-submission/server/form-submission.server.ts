@@ -9,13 +9,12 @@ import {
   type UpdateFormSubmission,
 } from "../schema/form-submission.schema";
 import {
+  normalizeUuidIds,
   parseFiltersParam,
   parseIdsParam,
   parseSortParam,
   type PaginatedSubmissionsResponse,
 } from "../schema/submission-query.schema";
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * 서브미션 데이터에 포함된 관계형 필드(relation) 값을 분석하여 relations 엣지 테이블을 동기화합니다.
@@ -59,11 +58,7 @@ export async function syncSubmissionRelations(submission: FormSubmission): Promi
     const rawVal = submissionData[fieldId];
     if (!rawVal) continue;
 
-    const targetIds: string[] = Array.isArray(rawVal)
-      ? rawVal.filter((v): v is string => typeof v === "string" && UUID_REGEX.test(v))
-      : typeof rawVal === "string" && UUID_REGEX.test(rawVal)
-        ? [rawVal]
-        : [];
+    const targetIds = normalizeUuidIds(rawVal);
 
     for (const targetId of targetIds) {
       newEdges.push({
@@ -105,16 +100,11 @@ export const insertSubmission = async (data: InsertFormSubmission): Promise<Form
 
 /**
  * 특정 폼 ID에 귀속된 소프트 삭제되지 않은 활성 응답 목록을 생성순(최신순)으로 조회합니다.
- * 폼 ID가 유효한 UUID 형식이 아닌 경우 빈 배열을 반환하여 데이터베이스 에러를 방지합니다.
  *
  * @param formId 조회 대상 폼 고유 식별자(UUID)
  * @returns FormSubmission[] 배열 반환
  */
 export const findSubmissionsByFormId = async (formId: string): Promise<FormSubmission[]> => {
-  if (!UUID_REGEX.test(formId)) {
-    return [];
-  }
-
   return await db
     .select()
     .from(formSubmissions)
@@ -130,10 +120,6 @@ export const findSubmissionsByFormId = async (formId: string): Promise<FormSubmi
  * @returns 응답 존재 여부 (true: 1건 이상 존재, false: 응답 없음)
  */
 export const hasSubmissionsByFormId = async (formId: string): Promise<boolean> => {
-  if (!UUID_REGEX.test(formId)) {
-    return false;
-  }
-
   const [row] = await db
     .select({ id: formSubmissions.id })
     .from(formSubmissions)
@@ -167,18 +153,6 @@ export const findSubmissionsPaginated = async (
 ): Promise<PaginatedSubmissionsResponse> => {
   const page = Math.max(1, options.page ?? 1);
   const limit = Math.max(1, Math.min(100, options.limit ?? 20));
-
-  if (!UUID_REGEX.test(formId)) {
-    return {
-      items: [],
-      page,
-      limit,
-      totalCount: 0,
-      totalPages: 0,
-      hasMore: false,
-    };
-  }
-
   const offset = (page - 1) * limit;
 
   // 1. Where 절 조립 (기본: 대상 폼 일치 및 소프트 삭제 제외)
@@ -263,16 +237,12 @@ export const findSubmissionsPaginated = async (
 
 /**
  * 특정 ID의 소프트 삭제되지 않은 활성 응답 1건을 조회합니다.
- * ID가 유효한 UUID 형식이 아닌 경우 undefined를 즉시 반환하여 데이터베이스 에러를 방지합니다.
+ * API 경계에서 UUID 검증이 완료된 식별자만 전달받는 것을 전제로 순수 DB 조회를 수행합니다.
  *
  * @param id 조회할 응답 고유 식별자(UUID)
  * @returns 일치하는 FormSubmission 객체 또는 undefined
  */
 export const findSubmissionById = async (id: string): Promise<FormSubmission | undefined> => {
-  if (!UUID_REGEX.test(id)) {
-    return undefined;
-  }
-
   const [submission] = await db
     .select()
     .from(formSubmissions)
@@ -293,10 +263,6 @@ export const updateSubmissionById = async (
   id: string,
   data: UpdateFormSubmission
 ): Promise<FormSubmission | undefined> => {
-  if (!UUID_REGEX.test(id)) {
-    return undefined;
-  }
-
   const [updatedSubmission] = await db
     .update(formSubmissions)
     .set({
@@ -324,10 +290,6 @@ export const updateSubmissionById = async (
  * @returns 소프트 삭제된 FormSubmission 객체 또는 대상이 없을 경우 undefined
  */
 export const softDeleteSubmissionById = async (id: string): Promise<FormSubmission | undefined> => {
-  if (!UUID_REGEX.test(id)) {
-    return undefined;
-  }
-
   const [deletedSubmission] = await db
     .update(formSubmissions)
     .set({
@@ -355,8 +317,7 @@ export const softDeleteSubmissionById = async (id: string): Promise<FormSubmissi
  * @returns 소프트 삭제된 FormSubmission 객체 배열
  */
 export const softDeleteSubmissionsByIds = async (ids: string[]): Promise<FormSubmission[]> => {
-  const validIds = ids.filter((id) => UUID_REGEX.test(id));
-  if (validIds.length === 0) {
+  if (ids.length === 0) {
     return [];
   }
 
@@ -366,15 +327,13 @@ export const softDeleteSubmissionsByIds = async (ids: string[]): Promise<FormSub
       deletedAt: sql`now()`,
       updatedAt: sql`now()`,
     })
-    .where(and(inArray(formSubmissions.id, validIds), isNull(formSubmissions.deletedAt)))
+    .where(and(inArray(formSubmissions.id, ids), isNull(formSubmissions.deletedAt)))
     .returning();
 
-  if (validIds.length > 0) {
-    try {
-      await db.delete(relations).where(inArray(relations.sourceId, validIds));
-    } catch (error) {
-      console.error("서브미션 관계 일괄 삭제 동기화 실패:", error);
-    }
+  try {
+    await db.delete(relations).where(inArray(relations.sourceId, ids));
+  } catch (error) {
+    console.error("서브미션 관계 일괄 삭제 동기화 실패:", error);
   }
 
   return deletedSubmissions;

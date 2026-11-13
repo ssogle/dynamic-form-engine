@@ -4,8 +4,9 @@ import * as React from "react";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import {
-  extractActiveFields,
   extractPrimaryFieldId,
+  formatFieldDisplayValue,
+  orderFieldsWithPrimaryFirst,
   PrimaryFieldBadge,
   type Form,
 } from "@/entities/form";
@@ -19,26 +20,6 @@ export interface RelatedSubmissionSubtableProps {
    * 특정 소스 폼에 의해 그룹화된 역참조 서브미션 데이터
    */
   group: RelatedSubmissionsGroup;
-}
-
-/**
- * 필드 값 시각화 포맷 유틸리티
- * 원시 데이터(문자열, 숫자, 불리언, 배열, 객체 등)를 사용자 친화적인 문자열로 변환합니다.
- */
-function formatFieldValue(value: unknown): string {
-  if (value === undefined || value === null || value === "") {
-    return "-";
-  }
-  if (typeof value === "boolean") {
-    return value ? "예" : "아니오";
-  }
-  if (Array.isArray(value)) {
-    return value.map((v) => (typeof v === "object" ? JSON.stringify(v) : String(v))).join(", ");
-  }
-  if (typeof value === "object") {
-    return JSON.stringify(value);
-  }
-  return String(value);
 }
 
 /**
@@ -61,16 +42,9 @@ export function RelatedSubmissionSubtable({ group }: RelatedSubmissionSubtablePr
   const primaryFieldId = extractPrimaryFieldId(rawSourceForm);
 
   const columns = React.useMemo(() => {
-    const allActive = extractActiveFields(rawSourceForm);
-    const ordered = primaryFieldId
-      ? [
-          ...allActive.filter((f) => f.id === primaryFieldId),
-          ...allActive.filter((f) => f.id !== primaryFieldId),
-        ]
-      : allActive;
-    // 최대 4개의 주요 데이터 컬럼만 노출하여 테이블 가독성 유지
-    return ordered.slice(0, 4);
-  }, [rawSourceForm, primaryFieldId]);
+    // 최대 4개의 주요 데이터 컬럼만 노출하여 테이블 가독성 유지 (대표 필드 우선 배치)
+    return orderFieldsWithPrimaryFirst(rawSourceForm).slice(0, 4);
+  }, [rawSourceForm]);
 
   if (!submissions || submissions.length === 0) {
     return (
@@ -107,7 +81,7 @@ export function RelatedSubmissionSubtable({ group }: RelatedSubmissionSubtablePr
               <TableRow key={sub.id} className="hover:bg-muted/30 text-xs">
                 {columns.map((col) => (
                   <TableCell key={col.id} className="max-w-50 truncate py-2.5 font-medium">
-                    {formatFieldValue(data[col.id])}
+                    {formatFieldDisplayValue(data[col.id], col)}
                   </TableCell>
                 ))}
                 <TableCell className="text-muted-foreground py-2.5 whitespace-nowrap">

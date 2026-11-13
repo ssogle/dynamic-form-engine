@@ -359,7 +359,7 @@ export function RelationFieldInput({
         <div className="flex items-center gap-1.5">
           <Badge variant="outline" className="gap-1 text-[11px] font-medium">
             <Link2 className="size-3" />
-            {targetForm?.title ?? `${targetFormId.slice(0, 8)}...`}
+            {targetForm?.title ?? targetFormId}
           </Badge>
           <span className="text-muted-foreground text-[11px]">
             {multiple ? `복수 선택 (${selectedIds.length}건)` : "단일 선택"}
@@ -422,7 +422,7 @@ export function RelationFieldInput({
                   <TableRow key={selectedId} className="text-xs">
                     {miniTableColumns.length === 0 ? (
                       <TableCell className="text-muted-foreground font-mono text-[11px]">
-                        {selectedId.slice(0, 8)}...
+                        {selectedId}
                       </TableCell>
                     ) : (
                       miniTableColumns.map((col, idx) => {
@@ -430,7 +430,7 @@ export function RelationFieldInput({
                         const cellText = row
                           ? formatRelationCellValue(rowData[col.id], col)
                           : idx === 0
-                            ? `${selectedId.slice(0, 8)}...`
+                            ? selectedId
                             : "-";
                         return (
                           <TableCell

@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   formatDate,
   formatDateTime,
+  formatDateToYmd,
   formatRelativeTime,
   formatUtc,
   nowUtcIso,
+  parseYmdToDate,
   toSafeDate,
   toUtcIso,
 } from "@/shared/lib/date";
@@ -105,6 +107,32 @@ describe("Date Utilities (shared/lib/date)", () => {
     it("null 또는 유효하지 않은 값이 전달되면 fallback을 반환해야 한다", () => {
       expect(formatRelativeTime(null)).toBe("-");
       expect(formatRelativeTime("invalid", "알 수 없음")).toBe("알 수 없음");
+    });
+  });
+
+  describe("formatDateToYmd & parseYmdToDate", () => {
+    it("formatDateToYmd는 로컬 Date 객체에서 타임존 왜곡 없이 YYYY-MM-DD 문자열을 추출해야 한다", () => {
+      const localDate = new Date(2026, 0, 5);
+      expect(formatDateToYmd(localDate)).toBe("2026-01-05");
+    });
+
+    it("parseYmdToDate는 유효한 YYYY-MM-DD 문자열을 로컬 Date 객체로 파싱하고 비정상 입력은 undefined를 반환해야 한다", () => {
+      const parsed = parseYmdToDate("2026-01-05");
+      expect(parsed).toBeInstanceOf(Date);
+      expect(parsed?.getFullYear()).toBe(2026);
+      expect(parsed?.getMonth()).toBe(0);
+      expect(parsed?.getDate()).toBe(5);
+
+      const leapYearParsed = parseYmdToDate("2024-02-29");
+      expect(leapYearParsed?.getFullYear()).toBe(2024);
+      expect(leapYearParsed?.getMonth()).toBe(1);
+      expect(leapYearParsed?.getDate()).toBe(29);
+
+      expect(parseYmdToDate("2026-02-29")).toBeUndefined();
+      expect(parseYmdToDate("2026-02-31")).toBeUndefined();
+      expect(parseYmdToDate("2026/01/05")).toBeUndefined();
+      expect(parseYmdToDate(undefined)).toBeUndefined();
+      expect(parseYmdToDate(12345)).toBeUndefined();
     });
   });
 });

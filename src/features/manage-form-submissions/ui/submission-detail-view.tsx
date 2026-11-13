@@ -3,10 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { ArrowLeft, Edit, Trash2, Calendar, Clock, FileText, Link2 } from "lucide-react";
-import type { CoreFormField } from "@/entities/form";
+import { formatFieldDisplayValue, PrimaryFieldBadge, type CoreFormField } from "@/entities/form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
-import { PrimaryFieldBadge } from "@/entities/form";
 import { Badge } from "@/shared/ui/badge";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
@@ -182,9 +181,7 @@ export function SubmissionDetailView({ formId, submissionId }: SubmissionDetailV
             Submission Detail
           </span>
           <span className="text-muted-foreground/60">•</span>
-          <span className="text-muted-foreground font-mono text-xs">
-            ID: {submission.id.slice(0, 8)}...
-          </span>
+          <span className="text-muted-foreground font-mono text-xs">ID: {submission.id}</span>
           {primaryDisplayValue && (
             <>
               <span className="text-muted-foreground/60">•</span>
@@ -253,16 +250,7 @@ export function SubmissionDetailView({ formId, submissionId }: SubmissionDetailV
               rawValue !== null &&
               rawValue !== "" &&
               (!Array.isArray(rawValue) || rawValue.length > 0);
-            const displayValue =
-              typeof rawValue === "boolean"
-                ? rawValue
-                  ? "예"
-                  : "아니오"
-                : Array.isArray(rawValue)
-                  ? rawValue.join(", ")
-                  : hasValue
-                    ? String(rawValue)
-                    : "-";
+            const displayValue = formatFieldDisplayValue(rawValue, field);
             const typeLabel = FIELD_TYPE_LABELS[field.type] ?? field.type;
             const relDetail = field.type === "relation" ? relationDetails[field.id] : undefined;
 
@@ -307,7 +295,7 @@ export function SubmissionDetailView({ formId, submissionId }: SubmissionDetailV
                       <div className="bg-muted/30 border-border/40 flex flex-wrap gap-1.5 rounded-md border p-3">
                         {relDetail.missingIds.map((missingId) => (
                           <Badge key={missingId} variant="outline" className="font-mono text-xs">
-                            {missingId.slice(0, 8)}...
+                            {missingId}
                           </Badge>
                         ))}
                       </div>

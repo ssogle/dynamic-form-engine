@@ -130,7 +130,7 @@ export function BuilderFormList() {
             ) : null}
             <div className="text-muted-foreground/80 mt-1 flex items-center justify-between text-[11px]">
               <span>
-                ID: {form.id.slice(0, 8)}...
+                ID: {form.id}
                 {form.publishedAt ? (
                   <span className="ml-2 font-medium text-emerald-600 dark:text-emerald-400">
                     · {formatDate(form.publishedAt)} 발행

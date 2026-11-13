@@ -187,7 +187,7 @@ function createDateFieldSchema(field: CoreFormField): z.ZodType {
         return;
       }
 
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+      if (!z.iso.date().safeParse(val).success) {
         ctx.addIssue({
           code: "custom",
           message: `${field.label} 항목은 YYYY-MM-DD 형식의 올바른 날짜여야 합니다.`,

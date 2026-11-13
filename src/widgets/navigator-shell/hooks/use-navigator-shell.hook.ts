@@ -21,6 +21,7 @@ import {
   useConsumerFormDraftStore,
   type FormSubmission,
 } from "@/entities/form-submission";
+import { toUtcIso } from "@/shared/lib/date";
 import { useNavigatorChatStore, type NavigatorChatMessage } from "../store/navigator-chat.store";
 import { NAVIGATOR_SHELL_CONFIGS, type NavigatorShellConfig } from "../lib/navigator-shell-config";
 
@@ -289,7 +290,7 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
           return {
             id: s.id,
             title: primaryVal ? `응답 #${idx + 1} (${primaryVal})` : `응답 #${idx + 1}`,
-            createdAt: s.createdAt ? new Date(s.createdAt).toISOString() : undefined,
+            createdAt: toUtcIso(s.createdAt) ?? undefined,
             summary: summaryKeys
               .slice(0, 3)
               .map((k) => `${k}: ${String(dataObj[k] ?? "")}`)

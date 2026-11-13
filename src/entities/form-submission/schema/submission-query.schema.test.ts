@@ -4,6 +4,7 @@ import {
   parseSortParam,
   parseFiltersParam,
   parseIdsParam,
+  normalizeUuidIds,
 } from "./submission-query.schema";
 
 describe("submissionQuerySchema (entities/form-submission/schema)", () => {
@@ -94,5 +95,37 @@ describe("parseIdsParam", () => {
     expect(parseIdsParam(undefined)).toEqual([]);
     expect(parseIdsParam("")).toEqual([]);
     expect(parseIdsParam("not-a-uuid,123")).toEqual([]);
+  });
+});
+
+describe("normalizeUuidIds", () => {
+  const validUuidLower = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
+  const validUuidUpper = "A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11";
+  const anotherUuid = "22222222-2222-4222-a222-222222222222";
+  const nilUuid = "00000000-0000-0000-0000-000000000000";
+  const nonRfcHexUuid = "00000000-0000-0000-0000-000000000001";
+
+  it("대소문자 무관하게 RFC 표준 UUID 및 Nil UUID만 공백 제거·중복 제거하여 추출해야 한다", () => {
+    expect(
+      normalizeUuidIds([
+        "sub-1",
+        ` ${validUuidLower} `,
+        nonRfcHexUuid,
+        validUuidUpper,
+        nilUuid,
+        anotherUuid,
+        validUuidLower,
+        "",
+        null,
+      ])
+    ).toEqual([validUuidLower, validUuidUpper, nilUuid, anotherUuid]);
+  });
+
+  it("단일 문자열 입력 및 비정상 입력을 안전하게 처리해야 한다", () => {
+    expect(normalizeUuidIds(` ${validUuidLower} `)).toEqual([validUuidLower]);
+    expect(normalizeUuidIds("invalid-id")).toEqual([]);
+    expect(normalizeUuidIds(nonRfcHexUuid)).toEqual([]);
+    expect(normalizeUuidIds(undefined)).toEqual([]);
+    expect(normalizeUuidIds(null)).toEqual([]);
   });
 });

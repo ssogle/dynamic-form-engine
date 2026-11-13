@@ -53,6 +53,8 @@ export {
   useDeleteSubmissionMutation,
 } from "./queries/use-form-submissions.mutation";
 
+export { extractSubmissionPayload } from "./lib/extract-submission-payload";
+
 export {
   useConsumerFormDraftStore,
   type ConsumerFormDraftState,

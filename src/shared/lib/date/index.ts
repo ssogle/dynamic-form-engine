@@ -7,9 +7,11 @@
 export {
   formatDate,
   formatDateTime,
+  formatDateToYmd,
   formatRelativeTime,
   formatUtc,
   nowUtcIso,
+  parseYmdToDate,
   toSafeDate,
   toUtcIso,
   type DateInput,

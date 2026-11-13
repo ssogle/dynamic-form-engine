@@ -3,14 +3,27 @@ import { z } from "zod";
 import { findFormById } from "@/entities/form/server";
 import { extractActiveFields, validateSubmissionData } from "@/entities/form";
 import { findSubmissionsPaginated, insertSubmission } from "@/entities/form-submission/server";
-import { submissionQuerySchema } from "@/entities/form-submission";
-import { apiResponse, badRequest, notFound, withErrorHandler } from "@/shared/lib/http";
+import { extractSubmissionPayload, submissionQuerySchema } from "@/entities/form-submission";
+import {
+  apiResponse,
+  badRequest,
+  notFound,
+  parseRequestData,
+  withErrorHandler,
+} from "@/shared/lib/http";
 
 interface RouteContext {
   params: Promise<{
     id: string;
   }>;
 }
+
+/**
+ * 폼 응답 라우트 경로 파라미터 검증 스키마
+ */
+const formRouteParamsSchema = z.object({
+  id: z.uuid("올바른 폼 ID(UUID) 형식이 아닙니다."),
+});
 
 /**
  * GET /api/v1/forms/[id]/submissions
@@ -23,7 +36,11 @@ interface RouteContext {
  * @returns 200 OK와 함께 PaginatedSubmissionsResponse 객체 반환
  */
 export const GET = withErrorHandler(async (req: NextRequest, context: RouteContext) => {
-  const { id } = await context.params;
+  const { id } = parseRequestData(
+    formRouteParamsSchema,
+    await context.params,
+    "올바른 폼 ID(UUID) 형식이 아닙니다."
+  );
 
   // 1. 대상 폼 존재 여부 확인 (UUID)
   const form = await findFormById(id);
@@ -42,17 +59,14 @@ export const GET = withErrorHandler(async (req: NextRequest, context: RouteConte
     ...(filtersParam !== null ? { filters: filtersParam } : {}),
     ...(idsParam !== null ? { ids: idsParam } : {}),
   };
-  const parsed = submissionQuerySchema.safeParse(rawQuery);
-
-  if (!parsed.success) {
-    throw badRequest(
-      "요청 쿼리 매개변수가 올바르지 않습니다.",
-      z.flattenError(parsed.error).fieldErrors
-    );
-  }
+  const query = parseRequestData(
+    submissionQuerySchema,
+    rawQuery,
+    "요청 쿼리 매개변수가 올바르지 않습니다."
+  );
 
   // 3. 폼의 실제 UUID(form.id)를 기반으로 페이지네이션 응답 조회
-  const paginatedResult = await findSubmissionsPaginated(form.id, parsed.data);
+  const paginatedResult = await findSubmissionsPaginated(form.id, query);
   return apiResponse.ok(paginatedResult);
 });
 
@@ -69,7 +83,11 @@ export const GET = withErrorHandler(async (req: NextRequest, context: RouteConte
  * @returns 201 Created와 함께 영속화된 단일 FormSubmission 객체 반환
  */
 export const POST = withErrorHandler(async (req: NextRequest, context: RouteContext) => {
-  const { id } = await context.params;
+  const { id } = parseRequestData(
+    formRouteParamsSchema,
+    await context.params,
+    "올바른 폼 ID(UUID) 형식이 아닙니다."
+  );
 
   // 1. 대상 폼 조회 및 발행 상태 검증 (UUID)
   const form = await findFormById(id);
@@ -83,15 +101,7 @@ export const POST = withErrorHandler(async (req: NextRequest, context: RouteCont
 
   // 2. 요청 본문 파싱 (래핑된 { data: {...} } 형태와 직접 Key-Value 형태 모두 호환)
   const body: unknown = await req.json();
-  let rawData: Record<string, unknown> = {};
-
-  if (body !== null && typeof body === "object") {
-    if ("data" in body && body.data !== null && typeof body.data === "object") {
-      rawData = body.data as Record<string, unknown>;
-    } else {
-      rawData = body as Record<string, unknown>;
-    }
-  }
+  const rawData = extractSubmissionPayload(body);
 
   // 3. 폼 필드 스키마 기반 런타임 동적 Zod 유효성 검증
   const fields = extractActiveFields(form);

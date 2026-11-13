@@ -151,9 +151,9 @@ describe("relation-summary (features/manage-form-submissions/lib)", () => {
       expect(formatRelationSummaryCell([], multiRelField, lookup)).toBe("-");
     });
 
-    it("타깃 레코드가 아직 조회되지 않았거나 삭제된 경우 축약 UUID로 안전하게 폴백해야 한다", () => {
+    it("타깃 레코드가 아직 조회되지 않았거나 삭제된 경우 전체 UUID로 안전하게 폴백해야 한다", () => {
       const lookup = buildRelationLookupMap([targetForm], targetSubmissions);
-      expect(formatRelationSummaryCell(subMissingId, singleRelField, lookup)).toBe("cccc3333...");
+      expect(formatRelationSummaryCell(subMissingId, singleRelField, lookup)).toBe(subMissingId);
     });
   });
 

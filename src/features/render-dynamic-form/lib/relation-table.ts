@@ -1,10 +1,11 @@
 import {
-  extractActiveFields,
-  extractPrimaryFieldId,
+  formatFieldDisplayValue,
+  orderFieldsWithPrimaryFirst,
   type ActiveForm,
   type CoreFormField,
   type Form,
 } from "@/entities/form";
+import { normalizeStringIds } from "@/shared/lib/normalize";
 
 /**
  * 관계형 필드의 폼 값(단일 UUID 문자열 또는 다중 UUID 배열)을
@@ -15,21 +16,7 @@ import {
  * @returns 정규화된 타깃 레코드 ID 배열
  */
 export function normalizeSelectedRelationIds(value: unknown, multiple: boolean): string[] {
-  const uniqueIds: string[] = [];
-  const seen = new Set<string>();
-
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      if (typeof item === "string" && item.trim().length > 0 && !seen.has(item)) {
-        seen.add(item);
-        uniqueIds.push(item);
-      }
-    }
-  } else if (typeof value === "string" && value.trim().length > 0) {
-    uniqueIds.push(value);
-  }
-
-  return multiple ? uniqueIds : uniqueIds.slice(0, 1);
+  return normalizeStringIds(value, { maxItems: multiple ? undefined : 1 });
 }
 
 /**
@@ -80,22 +67,7 @@ export function removeRelationSelection(params: {
  * @returns 대표 필드가 최우선 정렬된 CoreFormField 배열
  */
 export function orderTargetColumns(targetForm?: Form | ActiveForm | null): CoreFormField[] {
-  const activeFields = extractActiveFields(targetForm);
-  if (activeFields.length === 0) {
-    return [];
-  }
-
-  const primaryFieldId = extractPrimaryFieldId(targetForm);
-  if (!primaryFieldId) {
-    return activeFields;
-  }
-
-  const primaryField = activeFields.find((f) => f.id === primaryFieldId);
-  if (!primaryField) {
-    return activeFields;
-  }
-
-  return [primaryField, ...activeFields.filter((f) => f.id !== primaryFieldId)];
+  return orderFieldsWithPrimaryFirst(targetForm);
 }
 
 /**
@@ -106,35 +78,7 @@ export function orderTargetColumns(targetForm?: Form | ActiveForm | null): CoreF
  * @returns 셀에 렌더링할 포맷팅된 문자열
  */
 export function formatRelationCellValue(rawVal: unknown, field: CoreFormField): string {
-  if (rawVal === undefined || rawVal === null || rawVal === "") {
-    return "-";
-  }
-
-  if (typeof rawVal === "boolean") {
-    return rawVal ? "예" : "아니오";
-  }
-
-  if (Array.isArray(rawVal)) {
-    if (rawVal.length === 0) return "-";
-    const optionMap = new Map(
-      (field.options ?? []).map((opt) =>
-        typeof opt === "string" ? [opt, opt] : [opt.value, opt.label]
-      )
-    );
-    return rawVal.map((item) => optionMap.get(String(item)) ?? String(item)).join(", ");
-  }
-
-  const strVal = String(rawVal);
-  if (field.options && field.options.length > 0) {
-    const matched = field.options.find((opt) =>
-      typeof opt === "string" ? opt === strVal : opt.value === strVal
-    );
-    if (matched) {
-      return typeof matched === "string" ? matched : matched.label;
-    }
-  }
-
-  return strVal;
+  return formatFieldDisplayValue(rawVal, field);
 }
 
 /**

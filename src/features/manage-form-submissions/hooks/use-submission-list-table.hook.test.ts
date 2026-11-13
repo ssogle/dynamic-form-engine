@@ -280,4 +280,83 @@ describe("useSubmissionListTable (features/manage-form-submissions/hooks)", () =
     expect(mockGetFormDetail).toHaveBeenCalledWith(targetFormId);
     expect(mockGetFormSubmissionsByIds).toHaveBeenCalledWith(targetFormId, [subAId, subBId]);
   });
+
+  it("select 및 checkbox 필드의 셀 렌더링 시 내부 코드값 대신 옵션의 한글 라벨(비활성 옵션 포함)을 표시해야 한다", () => {
+    const formWithOptions: Form = {
+      ...dummyForm,
+      schemaDefinition: {
+        primaryFieldId: "field-priority",
+        fields: [
+          {
+            id: "field-priority",
+            label: "우선순위",
+            type: "select",
+            required: true,
+            description: "긴급도 구분",
+            options: [
+              { label: "긴급", value: "HIGH", description: "즉시 처리", disabled: false },
+              { label: "과거보류", value: "LEGACY_HOLD", description: "폐기 옵션", disabled: true },
+            ],
+          },
+          {
+            id: "field-tags",
+            label: "비용 항목",
+            type: "checkbox",
+            required: false,
+            description: "복수 항목 선택",
+            options: [
+              { label: "식대", value: "MEAL", description: "식비", disabled: false },
+              { label: "교통비", value: "TAXI", description: "이동비", disabled: false },
+            ],
+          },
+        ],
+      },
+    };
+
+    mockUseInfiniteQuery.mockReturnValue({
+      data: {
+        pages: [
+          {
+            items: [
+              {
+                id: "sub-opt-1",
+                formId: "form-uuid-1",
+                data: { "field-priority": "LEGACY_HOLD", "field-tags": ["MEAL", "TAXI"] },
+                createdAt: new Date("2026-01-01T00:00:00Z"),
+                updatedAt: new Date("2026-01-01T00:00:00Z"),
+                deletedAt: null,
+              },
+            ],
+            totalCount: 1,
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      isFetchingNextPage: false,
+      hasNextPage: false,
+      fetchNextPage: mockFetchNextPage,
+    });
+
+    const { result } = renderHook(() => useSubmissionListTable({ form: formWithOptions }), {
+      wrapper: createWrapper(),
+    });
+
+    const cells = result.current.table.getRowModel().rows[0]?.getVisibleCells() ?? [];
+    const priorityCell = cells.find((c) => c.column.id === "field-priority");
+    const tagsCell = cells.find((c) => c.column.id === "field-tags");
+
+    const renderCellTitle = (cell: typeof priorityCell) => {
+      const cellDef = cell?.column.columnDef.cell;
+      const el =
+        typeof cellDef === "function"
+          ? (cellDef(cell!.getContext()) as React.ReactElement<{ title?: string }>)
+          : undefined;
+      return el?.props.title;
+    };
+
+    expect(renderCellTitle(priorityCell)).toBe("과거보류");
+    expect(renderCellTitle(tagsCell)).toBe("식대, 교통비");
+  });
 });

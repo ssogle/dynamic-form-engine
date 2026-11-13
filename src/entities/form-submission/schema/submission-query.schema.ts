@@ -1,7 +1,11 @@
 import { z } from "zod";
+import { normalizeStringIds } from "@/shared/lib/normalize";
 import type { FormSubmission } from "./form-submission.schema";
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/**
+ * RFC 4122/9562 표준 UUID 검증용 내부 Zod 스키마
+ */
+const uuidSchema = z.uuid();
 
 /**
  * 폼 응답 목록 페이징, 멀티 정렬, 컬럼 필터, 배치 ID 조회 요청 쿼리 Zod 스키마
@@ -89,6 +93,18 @@ export function parseFiltersParam(filtersStr?: string): Record<string, string> {
 }
 
 /**
+ * 단일 문자열 또는 문자열 배열 입력을 정규화한 뒤 RFC 4122/9562 표준 UUID만 추출합니다.
+ *
+ * 공백·빈 문자열·중복을 먼저 제거한 뒤 Zod 내장 UUID 검증기(`z.uuid()`)로 비표준 토큰을 걸러냅니다.
+ *
+ * @param rawVal 단일 UUID 문자열, UUID 배열 또는 알 수 없는 원시 값
+ * @returns 검증 및 중복 제거된 UUID 문자열 배열
+ */
+export function normalizeUuidIds(rawVal: unknown): string[] {
+  return normalizeStringIds(rawVal).filter((id) => uuidSchema.safeParse(id).success);
+}
+
+/**
  * 쉼표(,)로 구분된 응답 ID 쿼리 문자열을 공백 제거·UUID 검증·중복 제거하여 배열로 파싱합니다.
  *
  * 관계형 필드(relation)가 선택한 타깃 레코드가 1페이지 밖에 존재하더라도
@@ -102,14 +118,7 @@ export function parseIdsParam(idsStr?: string): string[] {
     return [];
   }
 
-  const uniqueIds = new Set<string>();
-  for (const part of idsStr.split(",")) {
-    const trimmed = part.trim();
-    if (trimmed.length > 0 && UUID_PATTERN.test(trimmed)) {
-      uniqueIds.add(trimmed);
-    }
-  }
-  return Array.from(uniqueIds);
+  return normalizeUuidIds(idsStr.split(","));
 }
 
 /**
