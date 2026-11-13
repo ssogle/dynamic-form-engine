@@ -14,37 +14,25 @@ import {
 } from "@/shared/ui/card";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { formatDate } from "@/shared/lib/date";
-import { useDeleteFormMutation, useFormsQuery, usePublishFormMutation } from "@/entities/form";
+import { useBuilderFormList } from "../hooks/use-builder-form-list.hook";
 
 /**
  * 빌더 전용 폼 목록 열람 및 소프트 삭제 기능 컴포넌트 (BuilderFormList)
  *
- * 데이터베이스에 저장된 모든 활성 폼의 슬러그, 메타데이터, 발행 상태를 카드 형태로 표시하며,
- * 특정 폼의 편집 캔버스로 진입하거나 폼을 소프트 삭제하는 관리 유스케이스를 온전히 제공합니다.
+ * 데이터베이스에 저장된 모든 활성 폼의 슬러그, 메타데이터, 발행 상태를 카드 형태로 표시합니다.
+ * 비즈니스 로직(목록 쿼리, 발행 상태 토글, 삭제 뮤테이션 등)은 useBuilderFormList 훅에 전담 위임하는 순수 얇은 뷰(Thin View)입니다.
  */
 export function BuilderFormList() {
-  const { data: forms, isLoading, isError, error } = useFormsQuery();
-  const deleteFormMutation = useDeleteFormMutation();
-  const publishFormMutation = usePublishFormMutation();
-
-  /**
-   * 폼 발행 상태 토글 핸들러
-   *
-   * @param id 대상 폼 고유 식별자(UUID)
-   * @param isPublished 변경할 발행 상태 (true: 발행, false: 초안 회수)
-   */
-  const handleTogglePublish = (id: string, isPublished: boolean) => {
-    publishFormMutation.mutate({ id, isPublished });
-  };
-
-  /**
-   * 폼 소프트 삭제 핸들러
-   *
-   * @param id 삭제 대상 폼의 고유 식별자(UUID)
-   */
-  const handleDeleteForm = (id: string) => {
-    deleteFormMutation.mutate(id);
-  };
+  const {
+    forms,
+    isLoading,
+    isError,
+    error,
+    isPublishPending,
+    isDeletePending,
+    handleTogglePublish,
+    handleDeleteForm,
+  } = useBuilderFormList();
 
   /* 1. 로딩 상태: shadcn Skeleton 컴포넌트 활용 */
   if (isLoading) {
@@ -142,7 +130,7 @@ export function BuilderFormList() {
             ) : null}
             <div className="text-muted-foreground/80 mt-1 flex items-center justify-between text-[11px]">
               <span>
-                ID: {form.id.slice(0, 8)}...
+                ID: {form.id}
                 {form.publishedAt ? (
                   <span className="ml-2 font-medium text-emerald-600 dark:text-emerald-400">
                     · {formatDate(form.publishedAt)} 발행
@@ -156,7 +144,7 @@ export function BuilderFormList() {
                   size="xs"
                   variant={form.publishedAt ? "outline" : "default"}
                   onClick={() => handleTogglePublish(form.id, !form.publishedAt)}
-                  disabled={publishFormMutation.isPending}
+                  disabled={isPublishPending}
                 >
                   {form.publishedAt ? "발행 취소" : "발행"}
                 </Button>
@@ -168,7 +156,7 @@ export function BuilderFormList() {
                   variant="ghost"
                   className="text-destructive hover:text-destructive"
                   onClick={() => handleDeleteForm(form.id)}
-                  disabled={deleteFormMutation.isPending}
+                  disabled={isDeletePending}
                 >
                   삭제
                 </Button>

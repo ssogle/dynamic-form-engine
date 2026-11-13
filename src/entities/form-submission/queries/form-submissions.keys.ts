@@ -18,4 +18,12 @@ export const formSubmissionsKeys = {
       | undefined
   ) => [...formSubmissionsKeys.all, "infinite", formId, params ?? {}] as const,
   detail: (id: string) => [...formSubmissionsKeys.all, "detail", id] as const,
+  byIds: (formId: string, ids: string[]) =>
+    [
+      ...formSubmissionsKeys.all,
+      "byIds",
+      formId,
+      Array.from(new Set(ids.filter(Boolean))).sort(),
+    ] as const,
+  related: (targetId: string) => [...formSubmissionsKeys.all, "related", targetId] as const,
 };

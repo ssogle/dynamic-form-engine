@@ -1,5 +1,6 @@
 import { format, formatDistanceToNow, isValid } from "date-fns";
 import { ko } from "date-fns/locale";
+import { z } from "zod";
 
 /**
  * 날짜 포맷팅 입력 지원 타입
@@ -118,4 +119,55 @@ export function formatUtc(
     .replace("HH", hours)
     .replace("mm", minutes)
     .replace("ss", seconds);
+}
+
+/**
+ * 순수 달력 일자(YYYY-MM-DD) 검증용 내부 Zod ISO Date 스키마
+ */
+const ymdDateSchema = z.iso.date();
+
+/**
+ * Date 객체에서 타임존 왜곡 없이 'YYYY-MM-DD' 순수 일자 문자열을 추출합니다.
+ *
+ * @param date 로컬 기준 Date 객체
+ * @returns YYYY-MM-DD 문자열
+ */
+export function formatDateToYmd(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * 'YYYY-MM-DD' 문자열을 실제 달력 유효성(윤년/월말 초과 포함) 검증 후 로컬 Date 객체로 파싱합니다.
+ *
+ * @param ymd 'YYYY-MM-DD' 형식의 날짜 문자열
+ * @returns 유효한 로컬 Date 객체 또는 파싱 실패 시 undefined
+ */
+export function parseYmdToDate(ymd?: unknown): Date | undefined {
+  if (typeof ymd !== "string" || !ymdDateSchema.safeParse(ymd).success) {
+    return undefined;
+  }
+
+  const [yearStr, monthStr, dayStr] = ymd.split("-");
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+
+  if (!year || !month || !day) {
+    return undefined;
+  }
+
+  const parsed = new Date(year, month - 1, day);
+  // JS Date의 자동 이월(예: 2월 31일 -> 3월 3일)을 차단합니다.
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return undefined;
+  }
+
+  return parsed;
 }

@@ -70,6 +70,9 @@ export interface DynamicFieldProps {
   /** 코어 폼 필드 정의 메타데이터 */
   field: CoreFormField;
 
+  /** 도메인의 대표 식별 필드 여부 */
+  isPrimary?: boolean | undefined;
+
   /** 현재 필드가 선택되었는지 여부 */
   isSelected?: boolean | undefined;
 

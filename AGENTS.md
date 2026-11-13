@@ -43,10 +43,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - 코드를 작성하거나 수정할 때는 주요 인터페이스, 함수, 클래스, 복잡한 비즈니스 분기에 대해 **동작 원리와 목적을 설명하는 상세한 주석(JSDoc 및 인라인 설명)**을 반드시 포함하세요.
 - 다른 개발자나 사용자가 코드만 보고도 의도와 역할을 즉시 이해할 수 있도록 명확하게 서술하세요.
 
-### 5) UI 컴포넌트 재사용 및 시스템 팝업 금지 원칙
+### 5) UI 컴포넌트 재사용, 레지스트리 검증 및 시스템 팝업 금지 원칙
 
 - 새로운 태그나 임의의 UI를 바로 작성하지 말고, 반드시 `@/shared/ui` 디렉터리에 이미 존재하는 컴포넌트(shadcn/ui 기반)를 최우선으로 재사용하세요.
-- 필요한 컴포넌트(예: Slider, Popover 등)가 없다면 임의로 만들지 말고, 사용자에게 `npx shadcn@latest add [컴포넌트명]` 실행을 먼저 제안하세요.
+- 필요한 컴포넌트가 `@/shared/ui`에 없다면 임의로 만들지 말고, **반드시 shadcn 공식 레지스트리 단일 진실 원천(`https://ui.shadcn.com/r/index.json`)을 사전 조회**하여 공식 명칭(예: `combobox`, `radio-group`, `calendar`, `switch`, `separator` 등)과 의존성을 확인한 후 사용자에게 `npx shadcn@latest add [컴포넌트명]` 실행을 먼저 제안하세요. (과거 기억이나 임의 추측에 의한 컴포넌트 안내를 엄격히 금지합니다)
 - **브라우저 기본 시스템 팝업(`window.alert`, `window.confirm`, `window.prompt`)의 사용을 엄격히 금지**하며, 사용자 확인/알림 인터랙션은 반드시 `@/shared/ui`의 `Popover`(국소적/인라인 확인) 또는 `Dialog`(전역/모달 확인) 컴포넌트를 사용하세요.
 
 ### 6) FSD 기능 우선(Feature-First) 및 진화적 라이프사이클 준수
@@ -102,7 +102,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | :--------------------------- | :--------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------- |
 | **아키텍처 & 네이밍**        | [.agents/rules/fsd-architecture-rule.md](.agents/rules/fsd-architecture-rule.md)               | FSD 레이어 계층, kebab-case 파일/폴더 네이밍, Public API               |
 | **코딩 패러다임**            | [.agents/rules/coding-paradigm-rule.md](.agents/rules/coding-paradigm-rule.md)                 | 함수형 지향, class/this 금지, { data, error } Result 패턴              |
-| **테스트 전략 (TDD)**        | [.agents/rules/testing-strategy-rule.md](.agents/rules/testing-strategy-rule.md)               | ROI 중심 테스트, 테스트 대상(도메인/인터랙션) vs 제외 대상             |
+| **테스트 전략 (TDD)**        | [.agents/rules/testing-strategy-rule.md](.agents/rules/testing-strategy-rule.md)               | ROI 중심 로직 TDD, UI 테스트 배제 및 비즈니스 로직 단위 검증 집중      |
 | **UI & 스타일링**            | [.agents/rules/ui-and-styling-rule.md](.agents/rules/ui-and-styling-rule.md)                   | shadcn/ui 재사용, Tailwind v4 시맨틱 토큰, 배럴 파일 금지              |
 | **스펙 주도 개발 (SDD)**     | [.agents/rules/spec-driven-development-rule.md](.agents/rules/spec-driven-development-rule.md) | 5단계 SDD 라이프사이클, TEMPLATE 기반 스펙, 아카이브 가드레일          |
 | **Git 워크플로우 & 커밋/PR** | [.agents/rules/git-commit-automation-rule.md](.agents/rules/git-commit-automation-rule.md)     | GitHub Flow, PR 템플릿 준수, 머지 후 브랜치 삭제, Conventional Commits |
@@ -126,7 +126,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 에이전트는 코드 작성을 마친 후 사용자에게 보고하기 전에, 반드시 터미널에서 통합 검증 스크립트를 실행하여 **결함 0건**을 확인해야 합니다:
 
 ```bash
-# [올인원 검증] 타입체크 -> 린트 -> 포맷체크 -> 단위/컴포넌트 테스트 전체 자동 완주
+# [올인원 검증] 타입체크 -> 린트 -> 포맷체크 -> 비즈니스 로직 단위 테스트 전체 자동 완주
 npm run verify
 
 # (참고) 서식 어긋남 발생 시 자동 교정

@@ -7,3 +7,4 @@
 
 export { forms, type FormSchemaDefinition } from "./forms.table";
 export { formSubmissions } from "./form-submissions.table";
+export { relations, type RelationRecord, type InsertRelationRecord } from "./relations.table";

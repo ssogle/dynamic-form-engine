@@ -19,8 +19,8 @@ vi.mock("@/entities/form-submission/server", () => ({
 }));
 
 describe("Route Handler: /api/v1/forms/[id]/submissions/[submissionId]", () => {
-  const formId = "00000000-0000-0000-0000-000000000001";
-  const submissionId = "sub-uuid-1234";
+  const formId = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
+  const submissionId = "11111111-1111-4111-a111-111111111111";
   const mockContext = {
     params: Promise.resolve({ id: formId, submissionId }),
   };
@@ -36,12 +36,14 @@ describe("Route Handler: /api/v1/forms/[id]/submissions/[submissionId]", () => {
           label: "지원자 이름",
           type: "text",
           required: true,
+          description: "지원자의 성명을 입력합니다.",
         },
         {
           id: "yearsOfExperience",
           label: "경력 연수",
           type: "number",
           required: true,
+          description: "관련 실무 경력 연차를 입력합니다.",
         },
       ],
     },
@@ -76,7 +78,7 @@ describe("Route Handler: /api/v1/forms/[id]/submissions/[submissionId]", () => {
     it("응답의 formId가 경로의 id와 일치하지 않는 경우 404 Not Found를 반환해야 한다", async () => {
       mockFindSubmissionById.mockResolvedValueOnce({
         ...mockSubmission,
-        formId: "other-form-id",
+        formId: "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22",
       });
 
       const request = new NextRequest(
@@ -85,6 +87,19 @@ describe("Route Handler: /api/v1/forms/[id]/submissions/[submissionId]", () => {
       const response = await GET(request, mockContext);
 
       expect(response.status).toBe(404);
+    });
+
+    it("경로 파라미터가 유효한 UUID가 아니면 DB 조회 없이 400 Bad Request를 반환해야 한다", async () => {
+      const request = new NextRequest(
+        `http://localhost:3000/api/v1/forms/${formId}/submissions/invalid-sub-id`
+      );
+      const response = await GET(request, {
+        params: Promise.resolve({ id: formId, submissionId: "invalid-sub-id" }),
+      });
+
+      expect(response.status).toBe(400);
+      expect(mockFindFormById).not.toHaveBeenCalled();
+      expect(mockFindSubmissionById).not.toHaveBeenCalled();
     });
 
     it("유효한 응답인 경우 200 OK와 함께 응답 데이터를 반환해야 한다", async () => {
@@ -148,6 +163,26 @@ describe("Route Handler: /api/v1/forms/[id]/submissions/[submissionId]", () => {
       expect(json.success).toBe(true);
       expect(json.data.data.yearsOfExperience).toBe(5);
     });
+
+    it("경로 파라미터가 유효한 UUID가 아니면 DB 수정 없이 400 Bad Request를 반환해야 한다", async () => {
+      const request = new NextRequest(
+        `http://localhost:3000/api/v1/forms/${formId}/submissions/invalid-sub-id`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            data: { applicantName: "홍길동", yearsOfExperience: 5 },
+          }),
+        }
+      );
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: formId, submissionId: "invalid-sub-id" }),
+      });
+
+      expect(response.status).toBe(400);
+      expect(mockFindFormById).not.toHaveBeenCalled();
+      expect(mockUpdateSubmissionById).not.toHaveBeenCalled();
+    });
   });
 
   describe("DELETE /api/v1/forms/[id]/submissions/[submissionId] (응답 소프트 삭제)", () => {
@@ -181,6 +216,20 @@ describe("Route Handler: /api/v1/forms/[id]/submissions/[submissionId]", () => {
       const json = await response.json();
       expect(json.success).toBe(true);
       expect(mockSoftDeleteSubmissionById).toHaveBeenCalledWith(submissionId);
+    });
+
+    it("경로 파라미터가 유효한 UUID가 아니면 DB 삭제 없이 400 Bad Request를 반환해야 한다", async () => {
+      const request = new NextRequest(
+        `http://localhost:3000/api/v1/forms/invalid-form-id/submissions/${submissionId}`,
+        { method: "DELETE" }
+      );
+      const response = await DELETE(request, {
+        params: Promise.resolve({ id: "invalid-form-id", submissionId }),
+      });
+
+      expect(response.status).toBe(400);
+      expect(mockFindFormById).not.toHaveBeenCalled();
+      expect(mockSoftDeleteSubmissionById).not.toHaveBeenCalled();
     });
   });
 });

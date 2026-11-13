@@ -73,8 +73,13 @@ export function formatConsumerContextPrompt(
     currentFieldsSummary = currentContext.availableFields
       .map((f) => {
         const req = f.required ? "필수" : "선택";
-        const opts = f.options && f.options.length > 0 ? ` [선택지: ${f.options.join(", ")}]` : "";
-        return `  * ${f.id} (라벨: "${f.label}", 타입: ${f.type}, ${req})${opts}`;
+        const activeOptions = (f.options ?? []).filter((opt) => !opt.disabled);
+        const opts =
+          activeOptions.length > 0
+            ? ` [선택지: ${activeOptions.map((opt) => `${opt.label}(${opt.value}): ${opt.description}`).join(" | ")}]`
+            : "";
+        const desc = f.description ? ` — 설명: ${f.description}` : "";
+        return `  * ${f.id} (라벨: "${f.label}", 타입: ${f.type}, ${req})${opts}${desc}`;
       })
       .join("\n");
   }

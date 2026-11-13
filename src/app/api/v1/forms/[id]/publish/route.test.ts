@@ -19,7 +19,15 @@ describe("Route Handler: POST /api/v1/forms/[id]/publish", () => {
     title: "개발자 채용 지원서",
     description: "멋진 팀에 합류하세요.",
     schemaDefinition: {
-      fields: [{ id: "f1", type: "text", label: "이름", required: true }],
+      fields: [
+        {
+          id: "f1",
+          type: "text",
+          label: "이름",
+          required: true,
+          description: "지원자의 성명을 입력합니다.",
+        },
+      ],
     },
     publishedAt: null,
     createdAt: new Date("2026-01-01T00:00:00Z"),
@@ -136,5 +144,20 @@ describe("Route Handler: POST /api/v1/forms/[id]/publish", () => {
 
     const response = await POST(request, validContext);
     expect(response.status).toBe(400);
+  });
+
+  it("경로 파라미터 id가 유효한 UUID가 아니면 DB 조회 없이 400 Bad Request를 반환해야 한다", async () => {
+    const request = new NextRequest("http://localhost:3000/api/v1/forms/invalid-id/publish", {
+      method: "POST",
+      body: JSON.stringify({ isPublished: true }),
+    });
+
+    const response = await POST(request, {
+      params: Promise.resolve({ id: "invalid-id" }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(mockFindFormById).not.toHaveBeenCalled();
+    expect(mockPublishFormById).not.toHaveBeenCalled();
   });
 });

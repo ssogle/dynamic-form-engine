@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
-import { apiResponse, withErrorHandler } from "./server";
+import { z } from "zod";
+import { apiResponse, parseRequestData, withErrorHandler } from "./server";
 import { notFound, badRequest } from "./errors";
 
 describe("HTTP Server Utilities (apiResponse & withErrorHandler)", () => {
@@ -53,5 +54,30 @@ describe("HTTP Server Utilities (apiResponse & withErrorHandler)", () => {
     expect(json.error.code).toBe("BAD_REQUEST");
     expect(json.error.message).toBe("잘못된 필드 값입니다.");
     expect(json.error.details).toEqual({ field: "title" });
+  });
+
+  describe("parseRequestData", () => {
+    const schema = z.object({
+      id: z.uuid("유효한 UUID가 아닙니다."),
+    });
+
+    it("스키마 검증 통과 시 파싱된 데이터를 반환해야 한다", () => {
+      const validId = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
+      const parsed = parseRequestData(schema, { id: validId }, "요청 파라미터가 잘못되었습니다.");
+      expect(parsed).toEqual({ id: validId });
+    });
+
+    it("스키마 검증 실패 시 400 BAD_REQUEST HttpErrorObject(details 포함)를 던져야 한다", () => {
+      expect(() =>
+        parseRequestData(schema, { id: "not-a-uuid" }, "올바른 식별자가 필요합니다.")
+      ).toThrow("올바른 식별자가 필요합니다.");
+
+      try {
+        parseRequestData(schema, { id: "not-a-uuid" }, "올바른 식별자가 필요합니다.");
+      } catch (err) {
+        const res = apiResponse.fail(err);
+        expect(res.status).toBe(400);
+      }
+    });
   });
 });

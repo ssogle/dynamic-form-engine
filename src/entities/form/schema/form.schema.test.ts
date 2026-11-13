@@ -3,12 +3,21 @@ import { insertFormSchema, selectFormSchema, updateFormSchema } from "./form.sch
 
 describe("Form Schema Validation Engine", () => {
   describe("insertFormSchema (폼 신규 생성 검증)", () => {
-    it("올바른 폼 메타데이터가 주어지면 검증을 통과해야 한다", () => {
+    it("올바른 폼 메타데이터(primaryFieldId 및 1개 이상 활성 필드 포함)가 주어지면 검증을 통과해야 한다", () => {
       const validPayload = {
         title: "일일 업무 보고서",
         description: "일일 업무 내역을 기록하는 폼입니다.",
         schemaDefinition: {
-          fields: [{ id: "taskName", type: "text", label: "업무명", required: true }],
+          primaryFieldId: "taskName",
+          fields: [
+            {
+              id: "taskName",
+              type: "text",
+              label: "업무명",
+              required: true,
+              description: "수행한 업무의 제목을 입력합니다.",
+            },
+          ],
         },
       };
 
@@ -16,14 +25,64 @@ describe("Form Schema Validation Engine", () => {
       expect(result.success).toBe(true);
     });
 
-    it("선택 항목인 description이 누락되어도 검증을 통과해야 한다", () => {
+    it("선택 항목인 description이 누락되어도 유효한 fields 및 primaryFieldId가 있으면 검증을 통과해야 한다", () => {
       const validPayloadWithoutDesc = {
         title: "간단 폼",
-        schemaDefinition: { fields: [] },
+        schemaDefinition: {
+          primaryFieldId: "f_title",
+          fields: [
+            {
+              id: "f_title",
+              type: "text",
+              label: "제목",
+              required: true,
+              description: "항목의 대표 제목을 입력합니다.",
+            },
+          ],
+        },
       };
 
       const result = insertFormSchema.safeParse(validPayloadWithoutDesc);
       expect(result.success).toBe(true);
+    });
+
+    it("필드가 비어있거나 primaryFieldId가 누락/유효하지 않으면 검증에 실패해야 한다", () => {
+      const emptyFieldsPayload = {
+        title: "빈 폼",
+        schemaDefinition: { primaryFieldId: "f_1", fields: [] },
+      };
+      const missingPrimaryPayload = {
+        title: "대표 필드 없는 폼",
+        schemaDefinition: {
+          fields: [
+            {
+              id: "f_1",
+              type: "text",
+              label: "이름",
+              description: "사용자 이름",
+            },
+          ],
+        },
+      };
+      const invalidPrimaryTypePayload = {
+        title: "부적합 대표 필드 폼",
+        schemaDefinition: {
+          primaryFieldId: "f_tags",
+          fields: [
+            {
+              id: "f_tags",
+              type: "checkbox",
+              label: "분류",
+              description: "다중 분류 선택",
+              options: [{ label: "A", value: "A", description: "분류 A입니다.", disabled: false }],
+            },
+          ],
+        },
+      };
+
+      expect(insertFormSchema.safeParse(emptyFieldsPayload).success).toBe(false);
+      expect(insertFormSchema.safeParse(missingPrimaryPayload).success).toBe(false);
+      expect(insertFormSchema.safeParse(invalidPrimaryTypePayload).success).toBe(false);
     });
 
     it("폼 제목(title)이 빈 문자열이면 검증에 실패해야 한다", () => {

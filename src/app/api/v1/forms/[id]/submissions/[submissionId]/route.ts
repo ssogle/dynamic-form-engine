@@ -1,12 +1,20 @@
 import type { NextRequest } from "next/server";
+import { z } from "zod";
 import { findFormById } from "@/entities/form/server";
 import { extractActiveFields, validateSubmissionData } from "@/entities/form";
+import { extractSubmissionPayload } from "@/entities/form-submission";
 import {
   findSubmissionById,
   softDeleteSubmissionById,
   updateSubmissionById,
 } from "@/entities/form-submission/server";
-import { apiResponse, badRequest, notFound, withErrorHandler } from "@/shared/lib/http";
+import {
+  apiResponse,
+  badRequest,
+  notFound,
+  parseRequestData,
+  withErrorHandler,
+} from "@/shared/lib/http";
 
 interface RouteContext {
   params: Promise<{
@@ -14,6 +22,14 @@ interface RouteContext {
     submissionId: string;
   }>;
 }
+
+/**
+ * 단건 응답 라우트 경로 파라미터 검증 스키마
+ */
+const submissionRouteParamsSchema = z.object({
+  id: z.uuid("올바른 폼 ID(UUID) 형식이 아닙니다."),
+  submissionId: z.uuid("올바른 응답 ID(UUID) 형식이 아닙니다."),
+});
 
 /**
  * GET /api/v1/forms/[id]/submissions/[submissionId]
@@ -25,7 +41,11 @@ interface RouteContext {
  * @returns 200 OK와 함께 FormSubmission 객체 반환
  */
 export const GET = withErrorHandler(async (_req: NextRequest, context: RouteContext) => {
-  const { id, submissionId } = await context.params;
+  const { id, submissionId } = parseRequestData(
+    submissionRouteParamsSchema,
+    await context.params,
+    "올바른 경로 식별자(UUID)가 아닙니다."
+  );
 
   // 1. 대상 폼 및 단건 응답 조회 (id는 UUID)
   const [form, submission] = await Promise.all([
@@ -55,7 +75,11 @@ export const GET = withErrorHandler(async (_req: NextRequest, context: RouteCont
  * @returns 200 OK와 함께 갱신된 FormSubmission 객체 반환
  */
 export const PATCH = withErrorHandler(async (req: NextRequest, context: RouteContext) => {
-  const { id, submissionId } = await context.params;
+  const { id, submissionId } = parseRequestData(
+    submissionRouteParamsSchema,
+    await context.params,
+    "올바른 경로 식별자(UUID)가 아닙니다."
+  );
 
   // 1. 대상 폼 및 기존 응답 존재 여부 확인 (id는 UUID)
   const [form, existingSubmission] = await Promise.all([
@@ -73,15 +97,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest, context: RouteCon
 
   // 2. 요청 본문 파싱
   const body: unknown = await req.json();
-  let rawData: Record<string, unknown> = {};
-
-  if (body !== null && typeof body === "object") {
-    if ("data" in body && body.data !== null && typeof body.data === "object") {
-      rawData = body.data as Record<string, unknown>;
-    } else {
-      rawData = body as Record<string, unknown>;
-    }
-  }
+  const rawData = extractSubmissionPayload(body);
 
   // 3. 폼 필드 스키마 기반 런타임 동적 Zod 유효성 검증
   const fields = extractActiveFields(form);
@@ -113,7 +129,11 @@ export const PATCH = withErrorHandler(async (req: NextRequest, context: RouteCon
  * @returns 200 OK와 함께 소프트 삭제된 FormSubmission 객체 반환
  */
 export const DELETE = withErrorHandler(async (_req: NextRequest, context: RouteContext) => {
-  const { id, submissionId } = await context.params;
+  const { id, submissionId } = parseRequestData(
+    submissionRouteParamsSchema,
+    await context.params,
+    "올바른 경로 식별자(UUID)가 아닙니다."
+  );
 
   // 1. 대상 폼 및 기존 응답 존재 및 폼 일치 검증 (id는 UUID)
   const [form, existingSubmission] = await Promise.all([

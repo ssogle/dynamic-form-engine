@@ -2,8 +2,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useFormDetailQuery } from "@/entities/form";
-import { useSubmitFormMutation, useConsumerFormDraftStore } from "@/entities/form-submission";
 import {
   Card,
   CardHeader,
@@ -14,6 +12,7 @@ import {
 } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 import { Skeleton } from "@/shared/ui/skeleton";
+import { useConsumerFormSubmitter } from "../hooks/use-consumer-form-submitter.hook";
 import { DynamicFormRenderer } from "./dynamic-form-renderer";
 
 export interface ConsumerFormSubmitterProps {
@@ -27,45 +26,21 @@ export interface ConsumerFormSubmitterProps {
  * 컨슈머 폼 입력 및 실시간 제출 기능 컴포넌트 (ConsumerFormSubmitter)
  *
  * 공식 발행된 활성 폼을 불러와 엔드유저가 실시간 유효성 검증과 함께
- * 답변을 작성하고 서버로 일괄 제출(Batch Submission)하는 독립적 기능 컴포넌트입니다.
+ * 답변을 작성하고 서버로 일괄 제출(Batch Submission)하는 순수 얇은 뷰(Thin View) 컴포넌트입니다.
  */
 export function ConsumerFormSubmitter({ formId }: ConsumerFormSubmitterProps) {
-  const { data: form, isLoading, isError, error } = useFormDetailQuery(formId);
-  const [isSuccessSubmitted, setIsSuccessSubmitted] = React.useState(false);
-
-  const { mutateAsync: submitResponse, isPending: isSubmitting } = useSubmitFormMutation(
-    form?.id ?? formId
-  );
-
-  const currentDraftFormId = useConsumerFormDraftStore((state) => state.currentFormId);
-  const draftValues = useConsumerFormDraftStore((state) => state.draftValues);
-  const submitTriggerCount = useConsumerFormDraftStore((state) => state.submitTriggerCount);
-  const setCurrentFormId = useConsumerFormDraftStore((state) => state.setCurrentFormId);
-  const resetDraft = useConsumerFormDraftStore((state) => state.resetDraft);
-
-  React.useEffect(() => {
-    setCurrentFormId(formId);
-    resetDraft();
-    return () => {
-      resetDraft();
-    };
-  }, [formId, setCurrentFormId, resetDraft]);
-
-  const activeDraftValues = currentDraftFormId === formId ? draftValues : undefined;
-  const activeSubmitTriggerCount = currentDraftFormId === formId ? submitTriggerCount : undefined;
-
-  /**
-   * 폼 유효성 검사를 통과한 정제 데이터를 서버로 제출
-   */
-  const handleSubmit = async (cleanedData: Record<string, unknown>) => {
-    try {
-      await submitResponse(cleanedData);
-      resetDraft();
-      setIsSuccessSubmitted(true);
-    } catch (err) {
-      console.error("폼 제출 실패:", err);
-    }
-  };
+  const {
+    form,
+    isLoading,
+    isError,
+    error,
+    isSubmitting,
+    isSuccessSubmitted,
+    activeDraftValues,
+    activeSubmitTriggerCount,
+    handleSubmit,
+    handleResetSuccess,
+  } = useConsumerFormSubmitter({ formId });
 
   // 1. 서버 SSR 및 클라이언트 초기 하이드레이션, 데이터 로딩 단계 스켈레톤
   if (isLoading || (!form && !isError)) {
@@ -144,14 +119,7 @@ export function ConsumerFormSubmitter({ formId }: ConsumerFormSubmitterProps) {
             </CardDescription>
           </CardHeader>
           <CardFooter className="flex justify-center gap-3 pt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                resetDraft();
-                setIsSuccessSubmitted(false);
-              }}
-            >
+            <Button variant="outline" size="sm" onClick={handleResetSuccess}>
               새로운 응답 작성하기
             </Button>
             <Button asChild size="sm">

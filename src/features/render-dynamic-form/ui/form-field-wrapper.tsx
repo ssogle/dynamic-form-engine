@@ -1,4 +1,5 @@
 import * as React from "react";
+import { PrimaryFieldBadge } from "@/entities/form";
 import { Label } from "@/shared/ui/label";
 import { cn } from "@/shared/lib/cn";
 
@@ -16,6 +17,9 @@ export interface FormFieldWrapperProps {
 
   /** 필수 입력 여부 */
   required?: boolean | undefined;
+
+  /** 도메인의 대표 식별 필드 여부 */
+  isPrimary?: boolean | undefined;
 
   /** 필드 하단 설명/도움말 문구 */
   description?: string | undefined;
@@ -47,6 +51,7 @@ export function FormFieldWrapper({
   id,
   label,
   required = false,
+  isPrimary = false,
   description,
   error,
   isSelected = false,
@@ -64,23 +69,27 @@ export function FormFieldWrapper({
       onClick={handleClick}
       className={cn(
         "group relative flex flex-col gap-1.5 rounded-lg border border-transparent p-3 transition-colors",
+        isPrimary && "border-primary/30 bg-primary/[0.02]",
         isSelected && "border-primary/50 bg-primary/5 ring-primary/20 ring-2",
         onFieldClick && "hover:border-border hover:bg-muted/40 cursor-pointer",
         className
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <Label
-          htmlFor={id}
-          className="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-        >
-          {label}
-          {required && (
-            <span className="text-destructive ml-1" aria-label="필수 입력">
-              *
-            </span>
-          )}
-        </Label>
+        <div className="flex flex-wrap items-center gap-2">
+          <Label
+            htmlFor={id}
+            className="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          >
+            {label}
+            {required && (
+              <span className="text-destructive ml-1" aria-label="필수 입력">
+                *
+              </span>
+            )}
+          </Label>
+          {isPrimary && <PrimaryFieldBadge />}
+        </div>
       </div>
 
       <div className="mt-1">{children}</div>

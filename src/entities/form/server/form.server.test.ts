@@ -102,13 +102,6 @@ describe("Form Server Repository (entities/form/server)", () => {
       expect(result).toEqual(sampleForm);
     });
 
-    it("UUID 형식이 아닌 ID로 조회 시 DB 쿼리를 타지 않고 undefined를 즉시 반환해야 한다", async () => {
-      const result = await findFormById("invalid-uuid-string");
-
-      expect(mockSelect).not.toHaveBeenCalled();
-      expect(result).toBeUndefined();
-    });
-
     it("일치하는 폼이 없으면 undefined를 반환해야 한다", async () => {
       mockLimit.mockResolvedValueOnce([]);
 
@@ -123,7 +116,7 @@ describe("Form Server Repository (entities/form/server)", () => {
       const inputData = {
         title: "새로운 폼",
         description: "새로운 폼 설명",
-        schemaDefinition: { fields: [] },
+        schemaDefinition: { primaryFieldId: "f_title", fields: [] },
       };
 
       mockReturning.mockResolvedValueOnce([sampleForm]);
@@ -142,7 +135,7 @@ describe("Form Server Repository (entities/form/server)", () => {
       await expect(
         insertForm({
           title: "깨진 삽입",
-          schemaDefinition: { fields: [] },
+          schemaDefinition: { primaryFieldId: "f_title", fields: [] },
         })
       ).rejects.toThrow("폼 데이터베이스 삽입 결과가 반환되지 않았습니다.");
     });
@@ -235,13 +228,6 @@ describe("Form Server Repository (entities/form/server)", () => {
       expect(result).toEqual(publishedForm);
     });
 
-    it("UUID 형식이 아닌 경우 undefined를 반환해야 한다", async () => {
-      const result = await findPublishedFormById("invalid-id");
-
-      expect(mockSelect).not.toHaveBeenCalled();
-      expect(result).toBeUndefined();
-    });
-
     it("일치하는 발행 폼이 없으면 undefined를 반환해야 한다", async () => {
       mockLimit.mockResolvedValueOnce([]);
 
@@ -282,13 +268,6 @@ describe("Form Server Repository (entities/form/server)", () => {
         })
       );
       expect(result).toEqual(unpublished);
-    });
-
-    it("UUID 형식이 아닌 경우 DB 쿼리를 타지 않고 undefined를 즉시 반환해야 한다", async () => {
-      const result = await publishFormById("invalid-id", true);
-
-      expect(mockUpdate).not.toHaveBeenCalled();
-      expect(result).toBeUndefined();
     });
   });
 });

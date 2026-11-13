@@ -97,12 +97,15 @@ describe("Navigator Request Schema Validation (src/features/execute-navigator-ac
             id: "form-uuid-1",
             title: "입사 지원서",
             description: "개발팀 채용 폼",
+            isPublished: true,
+            primaryFieldId: "f_name",
             fields: [
               {
                 id: "f_name",
                 label: "이름",
                 type: "text",
                 required: true,
+                description: "지원자의 성명을 입력합니다.",
               },
             ],
           },
@@ -121,6 +124,8 @@ describe("Navigator Request Schema Validation (src/features/execute-navigator-ac
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.currentContext?.currentForm?.id).toBe("form-uuid-1");
+        expect(result.data.currentContext?.currentForm?.isPublished).toBe(true);
+        expect(result.data.currentContext?.currentForm?.primaryFieldId).toBe("f_name");
         expect(result.data.currentContext?.currentForm?.fields).toHaveLength(1);
         expect(result.data.currentContext?.visibleForms).toHaveLength(1);
       }
@@ -161,13 +166,28 @@ describe("Navigator Request Schema Validation (src/features/execute-navigator-ac
               label: "이름",
               type: "text",
               required: true,
+              description: "지원자의 성명을 입력합니다.",
             },
             {
               id: "f_role",
               label: "희망 직무",
               type: "select",
               required: false,
-              options: ["Frontend", "Backend"],
+              description: "지원하려는 직무를 선택합니다.",
+              options: [
+                {
+                  label: "프론트엔드",
+                  value: "Frontend",
+                  description: "웹 UI 및 클라이언트 상태 관리를 담당하는 직무입니다.",
+                  disabled: false,
+                },
+                {
+                  label: "백엔드",
+                  value: "Backend",
+                  description: "API 서버 및 데이터베이스 설계를 담당하는 직무입니다.",
+                  disabled: false,
+                },
+              ],
             },
           ],
           currentDraftValues: {
@@ -215,6 +235,25 @@ describe("Navigator Request Schema Validation (src/features/execute-navigator-ac
 
       expect(navigatorRequestSchema.safeParse(payloadMissingId).success).toBe(false);
       expect(navigatorRequestSchema.safeParse(payloadMissingTitle).success).toBe(false);
+    });
+
+    it("availableFields의 options에 단순 문자열 배열이 유입되면 파싱에 실패해야 한다", () => {
+      const payload = {
+        mode: "consumer",
+        prompt: "테스트",
+        currentContext: {
+          availableFields: [
+            {
+              id: "f_role",
+              label: "희망 직무",
+              type: "select",
+              options: ["Frontend", "Backend"],
+            },
+          ],
+        },
+      };
+
+      expect(navigatorRequestSchema.safeParse(payload).success).toBe(false);
     });
   });
 });

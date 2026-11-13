@@ -3,6 +3,8 @@ import {
   submissionQuerySchema,
   parseSortParam,
   parseFiltersParam,
+  parseIdsParam,
+  normalizeUuidIds,
 } from "./submission-query.schema";
 
 describe("submissionQuerySchema (entities/form-submission/schema)", () => {
@@ -12,6 +14,16 @@ describe("submissionQuerySchema (entities/form-submission/schema)", () => {
     expect(parsed.limit).toBe(20);
     expect(parsed.sort).toBe("createdAt:desc");
     expect(parsed.filters).toBeUndefined();
+    expect(parsed.ids).toBeUndefined();
+  });
+
+  it("ids 쿼리 파라미터를 문자열로 파싱해야 한다", () => {
+    const id1 = "11111111-1111-4111-a111-111111111111";
+    const id2 = "22222222-2222-4222-a222-222222222222";
+    const parsed = submissionQuerySchema.parse({
+      ids: `${id1},${id2}`,
+    });
+    expect(parsed.ids).toBe(`${id1},${id2}`);
   });
 
   it("문자열 형태의 숫자 파라미터를 숫자로 강제 변환(coerce)해야 한다", () => {
@@ -68,5 +80,52 @@ describe("parseFiltersParam", () => {
     expect(parseFiltersParam("")).toEqual({});
     expect(parseFiltersParam(undefined)).toEqual({});
     expect(parseFiltersParam("[]")).toEqual({});
+  });
+});
+
+describe("parseIdsParam", () => {
+  it("쉼표로 구분된 UUID 문자열을 공백 제거 및 중복 제거하여 UUID 배열로 파싱해야 한다", () => {
+    const id1 = "11111111-1111-4111-a111-111111111111";
+    const id2 = "22222222-2222-4222-a222-222222222222";
+    const result = parseIdsParam(` ${id1} , ${id2}, ${id1}, invalid-token `);
+    expect(result).toEqual([id1, id2]);
+  });
+
+  it("빈 문자열이나 undefined 전달 시 빈 배열을 반환해야 한다", () => {
+    expect(parseIdsParam(undefined)).toEqual([]);
+    expect(parseIdsParam("")).toEqual([]);
+    expect(parseIdsParam("not-a-uuid,123")).toEqual([]);
+  });
+});
+
+describe("normalizeUuidIds", () => {
+  const validUuidLower = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
+  const validUuidUpper = "A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11";
+  const anotherUuid = "22222222-2222-4222-a222-222222222222";
+  const nilUuid = "00000000-0000-0000-0000-000000000000";
+  const nonRfcHexUuid = "00000000-0000-0000-0000-000000000001";
+
+  it("대소문자 무관하게 RFC 표준 UUID 및 Nil UUID만 공백 제거·중복 제거하여 추출해야 한다", () => {
+    expect(
+      normalizeUuidIds([
+        "sub-1",
+        ` ${validUuidLower} `,
+        nonRfcHexUuid,
+        validUuidUpper,
+        nilUuid,
+        anotherUuid,
+        validUuidLower,
+        "",
+        null,
+      ])
+    ).toEqual([validUuidLower, validUuidUpper, nilUuid, anotherUuid]);
+  });
+
+  it("단일 문자열 입력 및 비정상 입력을 안전하게 처리해야 한다", () => {
+    expect(normalizeUuidIds(` ${validUuidLower} `)).toEqual([validUuidLower]);
+    expect(normalizeUuidIds("invalid-id")).toEqual([]);
+    expect(normalizeUuidIds(nonRfcHexUuid)).toEqual([]);
+    expect(normalizeUuidIds(undefined)).toEqual([]);
+    expect(normalizeUuidIds(null)).toEqual([]);
   });
 });

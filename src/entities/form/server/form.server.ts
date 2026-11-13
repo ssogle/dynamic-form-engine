@@ -16,20 +16,14 @@ export const findActiveForms = async (): Promise<Form[]> => {
     .orderBy(desc(forms.createdAt));
 };
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /**
  * 특정 ID를 가진 활성 폼(소프트 삭제되지 않은 폼) 1건을 조회합니다.
- * ID가 올바른 UUID 형식이 아닌 경우 데이터베이스 쿼리를 실행하지 않고 즉시 undefined를 반환합니다.
+ * API 경계에서 UUID 검증이 완료된 식별자만 전달받는 것을 전제로 순수 DB 조회를 수행합니다.
  *
  * @param id 조회할 폼 고유 식별자(UUID)
  * @returns 일치하는 Form 객체 또는 undefined
  */
 export const findFormById = async (id: string): Promise<Form | undefined> => {
-  if (!UUID_REGEX.test(id)) {
-    return undefined;
-  }
-
   const [form] = await db
     .select()
     .from(forms)
@@ -47,10 +41,6 @@ export const findFormById = async (id: string): Promise<Form | undefined> => {
  * @returns 발행된 Form 객체 또는 undefined
  */
 export const findPublishedFormById = async (id: string): Promise<Form | undefined> => {
-  if (!UUID_REGEX.test(id)) {
-    return undefined;
-  }
-
   const [form] = await db
     .select()
     .from(forms)
@@ -122,8 +112,7 @@ export const softDeleteFormById = async (id: string): Promise<Form | undefined> 
  * @returns 성공적으로 소프트 삭제 처리된 Form 객체 목록
  */
 export const softDeleteFormsByIds = async (ids: string[]): Promise<Form[]> => {
-  const validIds = ids.filter((id) => UUID_REGEX.test(id));
-  if (validIds.length === 0) return [];
+  if (ids.length === 0) return [];
 
   return await db
     .update(forms)
@@ -131,7 +120,7 @@ export const softDeleteFormsByIds = async (ids: string[]): Promise<Form[]> => {
       deletedAt: sql`now()`,
       updatedAt: sql`now()`,
     })
-    .where(and(inArray(forms.id, validIds), isNull(forms.deletedAt)))
+    .where(and(inArray(forms.id, ids), isNull(forms.deletedAt)))
     .returning();
 };
 
@@ -150,8 +139,6 @@ export const publishFormById = async (
   id: string,
   isPublished: boolean
 ): Promise<Form | undefined> => {
-  if (!UUID_REGEX.test(id)) return undefined;
-
   const [updatedForm] = await db
     .update(forms)
     .set({

@@ -18,6 +18,7 @@ export {
   submissionQuerySchema,
   parseSortParam,
   parseFiltersParam,
+  parseIdsParam,
   type SubmissionQueryParams,
   type SortItem,
   type PaginatedSubmissionsResponse,
@@ -27,13 +28,21 @@ export { formSubmissionsKeys } from "./queries/form-submissions.keys";
 
 export {
   getFormSubmissions,
+  getFormSubmissionsByIds,
   getPaginatedFormSubmissions,
   getFormSubmissionDetail,
   useFormSubmissionsQuery,
+  useFormSubmissionsByIdsQuery,
   useInfiniteFormSubmissionsQuery,
   useFormSubmissionDetailQuery,
   type UseInfiniteFormSubmissionsQueryOptions,
 } from "./queries/use-form-submissions.query";
+
+export {
+  getRelatedSubmissions,
+  useRelatedSubmissionsQuery,
+  type RelatedSubmissionsGroup,
+} from "./queries/use-related-submissions.query";
 
 export {
   submitFormResponse,
@@ -43,6 +52,8 @@ export {
   useUpdateSubmissionMutation,
   useDeleteSubmissionMutation,
 } from "./queries/use-form-submissions.mutation";
+
+export { extractSubmissionPayload } from "./lib/extract-submission-payload";
 
 export {
   useConsumerFormDraftStore,

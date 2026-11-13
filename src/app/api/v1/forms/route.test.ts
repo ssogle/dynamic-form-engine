@@ -99,12 +99,14 @@ describe("Route Handler: /api/v1/forms", () => {
         title: "고객 만족도 조사",
         description: "고객 피드백 수집 목적",
         schemaDefinition: {
+          primaryFieldId: "q1",
           fields: [
             {
               id: "q1",
               type: "text",
               label: "만족도 의견",
               required: true,
+              description: "서비스 이용에 대한 종합 의견을 입력합니다.",
             },
           ],
         },
