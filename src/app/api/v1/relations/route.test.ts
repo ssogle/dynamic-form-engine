@@ -1,117 +1,119 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { GET } from "./route";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { RelatedSubmissionsGroup } from "@/entities/form-submission";
+import * as formSubmissionServer from "@/entities/form-submission/server";
+import * as relationsRouteModule from "./route";
 
-const mockSelect = vi.fn();
-const mockFrom = vi.fn();
-const mockWhere = vi.fn();
-
-vi.mock("@/shared/db/server", () => ({
-  db: {
-    select: () => mockSelect(),
-  },
+// 엔티티 서버 레이어의 역참조 조회 함수를 모킹하여 Thin Controller의 파라미터 검증 및 위임 계약을 테스트합니다.
+vi.mock("@/entities/form-submission/server", () => ({
+  findInboundRelatedSubmissions: vi.fn(),
 }));
 
-describe("Route Handler: GET /api/v1/relations", () => {
-  const targetId = "11111111-1111-4111-a111-111111111111";
-  const sourceFormId = "22222222-2222-4222-a222-222222222222";
-  const sourceSubmissionId = "33333333-3333-4333-a333-333333333333";
+describe("GET /api/v1/relations (Hono Thin Controller)", () => {
+  const VALID_TARGET_ID = "550e8400-e29b-41d4-a716-446655440000";
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSelect.mockReturnValue({ from: mockFrom });
-    mockFrom.mockReturnValue({ where: mockWhere });
   });
 
-  it("targetId가 누락되었거나 유효한 UUID 형식이 아닌 경우 400 에러를 반환해야 한다", async () => {
-    const missingReq = new NextRequest("http://localhost/api/v1/relations");
-    const missingRes = await GET(missingReq, {});
+  it("exports only allowed HTTP method handlers (GET)", () => {
+    expect(typeof relationsRouteModule.GET).toBe("function");
+    expect("POST" in relationsRouteModule).toBe(false);
+    expect("relationsApp" in relationsRouteModule).toBe(false);
+  });
 
-    expect(missingRes.status).toBe(400);
-    const missingBody = (await missingRes.json()) as {
+  it("returns 400 BAD_REQUEST when targetId query param is missing", async () => {
+    const req = new NextRequest("http://localhost:3000/api/v1/relations");
+    const res = await relationsRouteModule.GET(req);
+
+    expect(res.status).toBe(400);
+    const json = (await res.json()) as {
       success: boolean;
-      error: { message: string; details?: Record<string, string[]> };
+      error: { code: string; details?: unknown };
     };
-    expect(missingBody.success).toBe(false);
-    expect(missingBody.error.message).toContain("올바른 targetId(UUID)");
+    expect(json.success).toBe(false);
+    expect(json.error.code).toBe("BAD_REQUEST");
+    expect(json.error.details).toBeDefined();
+    expect(formSubmissionServer.findInboundRelatedSubmissions).not.toHaveBeenCalled();
+  });
 
-    const nonRfcReq = new NextRequest(
-      "http://localhost/api/v1/relations?targetId=00000000-0000-0000-0000-000000000001"
+  it("returns 400 BAD_REQUEST when targetId is not a valid UUID", async () => {
+    const req = new NextRequest("http://localhost:3000/api/v1/relations?targetId=invalid-id");
+    const res = await relationsRouteModule.GET(req);
+
+    expect(res.status).toBe(400);
+    const json = (await res.json()) as {
+      success: boolean;
+      error: { code: string };
+    };
+    expect(json.success).toBe(false);
+    expect(json.error.code).toBe("BAD_REQUEST");
+    expect(formSubmissionServer.findInboundRelatedSubmissions).not.toHaveBeenCalled();
+  });
+
+  it("delegates valid targetId to findInboundRelatedSubmissions and returns 200 OK", async () => {
+    const mockGroups: RelatedSubmissionsGroup[] = [
+      {
+        sourceForm: {
+          id: "11111111-1111-4111-a111-111111111111",
+          title: "관련 고객 요청",
+          schemaDefinition: { primaryFieldId: "f_title", fields: [] },
+        },
+        submissions: [
+          {
+            id: "22222222-2222-4222-a222-222222222222",
+            formId: "11111111-1111-4111-a111-111111111111",
+            data: { f_title: "상담 1건" },
+            createdAt: new Date("2026-01-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+            deletedAt: null,
+          },
+        ],
+      },
+    ];
+
+    vi.mocked(formSubmissionServer.findInboundRelatedSubmissions).mockResolvedValue(mockGroups);
+
+    const req = new NextRequest(
+      `http://localhost:3000/api/v1/relations?targetId=${VALID_TARGET_ID}`
     );
-    const nonRfcRes = await GET(nonRfcReq, {});
-    expect(nonRfcRes.status).toBe(400);
-    const nonRfcBody = (await nonRfcRes.json()) as {
+    const res = await relationsRouteModule.GET(req);
+
+    expect(res.status).toBe(200);
+    expect(formSubmissionServer.findInboundRelatedSubmissions).toHaveBeenCalledWith(
+      VALID_TARGET_ID
+    );
+    const json = (await res.json()) as {
       success: boolean;
-      error: { message: string; details?: Record<string, string[]> };
+      data: Array<{ sourceForm: { id: string; title: string }; submissions: unknown[] }>;
     };
-    expect(nonRfcBody.error.details?.targetId).toBeDefined();
+    expect(json.success).toBe(true);
+    expect(json.data).toHaveLength(1);
+    expect(json.data[0]?.sourceForm.title).toBe("관련 고객 요청");
+    expect(json.data[0]?.submissions).toHaveLength(1);
   });
 
-  it("연결된 엣지가 없을 경우 빈 배열을 반환해야 한다", async () => {
-    // 1단계 엣지 조회 결과 빈 배열
-    mockWhere.mockResolvedValueOnce([]);
+  it("converts unexpected repository errors into 500 INTERNAL_SERVER_ERROR JSON", async () => {
+    vi.mocked(formSubmissionServer.findInboundRelatedSubmissions).mockRejectedValue(
+      new Error("DB 조회 실패")
+    );
 
-    const req = new NextRequest(`http://localhost/api/v1/relations?targetId=${targetId}`);
-    const response = await GET(req, {});
+    const req = new NextRequest(
+      `http://localhost:3000/api/v1/relations?targetId=${VALID_TARGET_ID}`
+    );
+    const res = await relationsRouteModule.GET(req);
 
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as { success: boolean; data: unknown[] };
-    expect(body.success).toBe(true);
-    expect(body.data).toEqual([]);
-  });
-
-  it("역방향 관계 엣지가 존재하면 소스 폼별로 그룹화하여 200 OK를 반환해야 한다", async () => {
-    const mockEdges = [
-      {
-        sourceId: sourceSubmissionId,
-        targetId,
-        fieldId: "f_rel",
-        createdAt: new Date(),
-      },
-    ];
-
-    const mockSubmissions = [
-      {
-        id: sourceSubmissionId,
-        formId: sourceFormId,
-        data: { cost: 50000, desc: "식대" },
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        deletedAt: null,
-      },
-    ];
-
-    const mockForms = [
-      {
-        id: sourceFormId,
-        title: "비용 청구서",
-        schemaDefinition: { fields: [] },
-      },
-    ];
-
-    // Phase 1: edges 조회
-    mockWhere.mockResolvedValueOnce(mockEdges);
-    // Phase 2: sourceSubmissions 조회
-    mockWhere.mockResolvedValueOnce(mockSubmissions);
-    // Phase 2: sourceForms 조회
-    mockWhere.mockResolvedValueOnce(mockForms);
-
-    const req = new NextRequest(`http://localhost/api/v1/relations?targetId=${targetId}`);
-    const response = await GET(req, {});
-
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as {
+    expect(res.status).toBe(500);
+    const json = (await res.json()) as {
       success: boolean;
-      data: Array<{
-        sourceForm: { id: string; title: string };
-        submissions: Array<{ id: string }>;
-      }>;
+      error: { code: string; message: string };
     };
-
-    expect(body.success).toBe(true);
-    expect(body.data).toHaveLength(1);
-    expect(body.data[0]?.sourceForm.title).toBe("비용 청구서");
-    expect(body.data[0]?.submissions).toHaveLength(1);
-    expect(body.data[0]?.submissions[0]?.id).toBe(sourceSubmissionId);
+    expect(json).toEqual({
+      success: false,
+      error: {
+        code: "INTERNAL_SERVER_ERROR",
+        message: "DB 조회 실패",
+      },
+    });
   });
 });

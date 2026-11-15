@@ -16,13 +16,17 @@ export {
 
 export {
   submissionQuerySchema,
+  relationsQuerySchema,
   parseSortParam,
   parseFiltersParam,
   parseIdsParam,
   type SubmissionQueryParams,
+  type RelationsQueryParams,
   type SortItem,
   type PaginatedSubmissionsResponse,
 } from "./schema/submission-query.schema";
+
+export type { RelatedSubmissionsGroup } from "./types/relation.types";
 
 export { formSubmissionsKeys } from "./queries/form-submissions.keys";
 
@@ -41,7 +45,6 @@ export {
 export {
   getRelatedSubmissions,
   useRelatedSubmissionsQuery,
-  type RelatedSubmissionsGroup,
 } from "./queries/use-related-submissions.query";
 
 export {

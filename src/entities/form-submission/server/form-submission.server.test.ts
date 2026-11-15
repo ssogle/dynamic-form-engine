@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  findInboundRelatedSubmissions,
   findSubmissionById,
   findSubmissionsByFormId,
   findSubmissionsPaginated,
@@ -361,6 +362,74 @@ describe("Form Submission Server Repository (entities/form-submission/server)", 
       expect(mockSelect).toHaveBeenCalledTimes(2);
       expect(result.totalCount).toBe(1);
       expect(result.items).toEqual([sampleSubmission]);
+    });
+  });
+
+  describe("findInboundRelatedSubmissions", () => {
+    const targetId = "99999999-9999-4999-a999-999999999999";
+
+    it("연결된 관계 엣지가 없으면 빈 배열을 반환하고 추가 쿼리를 실행하지 않아야 한다", async () => {
+      mockWhere.mockResolvedValueOnce([]);
+
+      const result = await findInboundRelatedSubmissions(targetId);
+
+      expect(result).toEqual([]);
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+    });
+
+    it("엣지가 존재하지만 활성 소스 서브미션이 모두 삭제되었으면 빈 배열을 반환해야 한다", async () => {
+      mockWhere
+        .mockResolvedValueOnce([{ sourceId: sampleSubmission.id, targetId, fieldId: "f_rel" }])
+        .mockResolvedValueOnce([]);
+
+      const result = await findInboundRelatedSubmissions(targetId);
+
+      expect(result).toEqual([]);
+      expect(mockSelect).toHaveBeenCalledTimes(2);
+    });
+
+    it("동일 소스 폼 내 여러 엣지가 같은 서브미션을 가리켜도 중복 없이 소스 폼별로 그룹화해야 한다", async () => {
+      const otherFormId = "33333333-3333-4333-a333-333333333333";
+      const secondSubmission = {
+        ...sampleSubmission,
+        id: "44444444-4444-4444-a444-444444444444",
+        formId: otherFormId,
+      };
+      const sourceForms = [
+        {
+          id: sampleSubmission.formId,
+          title: "프로젝트 목록",
+          schemaDefinition: { primaryFieldId: "name", fields: [] },
+        },
+        {
+          id: otherFormId,
+          title: "이슈 트래커",
+          schemaDefinition: { primaryFieldId: "title", fields: [] },
+        },
+      ];
+
+      mockWhere
+        .mockResolvedValueOnce([
+          { sourceId: sampleSubmission.id, targetId, fieldId: "f_rel_1" },
+          { sourceId: sampleSubmission.id, targetId, fieldId: "f_rel_2" },
+          { sourceId: secondSubmission.id, targetId, fieldId: "f_rel_3" },
+        ])
+        .mockResolvedValueOnce([sampleSubmission, secondSubmission])
+        .mockResolvedValueOnce(sourceForms);
+
+      const result = await findInboundRelatedSubmissions(targetId);
+
+      expect(mockSelect).toHaveBeenCalledTimes(3);
+      expect(result).toEqual([
+        {
+          sourceForm: sourceForms[0],
+          submissions: [sampleSubmission],
+        },
+        {
+          sourceForm: sourceForms[1],
+          submissions: [secondSubmission],
+        },
+      ]);
     });
   });
 });

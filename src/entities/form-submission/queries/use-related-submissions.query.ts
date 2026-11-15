@@ -1,19 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { httpClient } from "@/shared/lib/http";
-import type { FormSubmission } from "../schema/form-submission.schema";
+import type { RelatedSubmissionsGroup } from "../types/relation.types";
 import { formSubmissionsKeys } from "./form-submissions.keys";
-
-/**
- * 역참조 그룹 응답 클라이언트 타입
- */
-export interface RelatedSubmissionsGroup {
-  sourceForm: {
-    id: string;
-    title: string;
-    schemaDefinition?: unknown;
-  };
-  submissions: FormSubmission[];
-}
 
 /**
  * 특정 대상 레코드(targetId)를 참조하고 있는 역방향 관계 서브미션 목록을 조회하는 순수 비동기 함수
