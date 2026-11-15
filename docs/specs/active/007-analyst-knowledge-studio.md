@@ -66,7 +66,7 @@
   - `src/entities/analysis-view/...`:
     - `schema/analysis-view.schema.ts`: 3종 블록 Discriminated Union(`text`, `table`, `chart`) 및 `analysisView` Zod 스키마.
     - `server/analysis-view.server.ts`: 분석 뷰 목록/상세/발행 목록 조회, 생성, 수정, 발행 토글, 소프트 삭제 Drizzle 쿼리.
-    - `queries/`: React Query 키 및 조회/변경 훅 (`useAnalysisViewsQuery`, `usePublishedAnalysisViewsQuery`, `useAnalysisViewDetailQuery`, mutation 훅).
+    - `queries/`: React Query 키 및 UI 조회/제어 훅 (`useAnalysisViewsQuery`, `usePublishedAnalysisViewsQuery`, `useAnalysisViewDetailQuery`, `usePublishAnalysisViewMutation`, `useDeleteAnalysisViewMutation`).
   - `src/entities/form-submission/...`:
     - `schema/analytics-query.schema.ts`: 서버 통계 집계 요청/응답 Zod 스키마.
     - `server/analytics.server.ts`: 동적 JSONB 필드 집계(`count`, `sum`, `avg`, `min`, `max`, `groupBy`, `timeBucket`), 조건별 레코드 추출 및 다중 폼 비교 시 합집합(Union) 기준 누락 항목 `0` 채움(Zero-fill) 병합/정렬 유틸리티.
@@ -83,7 +83,12 @@
     - 분석가 캔버스(`/analyst/views`, `/analyst/views/[id]`): 분석 뷰 목록 카드/테이블, 문서 프리뷰 캔버스, 발행 스위치/삭제 등 최소 제어 액션.
     - 컨슈머 뷰어(`/consumer/views`, `/consumer/views/[id]`): 발행된 분석 뷰 목록 열람 및 읽기 전용 문서 뷰어.
   - `src/app/api/v1/...`:
-    - Hono 라우터에 통계 집계 엔드포인트(`POST /api/v1/forms/:id/analytics`) 및 분석 뷰 CRUD/발행 엔드포인트(`/api/v1/analysis-views`, `/api/v1/analysis-views/:id`, `/api/v1/analysis-views/:id/publish`) 추가.
+    - 통계 집계 및 분석 뷰 생성/블록 수정은 `analyst` AI Navigator(`/api/v1/navigator`)가 서버 도구를 통해 직접 실행합니다.
+    - Hono 라우터(`/api/v1/analysis-views`)는 UI가 실제로 호출하는 최소 4개 엔드포인트만 노출합니다:
+      - `GET /api/v1/analysis-views` (`?published=true` 지원)
+      - `GET /api/v1/analysis-views/:id`
+      - `POST /api/v1/analysis-views/:id/publish`
+      - `DELETE /api/v1/analysis-views/:id`
 
 - **데이터 계약 (Schema & Interfaces)**:
 
@@ -263,7 +268,7 @@
 - **단계별 구현 계획**:
   1. `npx shadcn@latest add chart` 적용 및 `analysis_views` DB 테이블 DDL(`src/shared/tables/analysis-views.table.ts`) 정의
   2. `analysis-view` 엔티티 Zod 스키마(3종 블록: `text`, `table`, `chart`) 및 결정론적 서버 통계 집계/시리즈 산술 연산 엔진 TDD 구현
-  3. Hono API 엔드포인트(`/api/v1/forms/:id/analytics`, `/api/v1/analysis-views`) 및 `analyst` AI Navigator 모드(도구/프롬프트) 구현
+  3. Hono API 최소 엔드포인트(`/api/v1/analysis-views` 조회·발행·단건삭제) 및 `analyst` AI Navigator 모드(집계/연산/생성/수정/발행/삭제 도구 및 프롬프트) 구현
   4. 분석가 워크스페이스 UI(`/analyst/views`, `/analyst/views/[id]`), `/builder/views` 제거 및 3자 게이트웨이/헤더 연결, 컨슈머 열람(`/consumer/views`, `/consumer/views/[id]`) 연동
 - **검증 기준**:
   - `npm test`: 서버 집계 엔진(`count`, `sum`, `avg`, `min`, `max`, `groupBy`, `timeBucket: "day" | "week" | "month" | "quarter"`, KST/UTC 분기 경계, 비정상 수치 방어, `select` 라벨 매핑), `computeSeriesMetric`(`subtract`, `add`, `ratio`, 분모 0 시 `null` 반환, 부동소수점 반올림, key 합집합 Zero-fill), 3종 블록 Zod 스키마 검증, `analyst` Navigator 도구 단위 테스트 전체 통과
