@@ -11,6 +11,7 @@ export {
   hasSubmissionsByFormId,
   findSubmissionsPaginated,
   findSubmissionById,
+  findInboundRelatedSubmissions,
   updateSubmissionById,
   softDeleteSubmissionById,
   softDeleteSubmissionsByIds,

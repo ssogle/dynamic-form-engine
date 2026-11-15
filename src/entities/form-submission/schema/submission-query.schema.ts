@@ -132,3 +132,18 @@ export interface PaginatedSubmissionsResponse<T = FormSubmission> {
   totalPages: number;
   hasMore: boolean;
 }
+
+/**
+ * 역참조 관계 조회(`GET /api/v1/relations`) 쿼리 파라미터 검증 Zod 스키마
+ *
+ * - 타깃 응답 레코드 ID(`targetId`)가 유효한 UUID 포맷인지 API 경계에서 검증합니다.
+ * - 엔티티 스키마 레이어에 위치시켜 API 라우터와 도메인이 동일한 검증 계약을 공유합니다.
+ */
+export const relationsQuerySchema = z.object({
+  targetId: z.uuid("올바른 targetId(UUID) 쿼리 파라미터가 필요합니다."),
+});
+
+/**
+ * 역참조 관계 조회 쿼리 파라미터 TypeScript 정적 타입
+ */
+export type RelationsQueryParams = z.infer<typeof relationsQuerySchema>;

@@ -2,6 +2,7 @@ import "server-only";
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/shared/db/server";
 import { forms, relations } from "@/shared/tables";
+import type { RelatedSubmissionsGroup } from "../types/relation.types";
 import {
   formSubmissions,
   type FormSubmission,
@@ -337,4 +338,86 @@ export const softDeleteSubmissionsByIds = async (ids: string[]): Promise<FormSub
   }
 
   return deletedSubmissions;
+};
+
+/**
+ * 특정 타깃 응답 레코드(`targetId`)를 참조(relation)하고 있는 인바운드 역참조 목록을
+ * 소스 폼 단위로 그룹화하여 조회합니다.
+ *
+ * 동작 원리 (2-Phase 역참조 그룹핑):
+ * 1. Phase 1: `relations` 엣지 테이블에서 `targetId`를 가리키는 모든 관계 엣지를 탐색합니다.
+ * 2. Phase 2: 추출한 중복 제거 `sourceId`로 소프트 삭제되지 않은(`deletedAt IS NULL`)
+ *    활성 소스 응답과 소스 폼 메타데이터를 일괄 조회(`inArray`)합니다.
+ * 3. 동일한 소스 응답이 동일 폼의 여러 필드를 통해 중복 참조하더라도 그룹 내 중복 노출을 차단하며,
+ *    소프트 삭제된 응답이나 존재하지 않는 폼의 엣지는 결과에서 안전하게 제외합니다.
+ *
+ * @param targetId 역참조를 추적할 타깃 응답 고유 식별자(UUID)
+ * @returns 소스 폼별로 묶인 `RelatedSubmissionsGroup[]` 배열
+ */
+export const findInboundRelatedSubmissions = async (
+  targetId: string
+): Promise<RelatedSubmissionsGroup[]> => {
+  // 1. [Phase 1] relations 엣지 테이블에서 targetId를 가리키는 링크 탐색
+  const edges = await db.select().from(relations).where(eq(relations.targetId, targetId));
+
+  if (edges.length === 0) {
+    return [];
+  }
+
+  // 2. [Phase 2] 연결된 소스 서브미션 식별자 목록 추출 및 활성 응답 일괄 조회
+  const sourceIds = Array.from(new Set(edges.map((e) => e.sourceId)));
+
+  const sourceSubmissions = await db
+    .select()
+    .from(formSubmissions)
+    .where(and(inArray(formSubmissions.id, sourceIds), isNull(formSubmissions.deletedAt)));
+
+  if (sourceSubmissions.length === 0) {
+    return [];
+  }
+
+  // 3. 소스 폼 메타데이터 일괄 조회
+  const formIds = Array.from(new Set(sourceSubmissions.map((s) => s.formId)));
+
+  const sourceForms = await db
+    .select({
+      id: forms.id,
+      title: forms.title,
+      schemaDefinition: forms.schemaDefinition,
+    })
+    .from(forms)
+    .where(inArray(forms.id, formIds));
+
+  const formMap = new Map(sourceForms.map((f) => [f.id, f]));
+  const submissionMap = new Map(sourceSubmissions.map((s) => [s.id, s]));
+
+  // 4. 소스 폼 단위로 역참조 응답 데이터 그룹화
+  const groupsMap = new Map<string, RelatedSubmissionsGroup>();
+
+  for (const edge of edges) {
+    const sub = submissionMap.get(edge.sourceId);
+    if (!sub) continue;
+
+    const formMeta = formMap.get(sub.formId);
+    if (!formMeta) continue;
+
+    let group = groupsMap.get(sub.formId);
+    if (!group) {
+      group = {
+        sourceForm: {
+          id: formMeta.id,
+          title: formMeta.title,
+          schemaDefinition: formMeta.schemaDefinition,
+        },
+        submissions: [],
+      };
+      groupsMap.set(sub.formId, group);
+    }
+
+    if (!group.submissions.some((existing) => existing.id === sub.id)) {
+      group.submissions.push(sub);
+    }
+  }
+
+  return Array.from(groupsMap.values());
 };
