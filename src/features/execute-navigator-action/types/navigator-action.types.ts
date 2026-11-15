@@ -6,10 +6,20 @@ import type { ActiveForm, CoreFormField, Form, SelectOption } from "@/entities/f
 export type NavigatorMode = "builder" | "consumer";
 
 /**
+ * 폼 스키마 변경 오퍼레이션 상수 목록 (단일 진실 원천 - SSOT)
+ */
+export const SCHEMA_OPERATIONS = [
+  "ADD_FIELD",
+  "UPDATE_FIELD",
+  "REMOVE_FIELD",
+  "SET_ALL_FIELDS",
+  "SET_PRIMARY_FIELD",
+] as const;
+
+/**
  * 폼 스키마 변경 오퍼레이션 유형 (Builder 전용)
  */
-export type SchemaOperation =
-  "ADD_FIELD" | "UPDATE_FIELD" | "REMOVE_FIELD" | "SET_ALL_FIELDS" | "SET_PRIMARY_FIELD";
+export type SchemaOperation = (typeof SCHEMA_OPERATIONS)[number];
 
 // ==========================================
 // 1. 빌더 클라이언트 액션 규격 (Builder Actions)

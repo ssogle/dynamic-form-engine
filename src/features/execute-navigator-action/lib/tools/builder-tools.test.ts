@@ -735,12 +735,12 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
       expect(nonexistentSwitch.success).toBe(false);
     });
 
-    it("발행된 폼(currentFormId)에서 MODIFY_FIELD로 options 수정 시 누락된 기존 옵션은 disabled: true로 보존되어야 한다", async () => {
+    it("발행된 폼(currentFormId)에서 UPDATE_FIELD로 options 수정 시 누락된 기존 옵션은 disabled: true로 보존되어야 한다", async () => {
       const tools = createBuilderTools(dependencies);
       const result = (await tools.updateSchema.execute!(
         {
           formId: currentFormId,
-          operation: "MODIFY_FIELD",
+          operation: "UPDATE_FIELD",
           targetFieldId: "f_category",
           fieldData: {
             options: [
@@ -1159,12 +1159,12 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
       ]);
     });
 
-    it("MODIFY_FIELD: 현재 대표 필드(primaryFieldId)의 타입을 checkbox/relation으로 변경하려 하면 차단해야 한다", async () => {
+    it("UPDATE_FIELD: 현재 대표 필드(primaryFieldId)의 타입을 checkbox/relation으로 변경하려 하면 차단해야 한다", async () => {
       const tools = createBuilderTools(dependencies);
       const result = (await tools.updateSchema.execute!(
         {
           formId: currentFormId,
-          operation: "MODIFY_FIELD",
+          operation: "UPDATE_FIELD",
           targetFieldId: "f_title",
           fieldData: {
             type: "checkbox",
