@@ -22,6 +22,15 @@ describe("useNavigatorChatStore (widgets/navigator-shell/store)", () => {
     expect(messages[0]?.content).toBe(INITIAL_WELCOME_MESSAGES.consumer);
   });
 
+  it("setMode('analyst') 호출 시 분석가 웰컴 메시지로 전환되어야 한다", () => {
+    useNavigatorChatStore.getState().setMode("analyst");
+
+    const { messages, currentMode } = useNavigatorChatStore.getState();
+    expect(currentMode).toBe("analyst");
+    expect(messages.length).toBe(1);
+    expect(messages[0]?.content).toBe(INITIAL_WELCOME_MESSAGES.analyst);
+  });
+
   it("addMessage 호출 시 순서대로 메시지가 추가되어야 한다", () => {
     useNavigatorChatStore.getState().addMessage({
       role: "user",

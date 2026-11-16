@@ -219,7 +219,7 @@ export const updateFieldOptionsInputSchema = z.object({
 export function createBuilderTools(deps: BuilderToolsDependencies) {
   const navigateTool = tool({
     description:
-      "애플리케이션 내의 다른 화면으로 이동합니다. 폼 목록(/builder/forms), 라이브 캔버스(/builder/forms/[id]), 뷰 목록(/builder/views) 등으로 이동할 때 호출합니다.",
+      "애플리케이션 내의 다른 화면으로 이동합니다. 폼 목록(/builder/forms), 라이브 캔버스(/builder/forms/[id]) 등으로 이동할 때 호출합니다.",
     inputSchema: navigateInputSchema,
     execute: async ({ targetPath, reason }: z.infer<typeof navigateInputSchema>) => {
       const action: NavigatorBuilderAction = {

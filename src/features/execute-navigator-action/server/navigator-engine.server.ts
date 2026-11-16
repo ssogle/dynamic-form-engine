@@ -10,14 +10,29 @@ import {
   softDeleteFormsByIds,
 } from "@/entities/form/server";
 import {
+  findAnalysisViewById,
+  insertAnalysisView,
+  publishAnalysisViewById,
+  softDeleteAnalysisViewsByIds,
+  updateAnalysisViewById,
+} from "@/entities/analysis-view/server";
+import type { AnalysisView } from "@/entities/analysis-view";
+import {
+  aggregateFormSubmissions,
   hasSubmissionsByFormId,
+  queryFormSubmissionsForAnalysis,
   softDeleteSubmissionsByIds,
 } from "@/entities/form-submission/server";
 import type { Form } from "@/entities/form";
 import { getAiModel } from "@/shared/lib/ai";
+import { createAnalystTools } from "../lib/tools/analyst-tools";
 import { createBuilderTools } from "../lib/tools/builder-tools";
 import { createConsumerTools } from "../lib/tools/consumer-tools";
 import { createQueryTools } from "../lib/tools/query-tools";
+import {
+  ANALYST_NAVIGATOR_SYSTEM_PROMPT,
+  formatAnalystContextPrompt,
+} from "../lib/prompts/analyst-prompt";
 import {
   BUILDER_NAVIGATOR_SYSTEM_PROMPT,
   formatBuilderContextPrompt,
@@ -40,6 +55,8 @@ import type {
 export interface NavigatorPostExecutionExtras {
   /** 갱신된 폼 엔티티 (빌더 모드 전용) */
   updatedForm?: Form | undefined;
+  /** 갱신/생성된 분석 뷰 엔티티 (분석가 모드 전용) */
+  updatedAnalysisView?: AnalysisView | undefined;
 }
 
 /**
@@ -50,9 +67,15 @@ export interface NavigatorModeConfig {
   instructions: string;
   /** 해당 모드에서 사용할 도구 카탈로그 */
   tools: ReturnType<typeof createQueryTools> &
-    (ReturnType<typeof createBuilderTools> | ReturnType<typeof createConsumerTools>);
+    (
+      | ReturnType<typeof createBuilderTools>
+      | ReturnType<typeof createConsumerTools>
+      | ReturnType<typeof createAnalystTools>
+    );
   /** 화면 맥락 기반의 린(Lean) 프롬프트 포맷터 */
   formatPrompt: (prompt: string, context?: NavigatorClientContext) => string;
+  /** 최대 에이전트 스텝 수 (기본값 5, 다중 집계/작성 워크플로우는 10 등) */
+  maxSteps?: number | undefined;
   /** 도구 실행 결과에서 모드별 부가 데이터를 추출하는 선택적 훅 */
   extractExtras?: (toolResults: Array<{ output: unknown }>) => NavigatorPostExecutionExtras;
 }
@@ -78,6 +101,21 @@ function extractUpdatedForm(toolResults: Array<{ output: unknown }>): Form | nul
   return toolResults
     .map((tr) => tr.output as { form?: Form; updatedForm?: Form } | undefined)
     .reduce<Form | null>((_, out) => out?.updatedForm ?? out?.form ?? null, null);
+}
+
+/**
+ * 분석가 도구 실행 결과로부터 생성/수정된 분석 뷰 엔티티를 추출합니다.
+ */
+function extractUpdatedAnalysisView(toolResults: Array<{ output: unknown }>): AnalysisView | null {
+  return toolResults
+    .map(
+      (tr) =>
+        tr.output as { analysisView?: AnalysisView; updatedAnalysisView?: AnalysisView } | undefined
+    )
+    .reduce<AnalysisView | null>(
+      (prev, out) => out?.updatedAnalysisView ?? out?.analysisView ?? prev,
+      null
+    );
 }
 
 /**
@@ -111,6 +149,26 @@ const NAVIGATOR_MODE_REGISTRY: Record<NavigatorMode, ModeConfigFactory> = {
     formatPrompt: formatBuilderContextPrompt,
     extractExtras: (toolResults) => ({
       updatedForm: extractUpdatedForm(toolResults) ?? undefined,
+    }),
+  }),
+  analyst: (queryTools) => ({
+    instructions: ANALYST_NAVIGATOR_SYSTEM_PROMPT,
+    maxSteps: 10,
+    tools: {
+      ...createAnalystTools({
+        findAnalysisViewById,
+        insertAnalysisView,
+        updateAnalysisViewById,
+        publishAnalysisViewById,
+        softDeleteAnalysisViewsByIds,
+        aggregateFormSubmissions,
+        queryFormSubmissionsForAnalysis,
+      }),
+      ...queryTools,
+    },
+    formatPrompt: formatAnalystContextPrompt,
+    extractExtras: (toolResults) => ({
+      updatedAnalysisView: extractUpdatedAnalysisView(toolResults) ?? undefined,
     }),
   }),
 };
@@ -169,13 +227,13 @@ export async function runNavigatorEngine(
     },
   ];
 
-  // 4. 단일 LLM 추론 완주 (온디맨드 팩트 조회 -> 액션 도출을 위해 stepCountIs(5) 지정)
+  // 4. 단일 LLM 추론 완주 (모드별 maxSteps 적용, 기본 5단계)
   const result = await generateText({
     model,
     instructions: config.instructions,
     messages: conversationMessages,
     tools: config.tools,
-    stopWhen: stepCountIs(5),
+    stopWhen: stepCountIs(config.maxSteps ?? 5),
   });
 
   const toolResults = (result.toolResults ?? []) as Array<{ output: unknown }>;

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { analysisBlockSchema } from "@/entities/analysis-view";
 import { coreFormFieldSchema, selectOptionSchema } from "@/entities/form";
 
 const visibleItemSchema = z.object({
@@ -12,7 +13,7 @@ const visibleItemSchema = z.object({
  * 네비게이터 HTTP 요청 페이로드 검증 스키마
  */
 export const navigatorRequestSchema = z.object({
-  mode: z.enum(["builder", "consumer"]).default("builder"),
+  mode: z.enum(["builder", "consumer", "analyst"]).default("builder"),
   prompt: z.string().min(1, "사용자 명령 프롬프트는 필수입니다."),
   messages: z
     .array(
@@ -54,6 +55,17 @@ export const navigatorRequestSchema = z.object({
         .optional(),
       currentDraftValues: z.record(z.string(), z.unknown()).optional(),
       visibleSubmissions: z.array(visibleItemSchema).optional(),
+      // Analyst Context
+      currentAnalysisView: z
+        .object({
+          id: z.string(),
+          title: z.string(),
+          description: z.string().optional(),
+          isPublished: z.boolean().optional(),
+          blocks: z.array(analysisBlockSchema).default([]),
+        })
+        .optional(),
+      visibleAnalysisViews: z.array(visibleItemSchema).optional(),
     })
     .optional(),
 });

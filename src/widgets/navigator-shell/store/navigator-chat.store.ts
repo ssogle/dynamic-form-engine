@@ -14,6 +14,8 @@ export const INITIAL_WELCOME_MESSAGES: Record<NavigatorMode, string> = {
     "안녕하세요! AI Navigator입니다. 마우스 클릭 없이 자연어로 원하시는 폼 생성, 필드 수정, 화면 이동을 명령해 보세요.",
   consumer:
     "안녕하세요! Consumer AI Navigator입니다. 참여하고자 하는 설문이나 작성하고 싶은 신청서에 대해 말씀해 주시면, 적합한 폼을 찾아드리고 작성을 도와드립니다.",
+  analyst:
+    "안녕하세요! Analyst AI Navigator입니다. 등록된 폼의 응답 데이터를 비교·집계하여 표, 차트, 요약 문단이 담긴 분석 뷰 문서를 만들고 발행할 수 있습니다.",
 };
 
 export interface NavigatorChatState {

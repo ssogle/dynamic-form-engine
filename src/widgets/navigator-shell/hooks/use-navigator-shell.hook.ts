@@ -10,6 +10,11 @@ import {
   type NavigatorMode,
 } from "@/features/execute-navigator-action";
 import {
+  analysisViewKeys,
+  extractAnalysisBlocks,
+  type AnalysisView,
+} from "@/entities/analysis-view";
+import {
   formKeys,
   type Form,
   extractActiveFields,
@@ -174,6 +179,23 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
           queryClient.invalidateQueries({ queryKey: formSubmissionsKeys.all });
           break;
 
+        case "CREATE_ANALYSIS_VIEW":
+          queryClient.invalidateQueries({ queryKey: analysisViewKeys.all });
+          if (action.viewId) {
+            router.push(`/analyst/views/${action.viewId}`);
+          }
+          break;
+
+        case "UPDATE_ANALYSIS_VIEW":
+        case "PUBLISH_ANALYSIS_VIEW":
+          queryClient.invalidateQueries({ queryKey: analysisViewKeys.all });
+          break;
+
+        case "DELETE_ANALYSIS_VIEWS":
+          queryClient.invalidateQueries({ queryKey: analysisViewKeys.all });
+          router.push("/analyst/views");
+          break;
+
         default:
           break;
       }
@@ -297,6 +319,35 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
               .join(", "),
           };
         });
+      }
+    } else if (mode === "analyst") {
+      // 1. 개별 분석 뷰 문서 상세 화면일 때
+      const match = pathname.match(/\/analyst\/views\/([^/]+)/);
+      if (match && match[1]) {
+        const viewId = match[1];
+        const cachedView = queryClient.getQueryData<AnalysisView>(
+          analysisViewKeys.detail(viewId, false)
+        );
+        if (cachedView) {
+          context.currentAnalysisView = {
+            id: cachedView.id,
+            title: cachedView.title,
+            description: cachedView.description ?? undefined,
+            isPublished: Boolean(cachedView.publishedAt),
+            blocks: extractAnalysisBlocks(cachedView),
+          };
+        }
+      }
+
+      // 2. 분석 뷰 목록 캐시가 존재할 때 (상위 10개 요약 주입)
+      const cachedViews = queryClient.getQueryData<AnalysisView[]>(analysisViewKeys.lists());
+      if (cachedViews && cachedViews.length > 0) {
+        context.visibleAnalysisViews = cachedViews.slice(0, 10).map((v) => ({
+          id: v.id,
+          title: v.title,
+          summary: v.description ?? undefined,
+          createdAt: toUtcIso(v.createdAt) ?? undefined,
+        }));
       }
     }
 

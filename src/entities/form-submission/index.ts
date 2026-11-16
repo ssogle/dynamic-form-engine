@@ -62,3 +62,31 @@ export {
   useConsumerFormDraftStore,
   type ConsumerFormDraftState,
 } from "./store/consumer-form-draft.store";
+
+export {
+  analyticsMetricSchema,
+  analyticsTimeBucketSchema,
+  analyticsAggregationQuerySchema,
+  seriesMetricPointSchema,
+  computeSeriesMetricInputSchema,
+  querySubmissionsForAnalysisSchema,
+  type AnalyticsMetric,
+  type AnalyticsTimeBucket,
+  type AnalyticsAggregationQuery,
+  type SeriesMetricPoint,
+  type ComputeSeriesMetricInput,
+  type QuerySubmissionsForAnalysisInput,
+} from "./schema/analytics-query.schema";
+
+export {
+  roundFloatingPoint,
+  parseNumericValue,
+  resolveFieldOptionLabelMap,
+  formatFieldDisplayKey,
+  formatTimeBucketKey,
+  mergeSeriesWithZeroFill,
+  computeSeriesMetric,
+  type AnalyticsFieldMeta,
+  type ComputedSeriesMetricRow,
+  type ComputeSeriesMetricResult,
+} from "./lib/analytics-calculator";

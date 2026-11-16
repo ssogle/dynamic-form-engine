@@ -55,12 +55,18 @@ export default function ConsumerLayout({ children }: { children: React.ReactNode
             </Link>
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <Link
               href="/builder/forms"
               className="text-muted-foreground hover:text-foreground text-xs font-medium transition-colors"
             >
               빌더로 이동
+            </Link>
+            <Link
+              href="/analyst/views"
+              className="text-muted-foreground hover:text-foreground text-xs font-medium transition-colors"
+            >
+              분석가로 이동
             </Link>
           </div>
         </header>

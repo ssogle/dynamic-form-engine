@@ -6,6 +6,8 @@ export type {
   NavigatorAction,
   NavigatorBuilderAction,
   NavigatorConsumerAction,
+  NavigatorAnalystAction,
+  AnalysisViewOperation,
   ExecuteNavigatorPayload,
   NavigatorExecutionResponse,
   NavigatorChatMessageDto,

@@ -233,4 +233,83 @@ describe("useNavigatorShell (widgets/navigator-shell/hooks)", () => {
       "신규 입사자 메모"
     );
   });
+
+  it("analyst 모드에서 currentAnalysisView와 visibleAnalysisViews 컨텍스트를 추출하고 CREATE/UPDATE/DELETE 액션을 디스패치해야 한다", async () => {
+    currentPathname = "/analyst/views/view-1";
+    mockGetQueryData.mockImplementation((key: readonly unknown[]) => {
+      if (Array.isArray(key) && key[1] === "detail" && key[2] === "view-1") {
+        return {
+          id: "view-1",
+          title: "1분기 리포트",
+          description: "요약",
+          blocks: [{ id: "b1", type: "text", content: "본문" }],
+          publishedAt: null,
+          createdAt: new Date("2026-02-01T00:00:00.000Z"),
+        };
+      }
+      if (Array.isArray(key) && key[1] === "list" && key.length === 2) {
+        return [
+          {
+            id: "view-1",
+            title: "1분기 리포트",
+            description: "요약",
+            blocks: [],
+            publishedAt: null,
+            createdAt: new Date("2026-02-01T00:00:00.000Z"),
+          },
+        ];
+      }
+      return undefined;
+    });
+
+    mockMutateAsync.mockResolvedValueOnce({
+      reply: "새 뷰 생성 및 수정",
+      actions: [
+        {
+          type: "CREATE_ANALYSIS_VIEW",
+          viewId: "view-2",
+          title: "새 리포트",
+          blocks: [],
+        },
+        {
+          type: "UPDATE_ANALYSIS_VIEW",
+          operation: "ADD_BLOCK",
+          viewId: "view-2",
+          blocks: [],
+        },
+        {
+          type: "PUBLISH_ANALYSIS_VIEW",
+          viewId: "view-2",
+          isPublished: true,
+        },
+        {
+          type: "DELETE_ANALYSIS_VIEWS",
+          deletedIds: ["view-1"],
+        },
+      ],
+    });
+
+    const { result } = renderHook(() => useNavigatorShell({ mode: "analyst" }));
+    expect(result.current.config.badgeLabel).toBe("Analyst");
+
+    await act(async () => {
+      await result.current.handleExecutePrompt("새 분석 뷰 만들어줘");
+    });
+
+    const callArg = mockMutateAsync.mock.calls[0]?.[0] as {
+      mode: string;
+      currentContext?: {
+        currentAnalysisView?: { id: string; blocks: unknown[] };
+        visibleAnalysisViews?: Array<{ id: string }>;
+      };
+    };
+    expect(callArg.mode).toBe("analyst");
+    expect(callArg.currentContext?.currentAnalysisView?.id).toBe("view-1");
+    expect(callArg.currentContext?.currentAnalysisView?.blocks).toHaveLength(1);
+    expect(callArg.currentContext?.visibleAnalysisViews?.[0]?.id).toBe("view-1");
+
+    expect(mockInvalidateQueries).toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith("/analyst/views/view-2");
+    expect(mockPush).toHaveBeenCalledWith("/analyst/views");
+  });
 });
