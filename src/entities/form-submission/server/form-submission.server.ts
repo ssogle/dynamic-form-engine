@@ -16,6 +16,8 @@ import {
   parseSortParam,
   type PaginatedSubmissionsResponse,
 } from "../schema/submission-query.schema";
+import { isValidTimezone } from "../schema/date-range.schema";
+import { buildDateRangeConditions } from "./date-filter-sql.server";
 
 /**
  * 서브미션 데이터에 포함된 관계형 필드(relation) 값을 분석하여 relations 엣지 테이블을 동기화합니다.
@@ -139,6 +141,10 @@ export interface FindSubmissionsPaginatedOptions {
   sort?: string | undefined;
   filters?: string | undefined;
   ids?: string | undefined;
+  dateFieldId?: string | undefined;
+  startDate?: string | undefined;
+  endDate?: string | undefined;
+  timezone?: string | undefined;
 }
 
 /**
@@ -184,6 +190,21 @@ export const findSubmissionsPaginated = async (
     } else {
       conditions.push(sql`${formSubmissions.data}->>${fieldId} ILIKE ${`%${keyword}%`}`);
     }
+  }
+
+  // 2-1. 기간 범위 필터 조립 (분석 뷰 -> 원천 데이터 드릴다운 지원)
+  const resolvedTimezone =
+    options.timezone && isValidTimezone(options.timezone) ? options.timezone : "Asia/Seoul";
+  if (options.startDate || options.endDate) {
+    conditions.push(
+      ...buildDateRangeConditions({
+        dateFieldId: options.dateFieldId,
+        startDate: options.startDate,
+        endDate: options.endDate,
+        timezone: resolvedTimezone,
+        requireValidDateField: Boolean(options.dateFieldId),
+      })
+    );
   }
 
   const whereClause = and(...conditions);

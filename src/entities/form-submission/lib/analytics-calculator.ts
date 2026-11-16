@@ -13,6 +13,7 @@ export interface AnalyticsFieldMeta {
   label: string;
   type: string;
   optionsMap: Map<string, string>;
+  relationTargetFormId?: string | undefined;
 }
 
 /**
@@ -91,6 +92,14 @@ export function resolveFieldOptionLabelMap(
     const label = typeof rawField.label === "string" && rawField.label ? rawField.label : id;
     const type = typeof rawField.type === "string" ? rawField.type : "text";
     const optionsMap = new Map<string, string>();
+    const rawRelationConfig =
+      rawField.relationConfig && typeof rawField.relationConfig === "object"
+        ? (rawField.relationConfig as Record<string, unknown>)
+        : undefined;
+    const relationTargetFormId =
+      typeof rawRelationConfig?.targetFormId === "string" && rawRelationConfig.targetFormId.trim()
+        ? rawRelationConfig.targetFormId.trim()
+        : undefined;
 
     if (Array.isArray(rawField.options)) {
       for (const opt of rawField.options) {
@@ -104,7 +113,7 @@ export function resolveFieldOptionLabelMap(
       }
     }
 
-    result.set(id, { id, label, type, optionsMap });
+    result.set(id, { id, label, type, optionsMap, relationTargetFormId });
   }
 
   return result;
@@ -202,6 +211,93 @@ export function formatTimeBucketKey(
       return `${wy}-${wm}-${wd}`;
     }
   }
+}
+
+function parseYmdParts(ymd: string): { year: number; month: number; day: number } | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!match) return null;
+  return {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+  };
+}
+
+function formatUtcYmd(date: Date): string {
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * 지정된 기간(`startDate` ~ `endDate`)에 대해 데이터가 0건인 구간도 누락 없이 표시할 수 있도록
+ * 연속된 시계열 버킷 키 목록(`YYYY-MM`, `YYYY-Q1`, `YYYY-MM-DD`)을 오름차순으로 생성합니다.
+ *
+ * 대량 구간에서도 안전하도록 종료일(`endDate`)부터 최신 `limit`개만 역방향으로 산출한 뒤 오름차순 정렬합니다.
+ */
+export function buildContinuousTimeBucketKeys(
+  timeBucket: AnalyticsTimeBucket,
+  startDate: string,
+  endDate: string,
+  limit = 50
+): { keys: string[]; isTruncated: boolean } {
+  const start = parseYmdParts(startDate);
+  const end = parseYmdParts(endDate);
+  if (!start || !end || startDate > endDate || limit <= 0) {
+    return { keys: [], isTruncated: false };
+  }
+
+  const maxCount = Math.max(1, Math.trunc(limit));
+  const reversedKeys: string[] = [];
+
+  if (timeBucket === "month") {
+    const startIdx = start.year * 12 + (start.month - 1);
+    const endIdx = end.year * 12 + (end.month - 1);
+    let cursor = endIdx;
+    while (cursor >= startIdx && reversedKeys.length < maxCount) {
+      const y = Math.floor(cursor / 12);
+      const m = (cursor % 12) + 1;
+      reversedKeys.push(`${y}-${String(m).padStart(2, "0")}`);
+      cursor -= 1;
+    }
+    return { keys: reversedKeys.reverse(), isTruncated: cursor >= startIdx };
+  }
+
+  if (timeBucket === "quarter") {
+    const startIdx = start.year * 4 + Math.floor((start.month - 1) / 3);
+    const endIdx = end.year * 4 + Math.floor((end.month - 1) / 3);
+    let cursor = endIdx;
+    while (cursor >= startIdx && reversedKeys.length < maxCount) {
+      const y = Math.floor(cursor / 4);
+      const q = (cursor % 4) + 1;
+      reversedKeys.push(`${y}-Q${q}`);
+      cursor -= 1;
+    }
+    return { keys: reversedKeys.reverse(), isTruncated: cursor >= startIdx };
+  }
+
+  if (timeBucket === "week") {
+    const startUtc = new Date(Date.UTC(start.year, start.month - 1, start.day));
+    const endUtc = new Date(Date.UTC(end.year, end.month - 1, end.day));
+    startUtc.setUTCDate(startUtc.getUTCDate() - ((startUtc.getUTCDay() + 6) % 7));
+    endUtc.setUTCDate(endUtc.getUTCDate() - ((endUtc.getUTCDay() + 6) % 7));
+
+    const cursor = new Date(endUtc.getTime());
+    while (cursor.getTime() >= startUtc.getTime() && reversedKeys.length < maxCount) {
+      reversedKeys.push(formatUtcYmd(cursor));
+      cursor.setUTCDate(cursor.getUTCDate() - 7);
+    }
+    return { keys: reversedKeys.reverse(), isTruncated: cursor.getTime() >= startUtc.getTime() };
+  }
+
+  const startMs = Date.UTC(start.year, start.month - 1, start.day);
+  const cursor = new Date(Date.UTC(end.year, end.month - 1, end.day));
+  while (cursor.getTime() >= startMs && reversedKeys.length < maxCount) {
+    reversedKeys.push(formatUtcYmd(cursor));
+    cursor.setUTCDate(cursor.getUTCDate() - 1);
+  }
+  return { keys: reversedKeys.reverse(), isTruncated: cursor.getTime() >= startMs };
 }
 
 /**

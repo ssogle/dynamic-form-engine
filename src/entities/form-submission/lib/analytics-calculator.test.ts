@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildContinuousTimeBucketKeys,
   computeSeriesMetric,
   formatFieldDisplayKey,
   formatTimeBucketKey,
@@ -183,6 +184,35 @@ describe("Analytics Calculator (entities/form-submission/lib)", () => {
         { key: "2026-Q2", baseValue: 150, targetValue: 0, execution_rate: null },
         { key: "2026-Q3", baseValue: 0, targetValue: 100, execution_rate: 0 },
       ]);
+    });
+  });
+
+  describe("buildContinuousTimeBucketKeys (0건 구간 포함 연속 버킷 생성)", () => {
+    it("month/quarter/week/day 단위 연속 키를 생성하고 limit 초과 시 최신 구간만 유지하며 isTruncated를 반환한다", () => {
+      expect(buildContinuousTimeBucketKeys("month", "2026-08-16", "2026-11-16", 50)).toEqual({
+        keys: ["2026-08", "2026-09", "2026-10", "2026-11"],
+        isTruncated: false,
+      });
+
+      expect(buildContinuousTimeBucketKeys("month", "2026-01-01", "2026-11-30", 2)).toEqual({
+        keys: ["2026-10", "2026-11"],
+        isTruncated: true,
+      });
+
+      expect(buildContinuousTimeBucketKeys("quarter", "2026-01-15", "2026-11-16", 50)).toEqual({
+        keys: ["2026-Q1", "2026-Q2", "2026-Q3", "2026-Q4"],
+        isTruncated: false,
+      });
+
+      expect(buildContinuousTimeBucketKeys("day", "2026-11-14", "2026-11-16", 50)).toEqual({
+        keys: ["2026-11-14", "2026-11-15", "2026-11-16"],
+        isTruncated: false,
+      });
+
+      expect(buildContinuousTimeBucketKeys("week", "2026-11-04", "2026-11-18", 50)).toEqual({
+        keys: ["2026-11-02", "2026-11-09", "2026-11-16"],
+        isTruncated: false,
+      });
     });
   });
 });

@@ -23,6 +23,7 @@ import {
   useInfiniteFormSubmissionsQuery,
   useDeleteSubmissionMutation,
   type FormSubmission,
+  type SubmissionDateRangeFilter,
 } from "@/entities/form-submission";
 import { formatDateTime } from "@/shared/lib/date";
 import { formatRelationSummaryCell } from "../lib/relation-summary";
@@ -56,6 +57,10 @@ export interface UseSubmissionListTableParams {
    * 폼 메타데이터 객체
    */
   form: Form;
+  /**
+   * URL 쿼리 파라미터로부터 전달된 초기 기간 필터 (분석 뷰 드릴다운 연동)
+   */
+  initialDateRange?: SubmissionDateRangeFilter | undefined;
 }
 
 export interface UseSubmissionListTableReturn {
@@ -80,7 +85,15 @@ export interface UseSubmissionListTableReturn {
    */
   primaryFieldId: string | undefined;
   /**
-   * 현재 적용 중인 컬럼 필터 개수
+   * 현재 적용 중인 기간 필터 상태
+   */
+  dateRangeFilter: SubmissionDateRangeFilter | undefined;
+  /**
+   * 기간 필터에 적용 중인 기준 날짜 필드 라벨 (예: "결제일" 또는 "제출일")
+   */
+  dateRangeFieldLabel: string;
+  /**
+   * 현재 적용 중인 컬럼 및 기간 필터 개수
    */
   activeFilterCount: number;
   /**
@@ -116,9 +129,13 @@ export interface UseSubmissionListTableReturn {
    */
   handleSetFieldFilter: (fieldId: string, value: string) => void;
   /**
-   * 모든 활성 컬럼 필터 초기화 핸들러
+   * 모든 활성 컬럼 및 기간 필터 초기화 핸들러
    */
   handleClearAllFilters: () => void;
+  /**
+   * 기간 필터만 단독 해제하는 핸들러
+   */
+  handleClearDateRange: () => void;
   /**
    * 단건 응답 삭제 핸들러
    */
@@ -132,18 +149,62 @@ export interface UseSubmissionListTableReturn {
 /**
  * 제출 응답 목록 가상화 테이블 비즈니스 오케스트레이션 전용 커스텀 훅 (useSubmissionListTable)
  *
- * 서버 무한 스크롤 연동, 다중 정렬/컬럼 필터 직렬화, TanStack Table 인스턴스화,
+ * 서버 무한 스크롤 연동, 다중 정렬/컬럼 필터 직렬화, 기간 필터 연동, TanStack Table 인스턴스화,
  * 컬럼 정의 생성, 삭제 인터랙션 및 라우팅 로직을 캡슐화합니다.
  */
 export function useSubmissionListTable({
   form,
+  initialDateRange,
 }: UseSubmissionListTableParams): UseSubmissionListTableReturn {
   const router = useRouter();
   const [sorting, setSorting] = React.useState<SortingState>([{ id: "createdAt", desc: true }]);
   const [columnFilters, setColumnFilters] = React.useState<Record<string, string>>({});
+  const [dateRangeFilter, setDateRangeFilter] = React.useState<
+    SubmissionDateRangeFilter | undefined
+  >(initialDateRange);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [columnSizing, setColumnSizing] = React.useState<ColumnSizingState>({});
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
+
+  const initialStartDate = initialDateRange?.startDate;
+  const initialEndDate = initialDateRange?.endDate;
+  const initialDateFieldId = initialDateRange?.dateFieldId;
+
+  React.useEffect(() => {
+    setDateRangeFilter((prev) => {
+      if (!initialStartDate && !initialEndDate) {
+        return prev === undefined ? prev : undefined;
+      }
+      if (
+        prev?.startDate === initialStartDate &&
+        prev?.endDate === initialEndDate &&
+        prev?.dateFieldId === initialDateFieldId
+      ) {
+        return prev;
+      }
+      return {
+        startDate: initialStartDate,
+        endDate: initialEndDate,
+        dateFieldId: initialDateFieldId,
+      };
+    });
+  }, [initialStartDate, initialEndDate, initialDateFieldId]);
+
+  const activeFields = React.useMemo(() => extractActiveFields(form), [form]);
+  const primaryFieldId = extractPrimaryFieldId(form);
+
+  // 활성 폼 스키마에 실제 존재하는 date 타입 필드인지 검증해 안전한 기준 축 ID/라벨 도출
+  const resolvedDateMeta = React.useMemo(() => {
+    if (!dateRangeFilter?.dateFieldId) return undefined;
+    const matched = activeFields.find(
+      (f) => f.id === dateRangeFilter.dateFieldId && f.type === "date"
+    );
+    return matched;
+  }, [activeFields, dateRangeFilter?.dateFieldId]);
+
+  const resolvedDateFieldId = resolvedDateMeta?.id;
+  const dateRangeFieldLabel = resolvedDateMeta?.label ?? "제출일";
+  const hasActiveDateRange = Boolean(dateRangeFilter?.startDate || dateRangeFilter?.endDate);
 
   // 1. 다중 정렬 파라미터 직렬화 (예: "f_exp:desc,createdAt:desc")
   const sortQueryString = React.useMemo(() => {
@@ -164,6 +225,9 @@ export function useSubmissionListTable({
       sort: sortQueryString,
       filters: filtersQueryString,
       limit: 20,
+      startDate: dateRangeFilter?.startDate,
+      endDate: dateRangeFilter?.endDate,
+      dateFieldId: resolvedDateFieldId,
     });
 
   const { mutateAsync: deleteSubmission } = useDeleteSubmissionMutation(form.id);
@@ -174,8 +238,6 @@ export function useSubmissionListTable({
   }, [data]);
 
   const totalCount = data?.pages[0]?.totalCount ?? flatSubmissions.length;
-  const activeFields = React.useMemo(() => extractActiveFields(form), [form]);
-  const primaryFieldId = extractPrimaryFieldId(form);
   const { lookupMap: relationLookupMap } = useRelationLookup(activeFields, flatSubmissions);
 
   // 단일 컬럼 필터 갱신 핸들러
@@ -190,10 +252,19 @@ export function useSubmissionListTable({
     });
   }, []);
 
+  // 기간 필터만 해제하고 URL 쿼리스트링도 함께 정리
+  const handleClearDateRange = React.useCallback(() => {
+    setDateRangeFilter(undefined);
+    router.replace(`/consumer/forms/${form.id}`, { scroll: false });
+  }, [router, form.id]);
+
   // 전체 필터 초기화
   const handleClearAllFilters = React.useCallback(() => {
     setColumnFilters({});
-  }, []);
+    if (hasActiveDateRange) {
+      handleClearDateRange();
+    }
+  }, [hasActiveDateRange, handleClearDateRange]);
 
   // 단건 응답 삭제 핸들러
   const handleDelete = React.useCallback(
@@ -414,9 +485,9 @@ export function useSubmissionListTable({
 
   React.useEffect(() => {
     tableContainerRef.current?.scrollTo({ top: 0 });
-  }, [sortQueryString, filtersQueryString]);
+  }, [sortQueryString, filtersQueryString, dateRangeFilter]);
 
-  const activeFilterCount = Object.keys(columnFilters).length;
+  const activeFilterCount = Object.keys(columnFilters).length + (hasActiveDateRange ? 1 : 0);
 
   return {
     table,
@@ -424,6 +495,14 @@ export function useSubmissionListTable({
     totalCount,
     activeFields,
     primaryFieldId,
+    dateRangeFilter: hasActiveDateRange
+      ? {
+          startDate: dateRangeFilter?.startDate,
+          endDate: dateRangeFilter?.endDate,
+          dateFieldId: resolvedDateFieldId,
+        }
+      : undefined,
+    dateRangeFieldLabel,
     activeFilterCount,
     isLoading,
     isError,
@@ -434,6 +513,7 @@ export function useSubmissionListTable({
     tableContainerRef,
     handleSetFieldFilter,
     handleClearAllFilters,
+    handleClearDateRange,
     handleDelete,
     handleRowClick,
   };

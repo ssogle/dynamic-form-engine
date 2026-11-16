@@ -5,6 +5,7 @@
  */
 export {
   analysisBlockSchema,
+  analysisBlockSourceLinkSchema,
   analysisViews,
   chartAnalysisBlockSchema,
   chartSeriesSchema,
@@ -16,6 +17,7 @@ export {
   textAnalysisBlockSchema,
   updateAnalysisViewSchema,
   type AnalysisBlock,
+  type AnalysisBlockSourceLink,
   type AnalysisView,
   type ChartAnalysisBlock,
   type ChartSeries,
@@ -42,3 +44,9 @@ export {
   useDeleteAnalysisViewMutation,
   usePublishAnalysisViewMutation,
 } from "./queries/use-analysis-view.mutation";
+export {
+  buildAnalysisViewRefreshPrompt,
+  useAnalysisViewRefreshStore,
+  type AnalysisViewRefreshState,
+  type PendingAnalysisRefreshRequest,
+} from "./store/analysis-view-refresh.store";

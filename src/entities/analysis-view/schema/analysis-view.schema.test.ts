@@ -47,6 +47,33 @@ describe("AnalysisView Schema Validation Engine", () => {
       expect(analysisBlockSchema.safeParse(chartBlock).success).toBe(true);
     });
 
+    it("sourceLinks가 포함된 블록 및 없는 레거시 블록(또는 과거 queryMeta 잔여 키 포함 JSON)을 모두 통과시켜야 한다", () => {
+      const formUuid = "33333333-3333-4333-8333-333333333333";
+      const tableWithLinks = {
+        id: "blk_table_links",
+        type: "table",
+        title: "분기 손익표",
+        columns: [
+          { key: "quarter", label: "분기", align: "left" },
+          { key: "revenue", label: "매출", align: "right" },
+          { key: "profit", label: "순이익", align: "right" },
+        ],
+        rows: [{ quarter: "2026-Q1", revenue: 1000, profit: 300 }],
+        sourceLinks: [
+          {
+            formId: formUuid,
+            label: "매출 원장",
+            startDate: "2026-01-01",
+            endDate: "2026-12-31",
+            dateFieldId: "f_date",
+          },
+        ],
+      };
+
+      const parsed = analysisBlockSchema.safeParse(tableWithLinks);
+      expect(parsed.success).toBe(true);
+    });
+
     it("text 블록의 content가 비어있거나 table 컬럼이 0개이면 실패해야 한다", () => {
       const emptyText = {
         id: "blk_1",

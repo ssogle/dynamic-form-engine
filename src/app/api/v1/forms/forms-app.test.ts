@@ -412,6 +412,58 @@ describe("formsApp (Hono Unified API Router)", () => {
       expect(formSubmissionServer.findSubmissionsPaginated).not.toHaveBeenCalled();
     });
 
+    it("GET forwards valid startDate, endDate, dateFieldId to findSubmissionsPaginated and rejects non-date fields", async () => {
+      const dateFieldId = "880e8400-e29b-41d4-a716-446655440004";
+      const formWithDate = createMockForm({
+        schemaDefinition: {
+          primaryFieldId: FIELD_ID,
+          fields: [
+            {
+              id: FIELD_ID,
+              type: "text",
+              label: "성함",
+              description: "성함",
+              required: true,
+            },
+            {
+              id: dateFieldId,
+              type: "date",
+              label: "결제일",
+              description: "실제 결제일",
+              required: true,
+            },
+          ],
+        },
+      });
+      vi.mocked(formServer.findFormById).mockResolvedValue(formWithDate);
+      vi.mocked(formSubmissionServer.findSubmissionsPaginated).mockResolvedValue({
+        items: [],
+        page: 1,
+        limit: 20,
+        totalCount: 0,
+        totalPages: 0,
+        hasMore: false,
+      });
+
+      const okRes = await formsApp.request(
+        `/api/v1/forms/${VALID_FORM_ID}/submissions?startDate=2026-10-01&endDate=2026-10-31&dateFieldId=${dateFieldId}`
+      );
+      expect(okRes.status).toBe(200);
+      expect(formSubmissionServer.findSubmissionsPaginated).toHaveBeenCalledWith(
+        VALID_FORM_ID,
+        expect.objectContaining({
+          startDate: "2026-10-01",
+          endDate: "2026-10-31",
+          dateFieldId,
+        })
+      );
+
+      const invalidFieldRes = await formsApp.request(
+        `/api/v1/forms/${VALID_FORM_ID}/submissions?startDate=2026-10-01&dateFieldId=${FIELD_ID}`
+      );
+      expect(invalidFieldRes.status).toBe(400);
+    });
+
     it("POST creates submission with dynamically validated and cleaned data (supports wrapped { data })", async () => {
       vi.mocked(formServer.findFormById).mockResolvedValue(createMockForm());
       const created = createMockSubmission({ data: { [FIELD_ID]: "이순신" } });

@@ -20,6 +20,23 @@ const systemManagedFields = {
 } as const;
 
 /**
+ * 블록에서 원천 폼 데이터 목록(`/consumer/forms/[id]`)으로 이동하기 위한 출처 링크 규격
+ */
+export const analysisBlockSourceLinkSchema = z.object({
+  formId: z.uuid("유효한 폼 ID(UUID)가 필요합니다."),
+  label: z.string().min(1, "출처 링크 라벨은 필수입니다."),
+  startDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "시작일은 YYYY-MM-DD 형식이어야 합니다.")
+    .optional(),
+  endDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "종료일은 YYYY-MM-DD 형식이어야 합니다.")
+    .optional(),
+  dateFieldId: z.string().min(1).optional(),
+});
+
+/**
  * 1. 글 블록 (Text Block)
  * 분석 요약, 데이터 항목 나열, 비교 시사점 등 서술형 콘텐츠를 담습니다.
  */
@@ -28,6 +45,7 @@ export const textAnalysisBlockSchema = z.object({
   type: z.literal("text"),
   title: z.string().optional(),
   content: z.string().min(1, "본문 내용은 필수입니다."),
+  sourceLinks: z.array(analysisBlockSourceLinkSchema).optional(),
 });
 
 /**
@@ -50,6 +68,7 @@ export const tableAnalysisBlockSchema = z.object({
   description: z.string().optional(),
   columns: z.array(tableColumnSchema).min(1, "최소 1개 이상의 테이블 컬럼이 필요합니다."),
   rows: z.array(z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))),
+  sourceLinks: z.array(analysisBlockSourceLinkSchema).optional(),
 });
 
 /**
@@ -73,6 +92,7 @@ export const chartAnalysisBlockSchema = z.object({
   xAxisKey: z.string().min(1, "X축 데이터 키는 필수입니다."),
   series: z.array(chartSeriesSchema).min(1, "최소 1개 이상의 차트 시리즈가 필요합니다."),
   data: z.array(z.record(z.string(), z.union([z.string(), z.number(), z.null()]))),
+  sourceLinks: z.array(analysisBlockSourceLinkSchema).optional(),
 });
 
 /**
@@ -129,6 +149,7 @@ export function extractAnalysisBlocks(
   }, []);
 }
 
+export type AnalysisBlockSourceLink = z.infer<typeof analysisBlockSourceLinkSchema>;
 export type TextAnalysisBlock = z.infer<typeof textAnalysisBlockSchema>;
 export type TableColumn = z.infer<typeof tableColumnSchema>;
 export type TableAnalysisBlock = z.infer<typeof tableAnalysisBlockSchema>;

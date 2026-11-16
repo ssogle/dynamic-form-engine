@@ -99,7 +99,9 @@ export function AnalysisViewRenderer({
             <p className="text-muted-foreground text-sm">{view.description}</p>
           ) : null}
           <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
-            <span>최종 수정: {formatDateTime(view.updatedAt) || "-"}</span>
+            <span className="text-foreground/80 font-medium">
+              데이터 기준 시각: {formatDateTime(view.updatedAt) || "-"}
+            </span>
             {view.publishedAt ? (
               <span>발행 일시: {formatDateTime(view.publishedAt) || "-"}</span>
             ) : null}
@@ -109,6 +111,13 @@ export function AnalysisViewRenderer({
           <div className="flex shrink-0 items-center gap-2">{headerActions}</div>
         ) : null}
       </header>
+
+      {publishedOnly ? (
+        <div className="border-border bg-muted/40 text-muted-foreground rounded-lg border px-3.5 py-2 text-xs">
+          저장된 스냅샷 리포트입니다. 각 블록 하단의 원천 데이터 링크를 통해 실시간 상세 내역을 바로
+          확인할 수 있습니다.
+        </div>
+      ) : null}
 
       {blocks.length === 0 ? (
         <div className="border-border bg-muted/20 flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">

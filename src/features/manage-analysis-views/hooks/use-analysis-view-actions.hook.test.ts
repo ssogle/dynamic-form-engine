@@ -1,5 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useAnalysisViewRefreshStore } from "@/entities/analysis-view";
 import { useAnalysisViewActions } from "./use-analysis-view-actions.hook";
 
 const mockPush = vi.fn();
@@ -30,6 +31,7 @@ vi.mock("@/entities/analysis-view", async (importOriginal) => {
 describe("useAnalysisViewActions (manage-analysis-views/hooks)", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    useAnalysisViewRefreshStore.setState({ pendingRefresh: null, isRefreshingByAi: false });
   });
 
   it("블록이 0개이고 미발행 상태이면 canPublish는 false여야 한다", () => {
@@ -86,5 +88,49 @@ describe("useAnalysisViewActions (manage-analysis-views/hooks)", () => {
     });
     expect(mockDeleteMutateAsync).toHaveBeenCalledWith("view-1");
     expect(mockPush).toHaveBeenCalledWith("/analyst/views");
+  });
+
+  it("handleRefresh는 Analyst AI 재집계 요청을 스토어에 등록하고 AI 작업 상태에 따라 isRefreshPending과 상태 메시지를 갱신한다", async () => {
+    mockUseAnalysisViewDetailQuery.mockReturnValue({
+      data: {
+        id: "view-1",
+        title: "재집계 문서",
+        description: null,
+        blocks: [{ id: "b1", type: "text", content: "내용" }],
+        publishedAt: null,
+        createdAt: new Date("2026-02-01T00:00:00Z"),
+        updatedAt: new Date("2026-02-01T00:00:00Z"),
+        deletedAt: null,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    const { result } = renderHook(() => useAnalysisViewActions({ viewId: "view-1" }));
+    expect(result.current.canRefresh).toBe(true);
+    expect(result.current.isRefreshPending).toBe(false);
+
+    await act(async () => {
+      await result.current.handleRefresh();
+    });
+
+    const pending = useAnalysisViewRefreshStore.getState().pendingRefresh;
+    expect(pending?.viewId).toBe("view-1");
+    expect(pending?.prompt).toContain("재집계 문서");
+    expect(pending?.prompt).toContain("SET_ALL_BLOCKS");
+    expect(result.current.isRefreshPending).toBe(true);
+    expect(result.current.refreshStatusMessage).toContain("Analyst AI");
+
+    act(() => {
+      useAnalysisViewRefreshStore.setState({ pendingRefresh: null, isRefreshingByAi: true });
+    });
+    expect(result.current.isRefreshPending).toBe(true);
+
+    act(() => {
+      useAnalysisViewRefreshStore.setState({ pendingRefresh: null, isRefreshingByAi: false });
+    });
+    expect(result.current.isRefreshPending).toBe(false);
+    expect(result.current.refreshStatusMessage).toContain("업데이트했습니다");
   });
 });

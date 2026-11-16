@@ -13,6 +13,9 @@ export interface GetPaginatedSubmissionsParams {
   sort?: string | undefined;
   filters?: string | undefined;
   ids?: string | undefined;
+  startDate?: string | undefined;
+  endDate?: string | undefined;
+  dateFieldId?: string | undefined;
 }
 
 /**
@@ -33,6 +36,9 @@ export async function getPaginatedFormSubmissions(
       sort: params.sort || undefined,
       filters: params.filters || undefined,
       ids: params.ids || undefined,
+      startDate: params.startDate || undefined,
+      endDate: params.endDate || undefined,
+      dateFieldId: params.dateFieldId || undefined,
     },
   });
 }
@@ -73,31 +79,44 @@ export interface UseInfiniteFormSubmissionsQueryOptions {
   sort?: string | undefined;
   filters?: string | undefined;
   limit?: number | undefined;
+  startDate?: string | undefined;
+  endDate?: string | undefined;
+  dateFieldId?: string | undefined;
 }
 
 /**
  * 특정 폼의 응답 목록을 무한 스크롤(가상화 그리드 연동)로 조회하는 TanStack Query 커스텀 훅
  *
- * 정렬(sort)이나 필터(filters)가 변경되면 쿼리 키가 자동으로 변경되어
+ * 정렬(sort)이나 필터(filters), 기간 범위가 변경되면 쿼리 키가 자동으로 변경되어
  * 기존 데이터가 1페이지부터 새롭게 자동 리셋 페칭됩니다.
  *
  * @param formId 조회 대상 폼 고유 식별자 (UUID)
- * @param options 멀티 정렬, 컬럼 필터, 페이지당 건수 옵션
+ * @param options 멀티 정렬, 컬럼 필터, 기간 범위, 페이지당 건수 옵션
  */
 export function useInfiniteFormSubmissionsQuery(
   formId: string,
   options: UseInfiniteFormSubmissionsQueryOptions = {}
 ) {
-  const { sort, filters, limit = 20 } = options;
+  const { sort, filters, limit = 20, startDate, endDate, dateFieldId } = options;
 
   return useInfiniteQuery({
-    queryKey: formSubmissionsKeys.infinite(formId, { sort, filters, limit }),
+    queryKey: formSubmissionsKeys.infinite(formId, {
+      sort,
+      filters,
+      limit,
+      startDate,
+      endDate,
+      dateFieldId,
+    }),
     queryFn: ({ pageParam }) =>
       getPaginatedFormSubmissions(formId, {
         page: pageParam,
         limit,
         sort,
         filters,
+        startDate,
+        endDate,
+        dateFieldId,
       }),
     initialPageParam: 1,
     getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.page + 1 : undefined),

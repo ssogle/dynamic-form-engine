@@ -38,16 +38,18 @@
   3. **분석 및 비교를 위한 결정론적 서버 통계/조회 엔진**:
      - LLM이 직접 숫자를 계산하거나 대량 데이터를 암산하지 않고, 서버 도구를 통해 정확한 데이터를 조회·집계합니다.
      - 지원 연산:
-       - 기본/그룹 집계: 전체 건수(`count`), 숫자 필드 집계(`sum`, `avg`, `min`, `max`), 범주/선택형 필드별 그룹 비교(`groupBy`, `select` 옵션 `value` -> `label` 변환 포함).
-       - 시계열 추이 비교: `day`, `week`, `month`, `quarter`(분기) 버킷 기준 집계 (PostgreSQL `DATE_TRUNC` + `AT TIME ZONE` 기반 시간대 경계 보정 및 정규화된 키 포맷: `YYYY-MM-DD`, `YYYY-MM`, `YYYY-Q1`~`YYYY-Q4`).
+       - 기본/그룹 집계: 전체 건수(`count`), 숫자 필드 집계(`sum`, `avg`, `min`, `max`), 범주/선택형/관계형(`relation`) 필드별 그룹 비교(`select` 옵션 라벨 및 `relation` 대상 폼 대표명 치환 포함), 특정 필드·관계형 조건 필터링(`filters`).
+       - 시계열 추이 비교: `day`, `week`, `month`, `quarter`(분기) 버킷 기준 집계 (`startDate`/`endDate` 지정 시 데이터 0건 구간도 연속 0-fill 버킷으로 포함) 및 PostgreSQL 서브쿼리 기반 `GROUP BY` 안전 실행.
        - 시리즈 산술 파생 지표 연산: 복수 폼/시리즈 집계 결과 간 차액(`subtract`: 손익 등), 합산(`add`), 비율(`ratio`: 집행률/이익률 백분율)을 서버 도구(`computeSeriesMetric`)로 결정론적 계산.
-       - 항목 나열/샘플링: 특정 조건 필터링 및 정렬을 통한 상위 N건 레코드 조회(테이블/글 블록 근거 데이터용).
+       - 항목 나열/샘플링: 특정 조건 필터링 및 정렬을 통한 소수 근거 샘플링 조회(대량 원천 목록 조회는 컨슈머 폼 데이터 뷰 `/consumer/forms/[id]`로 위임).
+       - 날짜 기준 축 및 대용량 정합성: 빌더는 발생·귀속 시점이 중요한 트랜잭션 폼에 `date` 필드를 도메인 맥락에 맞게 제안(마스터 폼 강제 배제)하고, 서버 집계/필터(`startDate`, `endDate`, `dateFieldId`)는 유효한 `date` 필드를 우선 기준 축으로 사용하되 생략 시 `created_at AT TIME ZONE`으로 폴백합니다. 또한 1만~10만 건 환경에서 `LIMIT` 절단 전 전체 집합 기준 `totalCount`/`summaryValue` 산출, `timeBucket` 최신 구간 우선 슬라이싱 후 시간 오름차순 정렬, `isTruncated` 반환을 보장합니다.
   4. **분석가 AI Navigator (`mode="analyst"`) 확장**:
-     - `NAVIGATOR_MODE_REGISTRY`에 `analyst` 모드를 등록합니다.
-     - AI가 분석가 질의에 따라 폼 스키마 조회 -> 서버 집계/레코드 조회 도구 실행 -> 분석 뷰 생성 또는 블록 추가/수정/삭제/재배치 도구를 실행하여 우측 화면을 즉시 갱신합니다.
-  5. **분석 뷰 영속화, 발행(Publish) 및 컨슈머 열람 연동**:
-     - 신규 물리 테이블 `analysis_views`에 분석 뷰 문서(제목, 설명, `blocks` JSONB, `publishedAt`, `deletedAt`)를 저장합니다. (멀티 소스 분석이 기본이므로 단일 폼 외래키 제약 없이 블록 내 집계/비교 데이터를 스냅샷 형태로 보관합니다.)
-     - 컨슈머의 `/consumer/views`에서 발행된(`publishedAt IS NOT NULL`) 분석 뷰 목록을 조회하고, `/consumer/views/[id]`에서 읽기 전용 분석 뷰 문서(글/테이블/차트)를 열람할 수 있도록 연동합니다.
+     - `NAVIGATOR_MODE_REGISTRY`에 `analyst` 모드를 등록하고, 컨텍스트 프롬프트에 서버 현재 날짜(`YYYY-MM-DD`)를 주입해 기본 안전 조회 기간을 정확히 계산합니다.
+     - AI가 분석가 질의에 따라 폼 스키마 조회 -> 서버 집계/샘플링 도구 실행 -> `sourceLinks`를 포함한 분석 뷰 생성 또는 블록 추가/수정/삭제/재배치 도구를 실행하여 우측 화면을 즉시 갱신합니다(병렬 블록 수정 경합 방지를 위한 `viewId` 단위 직렬화 잠금 적용).
+  5. **분석 뷰 영속화, AI 위임 재집계, 발행 및 원천 뷰 연결**:
+     - 신규 물리 테이블 `analysis_views`에 분석 뷰 문서(제목, 설명, `blocks` JSONB, `publishedAt`, `deletedAt`)를 저장합니다.
+     - 분석가 화면의 `[최신 데이터로 갱신]` 버튼 클릭 시 복잡한 별도 역직렬화(`queryMeta`) 재조립 대신 `useAnalysisViewRefreshStore`를 통해 좌측 Analyst AI에 최신 재집계를 위임하여 `text` 요약 수치·`table`·`chart`·`sourceLinks` 전체를 `SET_ALL_BLOCKS`로 일관되게 갱신합니다(이미 발행된 뷰는 컨슈머 뷰에도 최신 스냅샷 즉시 반영).
+     - 컨슈머의 `/consumer/views` 및 `/consumer/views/[id]`에서 데이터 기준 시각(`updatedAt`)과 함께 읽기 전용 문서를 열람하고, 블록의 `[원본 데이터 보기]` 링크를 통해 `/consumer/forms/[id]?startDate=...&endDate=...&dateFieldId=...` 새 탭(`target="_blank"`)으로 이동해 기간 필터링된 원천 목록을 확인할 수 있습니다.
 
 - **Non-Goals (이번 작업에서 의도적으로 배제하는 범위 - 후속 세부 스프린트로 이관)**:
   1. 드래그 앤 드롭 그리드 레이아웃, 위젯 크기 리사이징, 세밀한 마우스 기반 스타일/속성 인스펙터 등 복잡한 BI 대시보드 에디터.
@@ -80,6 +82,7 @@
     - `server/navigator-engine.server.ts`: `NAVIGATOR_MODE_REGISTRY`에 `analyst` 전략 등록 및 `updatedAnalysisView` 부가 데이터 반환.
   - `src/features/render-analysis-view/...` (및/또는 `src/features/manage-analysis-views/...`):
     - 블록 렌더러: `TextBlockRenderer`, `TableBlockRenderer`, `ChartBlockRenderer`(`@/shared/ui/chart` 활용).
+    - 차트 색상 정책: `src/app/globals.css`에 유채색 시맨틱 토큰 8종(`--chart-1` ~ `--chart-8`, 라이트/다크 대응)을 정의해 1~8번째 시리즈/세그먼트에 우선 사용하고, 9번째 이후 인덱스는 Golden Angle(`137.508deg`) 기반 `oklch` 색상 생성으로 중복 없이 자동 배정합니다.
     - 분석가 캔버스(`/analyst/views`, `/analyst/views/[id]`): 분석 뷰 목록 카드/테이블, 문서 프리뷰 캔버스, 발행 스위치/삭제 등 최소 제어 액션.
     - 컨슈머 뷰어(`/consumer/views`, `/consumer/views/[id]`): 발행된 분석 뷰 목록 열람 및 읽기 전용 문서 뷰어.
   - `src/app/api/v1/...`:
@@ -89,11 +92,27 @@
       - `GET /api/v1/analysis-views/:id`
       - `POST /api/v1/analysis-views/:id/publish`
       - `DELETE /api/v1/analysis-views/:id`
+    - 원천 폼 제출 목록 조회 API(`GET /api/v1/forms/:id/submissions`) 및 `/consumer/forms/[id]` 화면은 `startDate`, `endDate`, `dateFieldId` 쿼리 파라미터를 지원해 분석 뷰 블록에서 새 탭으로 넘어온 기간 드릴다운 요청을 필터링합니다.
 
 - **데이터 계약 (Schema & Interfaces)**:
 
   ```typescript
   import { z } from "zod";
+
+  // 블록 출처 링크 (하위 호환성을 위해 optional)
+  export const analysisBlockSourceLinkSchema = z.object({
+    formId: z.string().uuid(),
+    label: z.string().min(1),
+    startDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
+    endDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
+    dateFieldId: z.string().min(1).optional(),
+  });
 
   // 1. 글 블록 (Text Block): 설명, 데이터 항목 나열, 비교 시사점
   export const textAnalysisBlockSchema = z.object({
@@ -101,6 +120,7 @@
     type: z.literal("text"),
     title: z.string().optional(),
     content: z.string().min(1, "본문 내용은 필수입니다."),
+    sourceLinks: z.array(analysisBlockSourceLinkSchema).optional(),
   });
 
   // 2. 데이터 테이블 블록 (Table Block): 집계 비교표, 근거 데이터 목록
@@ -117,6 +137,7 @@
     description: z.string().optional(),
     columns: z.array(tableColumnSchema).min(1),
     rows: z.array(z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))),
+    sourceLinks: z.array(analysisBlockSourceLinkSchema).optional(),
   });
 
   // 3. 차트 블록 (Chart Block): 비교 및 추이 시각화
@@ -134,6 +155,7 @@
     xAxisKey: z.string().min(1),
     series: z.array(chartSeriesSchema).min(1),
     data: z.array(z.record(z.string(), z.union([z.string(), z.number(), z.null()]))),
+    sourceLinks: z.array(analysisBlockSourceLinkSchema).optional(),
   });
 
   // 분석 뷰 문서 블록 통합 Union
@@ -150,6 +172,15 @@
     targetFieldId: z.string().optional(),
     groupByFieldId: z.string().optional(),
     timeBucket: z.enum(["day", "week", "month", "quarter"]).optional(),
+    dateFieldId: z.string().optional(),
+    startDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
+    endDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
     timezone: z.string().default("Asia/Seoul"),
     limit: z.number().int().min(1).max(100).default(50),
   });
@@ -260,6 +291,10 @@
   - 복수 폼의 집계 결과를 공통 축(`groupBy` 또는 `timeBucket`)으로 비교 결합할 때, 전체 항목의 합집합(Union)을 기준으로 특정 폼에 데이터가 없는 항목은 누락하거나 `undefined`로 두지 않고 반드시 `0`으로 채워 정렬합니다(`timeBucket`은 시간 오름차순, `groupBy`는 일관된 기준 정렬).
   - `updateAnalysisView`에서 `REORDER_BLOCKS` 수행 시 `orderedBlockIds`가 기존 블록 ID 집합과 누락·중복 없이 1:1 일치하는지 검증하고, `UPDATE_BLOCK` 수행 시 기존 블록의 `id`가 변조되지 않도록 보정해야 합니다.
   - `computeSeriesMetric` 실행 시 `ratio` 연산에서 분모(`targetSeries` 값)가 `0`인 경우 `0으로 나누기(division by zero)`를 방어하여 반드시 `null`을 반환해야 하며(테이블은 `-` 등으로 안전 표시, 차트는 null 안전 렌더링), `ratio`는 소수점 둘째 자리 반올림, `add`/`subtract`는 IEEE 754 부동소수점 오차 보정을 적용해야 합니다.
+  - 날짜 기준 축(`dateFieldId` vs `created_at` 폴백) 일관성: `dateFieldId`가 전달된 경우 활성 스키마에 실제 존재하는 `date` 타입 필드인지 검증하고, `YYYY-MM-DD` 정규식 및 달력 유효성(`2026-02-31` 등 방어)을 통과한 행만 집계하며(누락·오류 행을 `created_at`으로 대체하지 않음), `created_at` 폴백 시에만 `AT TIME ZONE` 일 경계 변환을 적용합니다.
+  - 대용량(1만~10만 건) 버킷 절단 및 전체 지표 왜곡 방지: `totalCount`와 `summaryValue`는 반드시 `LIMIT` 적용 전 전체 필터 집합에서 산출하며, `timeBucket` 집계의 `LIMIT`은 최신 버킷(`DESC`)부터 슬라이싱한 뒤 시간 오름차순(`ASC`)으로 재정렬하고, 절단 발생 시 `isTruncated: true`를 반환합니다.
+  - 블록 갱신(`refresh`) 하위 호환성 및 부분 실패 격리: `queryMeta`가 없는 기존 수동/텍스트/레코드 블록은 기존 내용을 그대로 보존하며, `queryMeta` 내 특정 폼이 삭제되었거나 유효하지 않은 경우 해당 블록만 건너뛰고 정상 블록 갱신 결과를 보고합니다.
+  - 원천 목록 역할 분리 및 새 탭 드릴다운: 분석가 AI는 `queryFormSubmissions`를 소수 근거 샘플링으로만 사용하고 전체 목록 요청 시 `/consumer/forms/[id]` 안내 또는 `NAVIGATE`로 위임하며, 블록의 `[원본 데이터 보기]` 링크는 `/consumer/forms/[id]?startDate=...&endDate=...&dateFieldId=...`를 새 탭(`target="_blank"`)으로 열어 즉시 기간 필터링된 원천 내역을 확인할 수 있게 합니다.
 - **미해결 의문**:
   - 현재 단계에서 주요 아키텍처 의사결정 완료 (없음).
 
@@ -267,9 +302,10 @@
 
 - **단계별 구현 계획**:
   1. `npx shadcn@latest add chart` 적용 및 `analysis_views` DB 테이블 DDL(`src/shared/tables/analysis-views.table.ts`) 정의
-  2. `analysis-view` 엔티티 Zod 스키마(3종 블록: `text`, `table`, `chart`) 및 결정론적 서버 통계 집계/시리즈 산술 연산 엔진 TDD 구현
-  3. Hono API 최소 엔드포인트(`/api/v1/analysis-views` 조회·발행·단건삭제) 및 `analyst` AI Navigator 모드(집계/연산/생성/수정/발행/삭제 도구 및 프롬프트) 구현
-  4. 분석가 워크스페이스 UI(`/analyst/views`, `/analyst/views/[id]`), `/builder/views` 제거 및 3자 게이트웨이/헤더 연결, 컨슈머 열람(`/consumer/views`, `/consumer/views/[id]`) 연동
+  2. `analysis-view` 엔티티 Zod 스키마(3종 블록: `text`, `table`, `chart`, 선택적 `queryMeta`/`sourceLinks`) 및 결정론적 서버 통계 집계/시리즈 산술 연산 엔진(`dateFieldId`/`startDate`/`endDate`, `LIMIT` 분리 집계, 최신 버킷 우선 슬라이싱) TDD 구현
+  3. Hono API 엔드포인트(`/api/v1/analysis-views` 조회·발행·갱신(`refresh`)·단건삭제, `/api/v1/forms/:id/submissions` 기간 쿼리 필터) 및 `analyst` / `builder` AI Navigator 프롬프트/도구 고도화
+  4. 분석가 워크스페이스 UI(`/analyst/views`, `/analyst/views/[id]` 갱신 버튼 및 기준 시각), `/builder/views` 제거 및 3자 게이트웨이/헤더 연결, 컨슈머 뷰(`/consumer/views`, `/consumer/views/[id]` 스냅샷 안내, `/consumer/forms/[id]` 기간 필터 및 블록 `[원본 데이터 보기]` 새 탭 드릴다운) 연동
 - **검증 기준**:
-  - `npm test`: 서버 집계 엔진(`count`, `sum`, `avg`, `min`, `max`, `groupBy`, `timeBucket: "day" | "week" | "month" | "quarter"`, KST/UTC 분기 경계, 비정상 수치 방어, `select` 라벨 매핑), `computeSeriesMetric`(`subtract`, `add`, `ratio`, 분모 0 시 `null` 반환, 부동소수점 반올림, key 합집합 Zero-fill), 3종 블록 Zod 스키마 검증, `analyst` Navigator 도구 단위 테스트 전체 통과
+  - `npm test`: 서버 집계 엔진(`count`, `sum`, `avg`, `min`, `max`, `groupBy`, `timeBucket`, `dateFieldId` 달력 문자열 필터, 무효 날짜 제외, `created_at` `AT TIME ZONE` 폴백, `LIMIT` 초과 시 `totalCount`/`summaryValue` 무왜곡 & `isTruncated`), `findSubmissionsPaginated` 기간 필터, `computeSeriesMetric`, 블록 `queryMeta`/`sourceLinks` Zod 스키마, `POST /api/v1/analysis-views/:id/refresh` 결정론적 갱신, 드릴다운 URL 빌더, `analyst`/`builder` 프롬프트/도구 단위 테스트 전체 통과
   - `npm run verify`: 타입체크, 린트, 포맷, 전체 단위/컴포넌트 테스트 결함 0건 완주
+  - `npm run build`: Next.js 프로덕션 빌드 오류 0건 확인

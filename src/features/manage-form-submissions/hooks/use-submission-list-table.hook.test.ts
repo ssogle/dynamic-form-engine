@@ -7,9 +7,11 @@ import { useSubmissionListTable } from "./use-submission-list-table.hook";
 
 // Router 모킹
 const mockPush = vi.fn();
+const mockReplace = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
+    replace: mockReplace,
   }),
 }));
 
@@ -358,5 +360,57 @@ describe("useSubmissionListTable (features/manage-form-submissions/hooks)", () =
 
     expect(renderCellTitle(priorityCell)).toBe("과거보류");
     expect(renderCellTitle(tagsCell)).toBe("식대, 교통비");
+  });
+
+  it("initialDateRange 전달 시 무한 스크롤 쿼리에 기간 파라미터를 전달하고, 해제 시 URL 쿼리를 제거해야 한다", () => {
+    const formWithDate: Form = {
+      ...dummyForm,
+      schemaDefinition: {
+        primaryFieldId: "field-name",
+        fields: [
+          ...dummyForm.schemaDefinition.fields,
+          {
+            id: "field-paid-at",
+            label: "결제일",
+            type: "date",
+            required: true,
+            description: "실제 결제일",
+            order: 1,
+          },
+        ],
+      },
+    };
+
+    const { result } = renderHook(
+      () =>
+        useSubmissionListTable({
+          form: formWithDate,
+          initialDateRange: {
+            startDate: "2026-09-01",
+            endDate: "2026-11-16",
+            dateFieldId: "field-paid-at",
+          },
+        }),
+      { wrapper: createWrapper() }
+    );
+
+    expect(mockUseInfiniteQuery).toHaveBeenLastCalledWith(
+      "form-uuid-1",
+      expect.objectContaining({
+        startDate: "2026-09-01",
+        endDate: "2026-11-16",
+        dateFieldId: "field-paid-at",
+      })
+    );
+    expect(result.current.dateRangeFieldLabel).toBe("결제일");
+    expect(result.current.activeFilterCount).toBe(1);
+
+    act(() => {
+      result.current.handleClearDateRange();
+    });
+
+    expect(result.current.dateRangeFilter).toBeUndefined();
+    expect(result.current.activeFilterCount).toBe(0);
+    expect(mockReplace).toHaveBeenCalledWith("/consumer/forms/form-uuid-1", { scroll: false });
   });
 });

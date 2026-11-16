@@ -24,7 +24,7 @@ const publishAnalysisViewBodySchema = z.object({
 /**
  * `/api/v1/analysis-views` 최소 HTTP 라우터
  *
- * 생성 및 블록 단위 수정은 AI Navigator(`/api/v1/navigator`, mode="analyst")가 서버 도구로 직접 처리하며,
+ * 생성 및 블록 단위 수정/재집계는 AI Navigator(`/api/v1/navigator`, mode="analyst")가 서버 도구로 직접 처리하며,
  * 본 라우터는 UI가 실제로 호출하는 4개 엔드포인트(목록/상세 조회, 발행 토글, 단건 소프트 삭제)만 노출합니다.
  */
 export const analysisViewsRoutes = createSubRouter<AnalysisViewsRouterVariables>();

@@ -22,6 +22,7 @@ import {
   ChartTooltipContent,
 } from "@/shared/ui/chart";
 import { buildChartConfig, buildPieChartSegments } from "../lib/build-chart-config";
+import { BlockSourceLinksFooter } from "./block-source-links-footer";
 
 export interface ChartBlockRendererProps {
   block: ChartAnalysisBlock;
@@ -115,6 +116,7 @@ export function ChartBlockRenderer({ block }: ChartBlockRendererProps) {
           </div>
         ) : null}
       </CardContent>
+      <BlockSourceLinksFooter block={block} />
     </Card>
   );
 }

@@ -13,6 +13,7 @@ export {
   nowUtcIso,
   parseYmdToDate,
   toSafeDate,
+  todayYmd,
   toUtcIso,
   type DateInput,
 } from "./date";

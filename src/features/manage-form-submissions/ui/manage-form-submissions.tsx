@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useFormDetailQuery } from "@/entities/form";
+import type { SubmissionDateRangeFilter } from "@/entities/form-submission";
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 import { Skeleton } from "@/shared/ui/skeleton";
@@ -13,6 +14,10 @@ export interface ManageFormSubmissionsProps {
    * 대상 폼 식별자 (UUID)
    */
   formId: string;
+  /**
+   * 분석 뷰 드릴다운 등에서 URL 쿼리로 전달된 초기 기간 필터
+   */
+  initialDateRange?: SubmissionDateRangeFilter | undefined;
 }
 
 /**
@@ -21,7 +26,7 @@ export interface ManageFormSubmissionsProps {
  * 특정 폼의 상세 정보와 제출된 모든 응답 데이터를 조회하고,
  * 각 응답의 열람, 수정 전용 화면 이동, 삭제 인터랙션을 종합적으로 제공하는 자립형 기능 컴포넌트입니다.
  */
-export function ManageFormSubmissions({ formId }: ManageFormSubmissionsProps) {
+export function ManageFormSubmissions({ formId, initialDateRange }: ManageFormSubmissionsProps) {
   const { data: form, isLoading, isError, error } = useFormDetailQuery(formId);
 
   // 1. 서버 SSR 및 클라이언트 초기 하이드레이션, 데이터 로딩 단계 스켈레톤
@@ -69,7 +74,7 @@ export function ManageFormSubmissions({ formId }: ManageFormSubmissionsProps) {
         </p>
       </div>
 
-      <SubmissionListTable form={form} />
+      <SubmissionListTable form={form} initialDateRange={initialDateRange} />
     </div>
   );
 }

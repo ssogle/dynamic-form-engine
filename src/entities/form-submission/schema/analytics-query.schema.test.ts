@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   analyticsAggregationQuerySchema,
   computeSeriesMetricInputSchema,
+  querySubmissionsForAnalysisSchema,
 } from "./analytics-query.schema";
 
 describe("Analytics Query & Series Metric Schemas", () => {
@@ -37,6 +38,48 @@ describe("Analytics Query & Series Metric Schemas", () => {
           targetFieldId: "f_amount",
         });
         expect(withField.success).toBe(true);
+      }
+    });
+
+    it("유효한 dateFieldId 및 startDate/endDate 범위를 허용하고, 날짜 포맷 오류나 역전된 기간은 거부해야 한다", () => {
+      const valid = analyticsAggregationQuerySchema.safeParse({
+        formId: validUuid,
+        metric: "count",
+        dateFieldId: "f_expense_date",
+        startDate: "2026-09-01",
+        endDate: "2026-11-16",
+      });
+      expect(valid.success).toBe(true);
+
+      const reversed = analyticsAggregationQuerySchema.safeParse({
+        formId: validUuid,
+        metric: "count",
+        startDate: "2026-11-16",
+        endDate: "2026-09-01",
+      });
+      expect(reversed.success).toBe(false);
+
+      const invalidCalendar = analyticsAggregationQuerySchema.safeParse({
+        formId: validUuid,
+        metric: "count",
+        startDate: "2026-02-31",
+      });
+      expect(invalidCalendar.success).toBe(false);
+    });
+  });
+
+  describe("querySubmissionsForAnalysisSchema", () => {
+    it("기간 필터(startDate, endDate, dateFieldId)가 포함된 샘플 조회 스키마를 검증해야 한다", () => {
+      const valid = querySubmissionsForAnalysisSchema.safeParse({
+        formId: validUuid,
+        dateFieldId: "f_work_date",
+        startDate: "2026-10-01",
+        endDate: "2026-10-31",
+        limit: 10,
+      });
+      expect(valid.success).toBe(true);
+      if (valid.success) {
+        expect(valid.data.timezone).toBe("Asia/Seoul");
       }
     });
   });

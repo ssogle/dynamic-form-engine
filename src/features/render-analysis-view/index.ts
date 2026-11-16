@@ -4,4 +4,10 @@ export {
   buildChartConfig,
   buildPieChartSegments,
   formatTableCellValue,
+  resolveChartColor,
 } from "./lib/build-chart-config";
+export {
+  buildBlockSourceLinks,
+  buildRawDataHref,
+  type ResolvedSourceLink,
+} from "./lib/build-source-links";

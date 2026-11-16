@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft, Globe, RotateCcw, Trash2 } from "lucide-react";
+import { ArrowLeft, Globe, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 import { useAnalysisViewActions } from "../hooks/use-analysis-view-actions.hook";
@@ -12,17 +12,21 @@ export interface AnalysisViewActionBarProps {
 }
 
 /**
- * 분석 뷰 상세 캔버스 상단 제어 바 (목록 복귀, 발행 토글, Popover 삭제 확인)
+ * 분석 뷰 상세 캔버스 상단 제어 바 (목록 복귀, 최신 데이터 갱신, 발행 토글, Popover 삭제 확인)
  */
 export function AnalysisViewActionBar({ viewId }: AnalysisViewActionBarProps) {
   const {
     view,
     isPublished,
     canPublish,
+    canRefresh,
     actionErrorMessage,
+    refreshStatusMessage,
     isPublishPending,
+    isRefreshPending,
     isDeletePending,
     handleTogglePublish,
+    handleRefresh,
     handleDelete,
   } = useAnalysisViewActions({ viewId });
 
@@ -39,7 +43,19 @@ export function AnalysisViewActionBar({ viewId }: AnalysisViewActionBarProps) {
         </Button>
 
         {view ? (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={isRefreshPending || !canRefresh}
+              onClick={handleRefresh}
+            >
+              <RefreshCw className={isRefreshPending ? "size-3.5 animate-spin" : "size-3.5"} />
+              {isRefreshPending ? "AI 재집계 중..." : "최신 데이터로 갱신"}
+            </Button>
+
             <Button
               type="button"
               variant={isPublished ? "outline" : "default"}
@@ -107,6 +123,12 @@ export function AnalysisViewActionBar({ viewId }: AnalysisViewActionBarProps) {
           </div>
         ) : null}
       </div>
+
+      {refreshStatusMessage ? (
+        <div className="border-border bg-muted/40 text-foreground rounded-lg border px-3 py-2 text-xs">
+          {refreshStatusMessage}
+        </div>
+      ) : null}
 
       {actionErrorMessage ? (
         <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-lg border px-3 py-2 text-xs">

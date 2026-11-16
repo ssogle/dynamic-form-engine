@@ -4,6 +4,7 @@ import * as React from "react";
 import type { TextAnalysisBlock } from "@/entities/analysis-view";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { parseTextContent, type TextInlineSegment } from "../lib/parse-text-content";
+import { BlockSourceLinksFooter } from "./block-source-links-footer";
 
 export interface TextBlockRendererProps {
   block: TextAnalysisBlock;
@@ -85,6 +86,7 @@ export function TextBlockRenderer({ block }: TextBlockRendererProps) {
           })
         )}
       </CardContent>
+      <BlockSourceLinksFooter block={block} />
     </Card>
   );
 }
