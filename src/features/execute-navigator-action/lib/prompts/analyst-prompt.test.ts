@@ -19,21 +19,47 @@ describe("analyst-prompt (features/execute-navigator-action/lib/prompts)", () =>
     expect(ANALYST_NAVIGATOR_SYSTEM_PROMPT).toContain("SET_ALL_BLOCKS");
   });
 
-  it("formatAnalystContextPrompt는 현재 분석 뷰 문서와 목록 캐시 요약을 포함해야 한다", () => {
+  it("formatAnalystContextPrompt는 현재 분석 뷰 문서를 경량 요약(rows/data 제거, rowCount/dataCount 포함)하여 포함해야 한다", () => {
     const formatted = formatAnalystContextPrompt("맨 아래에 요약 문단 추가해줘", {
       currentPath: "/analyst/views/view-1",
       currentAnalysisView: {
         id: "view-1",
         title: "2월 매출 리포트",
         isPublished: false,
-        blocks: [{ id: "b1", type: "text", content: "초안 내용" }],
+        blocks: [
+          { id: "b1", type: "text", content: "초안 내용" },
+          {
+            id: "b2",
+            type: "chart",
+            title: "월별 추이",
+            chartType: "bar",
+            xAxisKey: "month",
+            series: [{ key: "amount", label: "금액" }],
+            data: [
+              { month: "2026-01", amount: 1000 },
+              { month: "2026-02", amount: 2000 },
+            ],
+          },
+        ],
       },
       visibleAnalysisViews: [{ id: "view-1", title: "2월 매출 리포트", summary: "초안" }],
     });
 
+    expect(formatted).toContain("현재 서버 기준 날짜(Asia/Seoul):");
+    expect(formatted).toMatch(/현재 서버 기준 날짜\(Asia\/Seoul\): \d{4}-\d{2}-\d{2}/);
     expect(formatted).toContain("/analyst/views/view-1");
     expect(formatted).toContain("2월 매출 리포트");
     expect(formatted).toContain('"id":"view-1"');
+    expect(formatted).toContain('"dataCount":2');
+    expect(formatted).not.toContain('"amount":2000');
     expect(formatted).toContain("1. [ID: view-1] 2월 매출 리포트 (초안)");
+  });
+
+  it("시스템 프롬프트에 날짜 기준 축, filters/sourceLinks 기록 및 원천 목록 위임 가드레일이 포함되어야 한다", () => {
+    expect(ANALYST_NAVIGATOR_SYSTEM_PROMPT).toContain("dateFieldId");
+    expect(ANALYST_NAVIGATOR_SYSTEM_PROMPT).toContain("filters");
+    expect(ANALYST_NAVIGATOR_SYSTEM_PROMPT).toContain("sourceLinks");
+    expect(ANALYST_NAVIGATOR_SYSTEM_PROMPT).toContain("/consumer/forms/[formId]");
+    expect(ANALYST_NAVIGATOR_SYSTEM_PROMPT).toContain("isTruncated");
   });
 });

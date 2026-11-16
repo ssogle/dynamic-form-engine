@@ -92,9 +92,11 @@ describe("Analyst Navigator Tools (analyst-tools.ts)", () => {
         formId: FORM_ID,
         formTitle: "매출 폼",
         metric: "sum",
+        dateAxis: "createdAt",
         timezone: "Asia/Seoul",
         totalCount: 2,
         summaryValue: 300,
+        isTruncated: false,
         points: [{ key: "2026-01", value: 300, count: 2 }],
       },
       error: null,
@@ -342,6 +344,58 @@ describe("Analyst Navigator Tools (analyst-tools.ts)", () => {
       expect(res).toMatchObject({ success: true });
       const updatedCall = vi.mocked(deps.updateAnalysisViewById).mock.calls[0]?.[1];
       expect(updatedCall?.blocks).toEqual([SAMPLE_BLOCK_3]);
+    });
+
+    it("동일 뷰에 대해 UPDATE_INFO와 복수 UPDATE_BLOCK이 병렬 호출되어도 순차 직렬화되어 모든 수정이 유실 없이 반영된다", async () => {
+      let persistedState = createMockAnalysisView({
+        title: "11월 리포트",
+        blocks: [SAMPLE_BLOCK_1, SAMPLE_BLOCK_2],
+      });
+
+      vi.mocked(deps.findAnalysisViewById).mockImplementation(async () => ({
+        ...persistedState,
+        blocks: [...persistedState.blocks],
+      }));
+      vi.mocked(deps.updateAnalysisViewById).mockImplementation(async (_id, updates) => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        persistedState = {
+          ...persistedState,
+          ...(updates.title !== undefined ? { title: updates.title } : {}),
+          ...(updates.description !== undefined ? { description: updates.description } : {}),
+          ...(updates.blocks !== undefined ? { blocks: updates.blocks } : {}),
+        };
+        return persistedState;
+      });
+
+      await Promise.all([
+        tools.updateAnalysisView.execute(
+          { viewId: VIEW_ID, operation: "UPDATE_INFO", title: "10월 리포트" },
+          TOOL_CTX
+        ),
+        tools.updateAnalysisView.execute(
+          {
+            viewId: VIEW_ID,
+            operation: "UPDATE_BLOCK",
+            targetBlockId: "block-1",
+            block: { ...SAMPLE_BLOCK_1, title: "10월 개요", content: "10월 내용" },
+          },
+          TOOL_CTX
+        ),
+        tools.updateAnalysisView.execute(
+          {
+            viewId: VIEW_ID,
+            operation: "UPDATE_BLOCK",
+            targetBlockId: "block-2",
+            block: { ...SAMPLE_BLOCK_2, title: "10월 테이블" },
+          },
+          TOOL_CTX
+        ),
+      ]);
+
+      expect(persistedState.title).toBe("10월 리포트");
+      const finalBlocks = persistedState.blocks as Array<{ id: string; title?: string }>;
+      expect(finalBlocks.find((b) => b.id === "block-1")?.title).toBe("10월 개요");
+      expect(finalBlocks.find((b) => b.id === "block-2")?.title).toBe("10월 테이블");
     });
   });
 

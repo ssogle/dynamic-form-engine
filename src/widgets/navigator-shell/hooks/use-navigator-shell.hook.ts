@@ -12,6 +12,7 @@ import {
 import {
   analysisViewKeys,
   extractAnalysisBlocks,
+  useAnalysisViewRefreshStore,
   type AnalysisView,
 } from "@/entities/analysis-view";
 import {
@@ -50,6 +51,10 @@ export interface UseNavigatorShellReturn {
    * AI 생성 또는 백엔드 요청 진행 중 여부
    */
   isBusy: boolean;
+  /**
+   * 다중 스텝 실행 중 서버 스트림으로부터 수신한 현재 진행 단계 메시지
+   */
+  progressMessage: string | null;
   /**
    * 입력창 텍스트 상태
    */
@@ -94,8 +99,10 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
   const setMode = useNavigatorChatStore((state) => state.setMode);
   const messages = useNavigatorChatStore((state) => state.messages);
   const isGenerating = useNavigatorChatStore((state) => state.isGenerating);
+  const progressMessage = useNavigatorChatStore((state) => state.progressMessage);
   const addMessage = useNavigatorChatStore((state) => state.addMessage);
   const setIsGenerating = useNavigatorChatStore((state) => state.setIsGenerating);
+  const setProgressMessage = useNavigatorChatStore((state) => state.setProgressMessage);
 
   React.useEffect(() => {
     if (currentMode !== mode) {
@@ -115,9 +122,14 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
   const messagesEndRef = React.useRef<HTMLDivElement | null>(null);
   const inputRef = React.useRef<HTMLInputElement | null>(null);
 
-  // 4. AI 통신 훅
-  const { mutateAsync: executeAction, isPending } = useNavigatorMutation();
+  // 4. AI 통신 훅 (스트리밍 진행 메시지 수신 연동) 및 분석 뷰 AI 재집계 요청 구독
+  const { mutateAsync: executeAction, isPending } = useNavigatorMutation({
+    onProgress: setProgressMessage,
+  });
   const isBusy = isGenerating || isPending;
+  const pendingRefresh = useAnalysisViewRefreshStore((state) => state.pendingRefresh);
+  const clearPendingRefresh = useAnalysisViewRefreshStore((state) => state.clearPendingRefresh);
+  const setIsRefreshingByAi = useAnalysisViewRefreshStore((state) => state.setIsRefreshingByAi);
 
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
@@ -367,10 +379,12 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
         content: trimmed,
       });
       setInputValue("");
+      setProgressMessage("요청을 준비하고 있습니다...");
       setIsGenerating(true);
 
       try {
-        const historyMessages = messages.map((m) => ({
+        // 과도한 과거 대화 누적으로 인한 LLM 토큰·레이턴시 급증을 방지하기 위해 최근 12개 메시지만 전달합니다.
+        const historyMessages = messages.slice(-12).map((m) => ({
           role: m.role,
           content: m.content,
         }));
@@ -391,6 +405,13 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
           content: replyText,
           action: response.action ?? undefined,
         });
+
+        if (response.updatedAnalysisView) {
+          queryClient.setQueryData?.(
+            analysisViewKeys.detail(response.updatedAnalysisView.id, false),
+            response.updatedAnalysisView
+          );
+        }
 
         // 복합 액션 및 단일 액션 추출
         const actionsToExecute: NavigatorAction[] =
@@ -419,16 +440,19 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
         });
       } finally {
         setIsGenerating(false);
+        setProgressMessage(null);
       }
     },
     [
       isBusy,
       addMessage,
       setIsGenerating,
+      setProgressMessage,
       messages,
       resolveCurrentContext,
       executeAction,
       mode,
+      queryClient,
       dispatchAction,
     ]
   );
@@ -441,10 +465,29 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
     [handleExecutePrompt, inputValue]
   );
 
+  React.useEffect(() => {
+    setIsRefreshingByAi(mode === "analyst" && isBusy);
+  }, [mode, isBusy, setIsRefreshingByAi]);
+
+  React.useEffect(() => {
+    if (mode !== "analyst" || !pendingRefresh || isBusy) {
+      return;
+    }
+    if (!pathname.includes(pendingRefresh.viewId)) {
+      return;
+    }
+    const promptToRun = pendingRefresh.prompt;
+    clearPendingRefresh();
+    queueMicrotask(() => {
+      void handleExecutePrompt(promptToRun);
+    });
+  }, [mode, pendingRefresh, isBusy, pathname, clearPendingRefresh, handleExecutePrompt]);
+
   return {
     config,
     messages,
     isBusy,
+    progressMessage,
     inputValue,
     setInputValue,
     messagesEndRef,

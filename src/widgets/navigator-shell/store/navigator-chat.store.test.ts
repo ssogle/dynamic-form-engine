@@ -42,4 +42,13 @@ describe("useNavigatorChatStore (widgets/navigator-shell/store)", () => {
     expect(messages[1]?.role).toBe("user");
     expect(messages[1]?.content).toBe("새로운 폼 만들어줘");
   });
+
+  it("setProgressMessage로 단계별 진행 상태를 기록하고 생성 종료(setIsGenerating(false)) 시 초기화해야 한다", () => {
+    useNavigatorChatStore.getState().setIsGenerating(true);
+    useNavigatorChatStore.getState().setProgressMessage("데이터 집계 중...");
+    expect(useNavigatorChatStore.getState().progressMessage).toBe("데이터 집계 중...");
+
+    useNavigatorChatStore.getState().setIsGenerating(false);
+    expect(useNavigatorChatStore.getState().progressMessage).toBeNull();
+  });
 });

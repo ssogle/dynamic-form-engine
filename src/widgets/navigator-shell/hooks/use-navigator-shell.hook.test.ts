@@ -2,6 +2,7 @@ import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useNavigatorChatStore } from "../store/navigator-chat.store";
 import { useConsumerFormDraftStore } from "@/entities/form-submission";
+import { useAnalysisViewRefreshStore } from "@/entities/analysis-view";
 import { useNavigatorShell } from "./use-navigator-shell.hook";
 
 // Router & Pathname 모킹
@@ -53,6 +54,10 @@ describe("useNavigatorShell (widgets/navigator-shell/hooks)", () => {
       currentFormId: null,
       draftValues: {},
       submitTriggerCount: 0,
+    });
+    useAnalysisViewRefreshStore.setState({
+      pendingRefresh: null,
+      isRefreshingByAi: false,
     });
     currentPathname = "/consumer/forms/form-uuid-1/new";
   });
@@ -311,5 +316,40 @@ describe("useNavigatorShell (widgets/navigator-shell/hooks)", () => {
     expect(mockInvalidateQueries).toHaveBeenCalled();
     expect(mockPush).toHaveBeenCalledWith("/analyst/views/view-2");
     expect(mockPush).toHaveBeenCalledWith("/analyst/views");
+  });
+
+  it("analyst 모드에서 pendingRefresh가 요청되면 자동으로 AI 프롬프트를 실행하고 스토어 요청을 비워야 한다", async () => {
+    currentPathname = "/analyst/views/view-1";
+    mockGetQueryData.mockReturnValue(undefined);
+    mockMutateAsync.mockResolvedValueOnce({
+      reply: "최신 데이터로 재집계했습니다.",
+      actions: [
+        {
+          type: "UPDATE_ANALYSIS_VIEW",
+          operation: "SET_ALL_BLOCKS",
+          viewId: "view-1",
+          blocks: [],
+        },
+      ],
+    });
+
+    renderHook(() => useNavigatorShell({ mode: "analyst" }));
+
+    await act(async () => {
+      useAnalysisViewRefreshStore.getState().requestAiRefresh({
+        viewId: "view-1",
+        viewTitle: "11월 리포트",
+        prompt: "최신 데이터로 갱신해 주세요.",
+        requestedAt: 1000,
+      });
+    });
+
+    expect(useAnalysisViewRefreshStore.getState().pendingRefresh).toBeNull();
+    expect(mockMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: "analyst",
+        prompt: "최신 데이터로 갱신해 주세요.",
+      })
+    );
   });
 });

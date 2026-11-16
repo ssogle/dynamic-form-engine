@@ -20,6 +20,7 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
     config,
     messages,
     isBusy,
+    progressMessage,
     inputValue,
     setInputValue,
     messagesEndRef,
@@ -72,7 +73,7 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
               <span className="size-1.5 animate-bounce rounded-full bg-current" />
               <span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:0.2s]" />
               <span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:0.4s]" />
-              <span className="ml-1 text-[11px]">생각 중...</span>
+              <span className="ml-1 text-[11px]">{progressMessage || "생각 중..."}</span>
             </div>
           </div>
         )}

@@ -108,4 +108,41 @@ describe("POST /api/v1/navigator (AI Navigator Thin Route Handler)", () => {
       })
     );
   });
+
+  it("?stream=1 요청 시 NDJSON 스트림으로 status 이벤트와 최종 result 이벤트를 반환해야 한다", async () => {
+    const mockStreamResponse = {
+      reply: "집계 완료",
+      action: null,
+    };
+
+    vi.spyOn(navigatorServer, "runNavigatorEngine").mockImplementationOnce(
+      async (_payload, options) => {
+        options?.onProgress?.("데이터를 집계하고 있습니다...");
+        return mockStreamResponse;
+      }
+    );
+
+    const request = new NextRequest("http://localhost:3000/api/v1/navigator?stream=1", {
+      method: "POST",
+      body: JSON.stringify({
+        mode: "analyst",
+        prompt: "비용 집계해줘",
+      }),
+    });
+
+    const response = await POST(request, {});
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/x-ndjson");
+
+    const text = await response.text();
+    const lines = text
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as { type: string; message?: string; data?: unknown });
+
+    expect(lines).toEqual([
+      { type: "status", message: "데이터를 집계하고 있습니다..." },
+      { type: "result", data: mockStreamResponse },
+    ]);
+  });
 });

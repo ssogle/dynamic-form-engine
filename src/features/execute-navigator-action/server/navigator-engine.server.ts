@@ -187,6 +187,76 @@ function resolveModeConfig(
   return factory(queryTools);
 }
 
+export interface RunNavigatorEngineOptions {
+  /** 다중 스텝 실행 중 단계별 진행 상태 텍스트를 수신하기 위한 선택적 콜백 (스트리밍 응답용) */
+  onProgress?: ((statusText: string) => void) | undefined;
+  /** 클라이언트 연결 해제 또는 스트림 취소 시 LLM 호출을 즉시 중단하기 위한 AbortSignal */
+  abortSignal?: AbortSignal | undefined;
+}
+
+function resolveStepStartProgressMessage(stepNumber: number): string {
+  if (stepNumber === 0) {
+    return "AI가 요청을 분석해 작업 계획을 세우고 있습니다...";
+  }
+  return `추가 분석 단계(${stepNumber + 1}단계)를 진행하고 있습니다...`;
+}
+
+function resolveToolStartProgressMessage(toolName: string): string {
+  if (
+    ["aggregateFormSubmissions", "queryFormSubmissions", "computeSeriesMetric"].includes(toolName)
+  ) {
+    return "데이터베이스에서 최신 데이터를 집계·조회하고 있습니다...";
+  }
+  if (["searchForms", "getFormDetails"].includes(toolName)) {
+    return "대상 폼 구조와 필드 정보를 확인하고 있습니다...";
+  }
+  if (
+    [
+      "createAnalysisView",
+      "updateAnalysisView",
+      "publishAnalysisView",
+      "deleteAnalysisViews",
+    ].includes(toolName)
+  ) {
+    return "분석 뷰 문서를 최신 상태로 반영하고 있습니다...";
+  }
+  if (["createForm", "updateFormSchema", "publishForm", "deleteForms"].includes(toolName)) {
+    return "폼 스키마 및 상태를 반영하고 있습니다...";
+  }
+  return "요청 작업을 실행하고 있습니다...";
+}
+
+function resolveStepEndProgressMessage(toolNames: string[], finishReason: string): string {
+  if (finishReason === "stop") {
+    return "응답 작성을 완료했습니다.";
+  }
+  if (
+    toolNames.some((name) =>
+      ["createAnalysisView", "updateAnalysisView", "publishAnalysisView"].includes(name)
+    )
+  ) {
+    return "분석 뷰 문서를 반영했습니다. 요약 응답을 작성하고 있습니다...";
+  }
+  if (
+    toolNames.some((name) =>
+      ["aggregateFormSubmissions", "queryFormSubmissions", "computeSeriesMetric"].includes(name)
+    )
+  ) {
+    return "데이터 집계·조회를 마쳤습니다. 분석 결과를 구성하고 있습니다...";
+  }
+  if (toolNames.some((name) => ["searchForms", "getFormDetails"].includes(name))) {
+    return "폼 구조와 필드를 확인했습니다. 다음 작업을 진행하고 있습니다...";
+  }
+  if (
+    toolNames.some((name) =>
+      ["createForm", "updateFormSchema", "publishForm", "deleteForms"].includes(name)
+    )
+  ) {
+    return "폼 설정을 반영했습니다. 결과를 정리하고 있습니다...";
+  }
+  return "도구 실행을 마치고 다음 단계를 진행하고 있습니다...";
+}
+
 /**
  * AI Navigator 통합 오케스트레이션 엔진 (Server-Side)
  *
@@ -194,10 +264,12 @@ function resolveModeConfig(
  * 모드 무관(Mode-Agnostic)한 단일 파이프라인을 완주하여 브라우저 제어 액션을 안전하게 도출합니다.
  *
  * @param payload 실행 요청 페이로드
+ * @param options 진행 상태 콜백 등 선택적 실행 옵션
  * @returns AI 답변 텍스트, 브라우저 제어 단일/복합 액션, 갱신된 폼 정보
  */
 export async function runNavigatorEngine(
-  payload: ExecuteNavigatorPayload
+  payload: ExecuteNavigatorPayload,
+  options?: RunNavigatorEngineOptions
 ): Promise<NavigatorExecutionResponse> {
   const mode = payload.mode ?? "builder";
   const { prompt, messages, currentContext } = payload;
@@ -227,13 +299,55 @@ export async function runNavigatorEngine(
     },
   ];
 
-  // 4. 단일 LLM 추론 완주 (모드별 maxSteps 적용, 기본 5단계)
+  // 4. 단일 LLM 추론 완주 (Thinking 예산 상한 512 제한, 스텝/전체 타임아웃 및 무응답 재시도 차단 적용)
+  const startedAt = Date.now();
+  let stepIndex = 0;
+
+  options?.onProgress?.("요청을 분석하고 필요한 작업을 준비하고 있습니다...");
+
   const result = await generateText({
     model,
     instructions: config.instructions,
     messages: conversationMessages,
     tools: config.tools,
     stopWhen: stepCountIs(config.maxSteps ?? 5),
+    maxRetries: 0,
+    timeout: {
+      stepMs: 25_000,
+      totalMs: 65_000,
+    },
+    ...(options?.abortSignal ? { abortSignal: options.abortSignal } : {}),
+    providerOptions: {
+      google: {
+        thinkingConfig: {
+          thinkingBudget: 512,
+        },
+      },
+    },
+    onStepStart: ({ stepNumber }) => {
+      options?.onProgress?.(resolveStepStartProgressMessage(stepNumber));
+    },
+    onToolExecutionStart: ({ toolCall }) => {
+      options?.onProgress?.(resolveToolStartProgressMessage(toolCall.toolName));
+    },
+    onStepEnd: (step) => {
+      stepIndex += 1;
+      const toolNames = (step.toolCalls ?? []).map((tc) => tc.toolName);
+      options?.onProgress?.(resolveStepEndProgressMessage(toolNames, step.finishReason));
+      if (process.env.NODE_ENV !== "test") {
+        console.info(
+          `[Navigator:${mode}] step=${stepIndex} finishReason=${step.finishReason} elapsed=${Date.now() - startedAt}ms tools=[${toolNames.join(", ")}]`
+        );
+      }
+    },
+    onStepError: ({ stepNumber, error }) => {
+      if (process.env.NODE_ENV !== "test") {
+        console.error(
+          `[Navigator:${mode}] step=${stepNumber + 1} error elapsed=${Date.now() - startedAt}ms`,
+          error
+        );
+      }
+    },
   });
 
   const toolResults = (result.toolResults ?? []) as Array<{ output: unknown }>;

@@ -327,6 +327,13 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
 
     const callArgs = mockGenerateText.mock.calls[0]?.[0];
     expect(callArgs?.stopWhen).toEqual({ type: "stepCount", count: 10 });
+    expect(callArgs?.providerOptions).toEqual({
+      google: {
+        thinkingConfig: {
+          thinkingBudget: 512,
+        },
+      },
+    });
     expect(callArgs?.tools).toHaveProperty("aggregateFormSubmissions");
     expect(callArgs?.tools).toHaveProperty("computeSeriesMetric");
     expect(callArgs?.tools).toHaveProperty("createAnalysisView");
@@ -342,5 +349,59 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
         prompt: "테스트",
       })
     ).rejects.toThrow('지원하지 않는 네비게이터 모드입니다: "unknown_mode"');
+  });
+
+  it("maxRetries: 0, step/total timeout, 외부 abortSignal 및 onStepStart/onToolExecutionStart/onStepEnd 진행 메시지를 전달해야 한다", async () => {
+    const abortController = new AbortController();
+    const progressLogs: string[] = [];
+
+    mockGenerateText.mockImplementationOnce(
+      async (args: {
+        onStepStart?: (e: { stepNumber: number }) => void;
+        onToolExecutionStart?: (e: { toolCall: { toolName: string } }) => void;
+        onStepEnd?: (e: { toolCalls: Array<{ toolName: string }>; finishReason: string }) => void;
+      }) => {
+        args.onStepStart?.({ stepNumber: 0 });
+        args.onToolExecutionStart?.({ toolCall: { toolName: "aggregateFormSubmissions" } });
+        args.onStepEnd?.({
+          toolCalls: [{ toolName: "aggregateFormSubmissions" }],
+          finishReason: "tool-calls",
+        });
+        args.onStepStart?.({ stepNumber: 1 });
+        args.onToolExecutionStart?.({ toolCall: { toolName: "updateAnalysisView" } });
+        args.onStepEnd?.({
+          toolCalls: [{ toolName: "updateAnalysisView" }],
+          finishReason: "stop",
+        });
+
+        return {
+          text: "최신 데이터로 갱신했습니다.",
+          toolResults: [],
+        };
+      }
+    );
+
+    const result = await runNavigatorEngine(
+      { mode: "analyst", prompt: "갱신해줘" },
+      {
+        abortSignal: abortController.signal,
+        onProgress: (msg) => progressLogs.push(msg),
+      }
+    );
+
+    const callArgs = mockGenerateText.mock.calls[0]?.[0];
+    expect(callArgs?.maxRetries).toBe(0);
+    expect(callArgs?.timeout).toEqual({ stepMs: 25_000, totalMs: 65_000 });
+    expect(callArgs?.abortSignal).toBe(abortController.signal);
+    expect(result.reply).toBe("최신 데이터로 갱신했습니다.");
+    expect(progressLogs).toEqual([
+      "요청을 분석하고 필요한 작업을 준비하고 있습니다...",
+      "AI가 요청을 분석해 작업 계획을 세우고 있습니다...",
+      "데이터베이스에서 최신 데이터를 집계·조회하고 있습니다...",
+      "데이터 집계·조회를 마쳤습니다. 분석 결과를 구성하고 있습니다...",
+      "추가 분석 단계(2단계)를 진행하고 있습니다...",
+      "분석 뷰 문서를 최신 상태로 반영하고 있습니다...",
+      "응답 작성을 완료했습니다.",
+    ]);
   });
 });

@@ -22,11 +22,13 @@ export interface NavigatorChatState {
   currentMode: NavigatorMode;
   messages: NavigatorChatMessage[];
   isGenerating: boolean;
+  progressMessage: string | null;
   selectedFieldId: string | null;
 
   setMode: (mode: NavigatorMode) => void;
   addMessage: (message: Omit<NavigatorChatMessage, "id" | "createdAt">) => void;
   setIsGenerating: (isGenerating: boolean) => void;
+  setProgressMessage: (progressMessage: string | null) => void;
   setSelectedFieldId: (fieldId: string | null) => void;
   clearMessages: () => void;
   reset: () => void;
@@ -43,6 +45,7 @@ export const useNavigatorChatStore = create<NavigatorChatState>()((set, get) => 
     },
   ],
   isGenerating: false,
+  progressMessage: null,
   selectedFieldId: null,
 
   setMode: (mode) => {
@@ -61,6 +64,7 @@ export const useNavigatorChatStore = create<NavigatorChatState>()((set, get) => 
       ],
       selectedFieldId: null,
       isGenerating: false,
+      progressMessage: null,
     });
   },
 
@@ -76,7 +80,13 @@ export const useNavigatorChatStore = create<NavigatorChatState>()((set, get) => 
     }));
   },
 
-  setIsGenerating: (isGenerating) => set({ isGenerating }),
+  setIsGenerating: (isGenerating) =>
+    set((state) => ({
+      isGenerating,
+      progressMessage: isGenerating ? state.progressMessage : null,
+    })),
+
+  setProgressMessage: (progressMessage) => set({ progressMessage }),
 
   setSelectedFieldId: (selectedFieldId) => set({ selectedFieldId }),
 
@@ -93,6 +103,7 @@ export const useNavigatorChatStore = create<NavigatorChatState>()((set, get) => 
       ],
       selectedFieldId: null,
       isGenerating: false,
+      progressMessage: null,
     });
   },
 
@@ -108,6 +119,7 @@ export const useNavigatorChatStore = create<NavigatorChatState>()((set, get) => 
         },
       ],
       isGenerating: false,
+      progressMessage: null,
       selectedFieldId: null,
     });
   },

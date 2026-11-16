@@ -1,5 +1,10 @@
 // Client Public API
-export { useNavigatorMutation, executeNavigatorAction } from "./queries/use-navigator.mutation";
+export {
+  useNavigatorMutation,
+  executeNavigatorAction,
+  executeNavigatorActionStream,
+  type UseNavigatorMutationOptions,
+} from "./queries/use-navigator.mutation";
 
 export type {
   NavigatorMode,
