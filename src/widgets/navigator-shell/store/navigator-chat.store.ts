@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { nowUtcIso } from "@/shared/lib/date";
 import type { NavigatorAction, NavigatorMode } from "@/features/execute-navigator-action";
 
 export interface NavigatorChatMessage {
@@ -47,7 +48,7 @@ export const useNavigatorChatStore = create<NavigatorChatState>()((set, get) => 
       id: "msg_welcome_builder",
       role: "assistant",
       content: INITIAL_WELCOME_MESSAGES.builder,
-      createdAt: new Date().toISOString(),
+      createdAt: nowUtcIso(),
     },
   ],
   isGenerating: false,
@@ -66,7 +67,7 @@ export const useNavigatorChatStore = create<NavigatorChatState>()((set, get) => 
           id: `msg_welcome_${mode}`,
           role: "assistant",
           content: INITIAL_WELCOME_MESSAGES[mode],
-          createdAt: new Date().toISOString(),
+          createdAt: nowUtcIso(),
         },
       ],
       selectedFieldId: null,
@@ -80,7 +81,7 @@ export const useNavigatorChatStore = create<NavigatorChatState>()((set, get) => 
     const newMessage: NavigatorChatMessage = {
       ...message,
       id: `msg_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`,
-      createdAt: new Date().toISOString(),
+      createdAt: nowUtcIso(),
     };
 
     set((state) => ({
@@ -120,7 +121,7 @@ export const useNavigatorChatStore = create<NavigatorChatState>()((set, get) => 
           id: `msg_welcome_${mode}`,
           role: "assistant",
           content: INITIAL_WELCOME_MESSAGES[mode],
-          createdAt: new Date().toISOString(),
+          createdAt: nowUtcIso(),
         },
       ],
       selectedFieldId: null,
@@ -138,7 +139,7 @@ export const useNavigatorChatStore = create<NavigatorChatState>()((set, get) => 
           id: `msg_welcome_${mode}`,
           role: "assistant",
           content: INITIAL_WELCOME_MESSAGES[mode],
-          createdAt: new Date().toISOString(),
+          createdAt: nowUtcIso(),
         },
       ],
       isGenerating: false,

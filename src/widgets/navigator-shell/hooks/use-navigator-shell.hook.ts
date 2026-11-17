@@ -289,7 +289,7 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
           id: f.id,
           title: f.title,
           summary: f.description ?? undefined,
-          createdAt: f.createdAt ? new Date(f.createdAt).toISOString() : undefined,
+          createdAt: toUtcIso(f.createdAt) ?? undefined,
         }));
       }
     } else if (mode === "consumer") {
