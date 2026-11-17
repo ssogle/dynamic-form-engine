@@ -93,7 +93,7 @@ function summarizeCurrentAnalysisView(
       const content = typeof block.content === "string" ? block.content : "";
       return {
         ...base,
-        contentPreview: content.length > 400 ? `${content.slice(0, 400)}...` : content,
+        contentPreview: content.length > 1500 ? `${content.slice(0, 1500)}...` : content,
       };
     }
 
@@ -182,5 +182,5 @@ export function formatAnalystContextPrompt(
 - 현재 화면 목록에 표시된 분석 뷰 (위에서부터 순서대로):
 ${visibleViewsSummary}
 
-(알림: 이미 위 문서 요약의 sourceLinks 등에 대상 formId와 dateFieldId·필드 키가 명확히 확인되는 재집계/갱신 요청이라면 searchForms/getFormDetails 재호출을 생략하고 바로 aggregateFormSubmissions를 병렬 실행하세요. 신규 분석이나 필드 ID가 불명확할 때만 searchForms/getFormDetails로 확인하세요.)`;
+(알림: 위 문서 요약의 sourceLinks에서 대상 formId가 이미 확인되는 재집계/갱신 요청이라면 searchForms는 생략할 수 있습니다. 다만 요약 컨텍스트에는 targetFieldId·groupByFieldId·filters 등 세부 필드 키가 포함되지 않으므로, 이전 대화에서 해당 폼의 필드 ID가 명확히 확인되지 않는 경우 반드시 getFormDetails({ formId })로 실제 필드 ID를 먼저 확인한 뒤 aggregateFormSubmissions를 병렬 실행하세요.)`;
 }

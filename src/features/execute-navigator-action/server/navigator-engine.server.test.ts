@@ -404,4 +404,20 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
       "응답 작성을 완료했습니다.",
     ]);
   });
+
+  it("최대 스텝 소진 등으로 finishReason이 stop이 아니고 텍스트·액션 없이 종료되면 미완료 안내 문구를 반환해야 한다", async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: "",
+      finishReason: "tool-calls",
+      toolResults: [],
+    });
+
+    const result = await runNavigatorEngine({
+      mode: "analyst",
+      prompt: "복잡한 다중 분석 실행해줘",
+    });
+
+    expect(result.reply).toContain("완료하지 못했습니다");
+    expect(result.reply).not.toBe("요청을 처리했습니다.");
+  });
 });

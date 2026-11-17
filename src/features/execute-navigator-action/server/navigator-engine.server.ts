@@ -302,6 +302,7 @@ export async function runNavigatorEngine(
   // 4. 단일 LLM 추론 완주 (Thinking 예산 상한 512 제한, 스텝/전체 타임아웃 및 무응답 재시도 차단 적용)
   const startedAt = Date.now();
   let stepIndex = 0;
+  let lastStepFinishReason: string | undefined;
 
   options?.onProgress?.("요청을 분석하고 필요한 작업을 준비하고 있습니다...");
 
@@ -332,6 +333,7 @@ export async function runNavigatorEngine(
     },
     onStepEnd: (step) => {
       stepIndex += 1;
+      lastStepFinishReason = step.finishReason;
       const toolNames = (step.toolCalls ?? []).map((tc) => tc.toolName);
       options?.onProgress?.(resolveStepEndProgressMessage(toolNames, step.finishReason));
       if (process.env.NODE_ENV !== "test") {
@@ -356,7 +358,12 @@ export async function runNavigatorEngine(
   const clientActions = extractClientActions(toolResults);
   const singleAction: NavigatorAction | null = clientActions[0] ?? null;
   const extras = config.extractExtras ? config.extractExtras(toolResults) : {};
-  const reply = result.text || singleAction?.message || "요청을 처리했습니다.";
+  const resolvedFinishReason = result.finishReason ?? lastStepFinishReason;
+  const fallbackReply =
+    resolvedFinishReason && resolvedFinishReason !== "stop" && clientActions.length === 0
+      ? "처리 단계가 많아 작업을 끝까지 완료하지 못했습니다. 조건을 좁히거나 나누어 다시 요청해 주세요."
+      : "요청을 처리했습니다.";
+  const reply = result.text || singleAction?.message || fallbackReply;
 
   // 6. 통합 단일 반환
   return {

@@ -62,4 +62,27 @@ describe("analyst-prompt (features/execute-navigator-action/lib/prompts)", () =>
     expect(ANALYST_NAVIGATOR_SYSTEM_PROMPT).toContain("/consumer/forms/[formId]");
     expect(ANALYST_NAVIGATOR_SYSTEM_PROMPT).toContain("isTruncated");
   });
+
+  it("formatAnalystContextPrompt는 text 블록 본문을 1500자까지 보존하고 getFormDetails 확인 안내를 포함해야 한다", () => {
+    const text600 = "가".repeat(600);
+    const text1700 = "나".repeat(1700);
+
+    const formatted = formatAnalystContextPrompt("최신 데이터로 갱신해줘", {
+      currentPath: "/analyst/views/view-1",
+      currentAnalysisView: {
+        id: "view-1",
+        title: "긴 요약 리포트",
+        isPublished: false,
+        blocks: [
+          { id: "b1", type: "text", content: text600 },
+          { id: "b2", type: "text", content: text1700 },
+        ],
+      },
+    });
+
+    expect(formatted).toContain(text600);
+    expect(formatted).toContain(`${"나".repeat(1500)}...`);
+    expect(formatted).not.toContain("나".repeat(1501));
+    expect(formatted).toContain("getFormDetails({ formId })");
+  });
 });
