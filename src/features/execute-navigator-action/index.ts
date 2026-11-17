@@ -1,13 +1,23 @@
 // Client Public API
-export { useNavigatorMutation, executeNavigatorAction } from "./queries/use-navigator.mutation";
+export {
+  useNavigatorMutation,
+  executeNavigatorAction,
+  executeNavigatorActionStream,
+  type NavigatorProgressMeta,
+  type NavigatorProgressHandler,
+  type UseNavigatorMutationOptions,
+} from "./queries/use-navigator.mutation";
 
 export type {
   NavigatorMode,
   NavigatorAction,
   NavigatorBuilderAction,
   NavigatorConsumerAction,
+  NavigatorAnalystAction,
+  AnalysisViewOperation,
   ExecuteNavigatorPayload,
   NavigatorExecutionResponse,
+  NavigatorStreamEvent,
   NavigatorChatMessageDto,
   NavigatorClientContext,
   VisibleItemSummary,

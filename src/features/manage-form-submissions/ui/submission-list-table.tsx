@@ -4,6 +4,7 @@ import * as React from "react";
 import { SlidersHorizontal, X } from "lucide-react";
 import { VirtualTable } from "@/shared/lib/virtual-table";
 import type { Form } from "@/entities/form";
+import type { SubmissionDateRangeFilter } from "@/entities/form-submission";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 import { Skeleton } from "@/shared/ui/skeleton";
@@ -14,6 +15,7 @@ import { useSubmissionListTable, getColumnLabel } from "../hooks/use-submission-
 
 export interface SubmissionListTableProps {
   form: Form;
+  initialDateRange?: SubmissionDateRangeFilter | undefined;
 }
 
 /**
@@ -23,12 +25,14 @@ export interface SubmissionListTableProps {
  * 비즈니스 상태 및 이벤트 오케스트레이션 로직은 useSubmissionListTable 훅에 전담 위임하고,
  * 순수 뷰 렌더링(상단 툴바, 컬럼 가시성 드롭다운, 가상화 테이블 본문)만 담당하는 Thin View입니다.
  */
-export function SubmissionListTable({ form }: SubmissionListTableProps) {
+export function SubmissionListTable({ form, initialDateRange }: SubmissionListTableProps) {
   const {
     table,
     flatSubmissions,
     totalCount,
     activeFields,
+    dateRangeFilter,
+    dateRangeFieldLabel,
     activeFilterCount,
     isLoading,
     isError,
@@ -38,8 +42,9 @@ export function SubmissionListTable({ form }: SubmissionListTableProps) {
     fetchNextPage,
     tableContainerRef,
     handleClearAllFilters,
+    handleClearDateRange,
     handleRowClick,
-  } = useSubmissionListTable({ form });
+  } = useSubmissionListTable({ form, initialDateRange });
 
   // 1. 초기 로딩 스켈레톤
   if (isLoading && flatSubmissions.length === 0) {
@@ -72,10 +77,24 @@ export function SubmissionListTable({ form }: SubmissionListTableProps) {
     <div className="space-y-3">
       {/* 테이블 상단 툴바: 레코드 수, 활성 필터 배지, 컬럼 가시성 설정 */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-muted-foreground">
             총 <strong className="text-foreground font-semibold">{totalCount}</strong>개 레코드
           </span>
+          {dateRangeFilter && (dateRangeFilter.startDate || dateRangeFilter.endDate) ? (
+            <Badge variant="outline" className="gap-1 px-2 py-0.5 text-[11px]">
+              기간({dateRangeFieldLabel}): {dateRangeFilter.startDate ?? "..."} ~{" "}
+              {dateRangeFilter.endDate ?? "..."}
+              <button
+                type="button"
+                onClick={handleClearDateRange}
+                className="hover:text-foreground ml-1 text-xs"
+                title="기간 필터 해제"
+              >
+                <X className="size-3" />
+              </button>
+            </Badge>
+          ) : null}
           {activeFilterCount > 0 && (
             <Badge variant="secondary" className="gap-1 px-2 py-0.5 text-[11px]">
               필터 {activeFilterCount}개 적용 중

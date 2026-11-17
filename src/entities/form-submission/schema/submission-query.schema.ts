@@ -1,6 +1,16 @@
 import { z } from "zod";
 import { normalizeStringIds } from "@/shared/lib/normalize";
+import { calendarDateStringSchema, refineDateRangeOrder } from "./date-range.schema";
 import type { FormSubmission } from "./form-submission.schema";
+
+/**
+ * URL 쿼리스트링의 빈 문자열(`""`)을 `undefined`로 정규화해 선택적 파라미터로 처리합니다.
+ */
+const optionalNonEmptyString = (schema: z.ZodType<string>) =>
+  z.preprocess(
+    (val) => (typeof val === "string" && val.trim() === "" ? undefined : val),
+    schema.optional()
+  );
 
 /**
  * RFC 4122/9562 표준 UUID 검증용 내부 Zod 스키마
@@ -8,15 +18,21 @@ import type { FormSubmission } from "./form-submission.schema";
 const uuidSchema = z.uuid();
 
 /**
- * 폼 응답 목록 페이징, 멀티 정렬, 컬럼 필터, 배치 ID 조회 요청 쿼리 Zod 스키마
+ * 폼 응답 목록 페이징, 멀티 정렬, 컬럼 필터, 배치 ID 및 기간 범위 조회 요청 쿼리 Zod 스키마
  */
-export const submissionQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  sort: z.string().optional().default("createdAt:desc"),
-  filters: z.string().optional(),
-  ids: z.string().optional(),
-});
+export const submissionQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    sort: z.string().optional().default("createdAt:desc"),
+    filters: z.string().optional(),
+    ids: z.string().optional(),
+    dateFieldId: optionalNonEmptyString(z.string().min(1)),
+    startDate: optionalNonEmptyString(calendarDateStringSchema),
+    endDate: optionalNonEmptyString(calendarDateStringSchema),
+    timezone: optionalNonEmptyString(z.string().min(1)),
+  })
+  .superRefine(refineDateRangeOrder);
 
 export type SubmissionQueryParams = z.infer<typeof submissionQuerySchema>;
 

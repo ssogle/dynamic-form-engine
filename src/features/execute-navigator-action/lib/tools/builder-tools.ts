@@ -17,13 +17,20 @@ import {
   type UpdateForm,
 } from "@/entities/form";
 import { nowUtcIso } from "@/shared/lib/date";
-import type { NavigatorBuilderAction, SchemaOperation } from "../../types/navigator-action.types";
+import { SCHEMA_OPERATIONS, type NavigatorBuilderAction } from "../../types/navigator-action.types";
 
 /**
  * 폼 엔티티의 schemaDefinition 내부에서 CoreFormField 배열을 안전하게 추출하는 유틸리티
  */
 export function extractFieldsFromForm(form?: Form | null): CoreFormField[] {
   return extractRawFields(form);
+}
+
+/**
+ * AI 도구가 새 필드를 추가할 때 1ms 이내 연속 호출에서도 충돌하지 않는 고유 필드 ID를 생성합니다.
+ */
+function createGeneratedFieldId(prefix: "f" | "f_rel"): string {
+  return `${prefix}_${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 6)}`;
 }
 
 /**
@@ -119,21 +126,14 @@ export const createFormInputSchema = z
 export const updateSchemaInputSchema = z.object({
   formId: z.uuid("수정 대상 폼의 ID(UUID)는 필수입니다.").describe("수정할 대상 폼의 고유 ID"),
   operation: z
-    .enum([
-      "ADD_FIELD",
-      "REMOVE_FIELD",
-      "MODIFY_FIELD",
-      "UPDATE_INFO",
-      "SET_ALL_FIELDS",
-      "SET_PRIMARY_FIELD",
-    ])
+    .enum(SCHEMA_OPERATIONS)
     .describe(
-      "수행할 스키마 조작 유형 (다중 수정이나 복합 필드 변경 시에는 SET_ALL_FIELDS, 대표 식별 필드 변경 시에는 SET_PRIMARY_FIELD 사용)"
+      "수행할 스키마 조작 유형 (단일 필드 수정은 UPDATE_FIELD, 다중 수정이나 복합 필드 변경 시에는 SET_ALL_FIELDS, 대표 식별 필드 변경 시에는 SET_PRIMARY_FIELD 사용)"
     ),
   targetFieldId: z
     .string()
     .optional()
-    .describe("수정/삭제 대상 필드 식별자 (단일 필드 ADD/REMOVE/MODIFY 시 사용)"),
+    .describe("수정/삭제 대상 필드 식별자 (단일 필드 ADD/REMOVE/UPDATE 시 사용)"),
   primaryFieldId: z
     .string()
     .optional()
@@ -226,7 +226,7 @@ export const updateFieldOptionsInputSchema = z.object({
 export function createBuilderTools(deps: BuilderToolsDependencies) {
   const navigateTool = tool({
     description:
-      "애플리케이션 내의 다른 화면으로 이동합니다. 폼 목록(/builder/forms), 라이브 캔버스(/builder/forms/[id]), 뷰 목록(/builder/views) 등으로 이동할 때 호출합니다.",
+      "애플리케이션 내의 다른 화면으로 이동합니다. 폼 목록(/builder/forms), 라이브 캔버스(/builder/forms/[id]) 등으로 이동할 때 호출합니다.",
     inputSchema: navigateInputSchema,
     execute: async ({ targetPath, reason }: z.infer<typeof navigateInputSchema>) => {
       const action: NavigatorBuilderAction = {
@@ -395,7 +395,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
           };
         }
         const newField: CoreFormField = {
-          id: fieldData.id ?? `f_${Date.now().toString(36)}`,
+          id: fieldData.id ?? createGeneratedFieldId("f"),
           label: fieldData.label,
           type: fieldData.type,
           required: fieldData.required ?? false,
@@ -458,7 +458,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
             };
           }
         }
-      } else if (operation === "MODIFY_FIELD") {
+      } else if (operation === "UPDATE_FIELD") {
         if (!targetFieldId || !fieldData) {
           return {
             success: false,
@@ -524,15 +524,9 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
 
       const updated = await deps.updateFormById(existing.id, updatePayload);
 
-      const rawOp = operation as string;
-      const op: SchemaOperation =
-        rawOp === "UPDATE_INFO" || rawOp === "MODIFY_FIELD"
-          ? "UPDATE_FIELD"
-          : (rawOp as SchemaOperation);
-
       const action: NavigatorBuilderAction = {
         type: "UPDATE_SCHEMA",
-        operation: op,
+        operation,
         formId: existing.id,
         primaryFieldId: nextPrimaryFieldId,
         field: fieldData as CoreFormField | undefined,
@@ -676,7 +670,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
       }
 
       const currentFields = extractFieldsFromForm(currentForm);
-      const newFieldId = `f_rel_${Date.now().toString(36)}`;
+      const newFieldId = createGeneratedFieldId("f_rel");
       const newField: CoreFormField = {
         id: newFieldId,
         label,

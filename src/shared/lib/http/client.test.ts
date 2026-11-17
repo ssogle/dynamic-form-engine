@@ -89,4 +89,88 @@ describe("HTTP Client Utilities (httpClient)", () => {
       expect(httpError.message).toBe("Failed to fetch");
     }
   });
+
+  it("streamNdjson은 청크 경계에 걸쳐 분할된 NDJSON 라인을 순차 파싱해 onEvent로 전달해야 한다", async () => {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('{"type":"status","message":"준비'));
+        controller.enqueue(encoder.encode(' 중..."}\n{"type":"result","data":{"ok":true}}\n'));
+        controller.close();
+      },
+    });
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(stream, {
+        status: 200,
+        headers: { "Content-Type": "application/x-ndjson; charset=utf-8" },
+      })
+    );
+    global.fetch = fetchMock;
+
+    const events: unknown[] = [];
+    await httpClient.streamNdjson(
+      "/api/v1/navigator",
+      { prompt: "테스트" },
+      {
+        params: { stream: 1 },
+        onEvent: (event) => {
+          events.push(event);
+        },
+      }
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/navigator?stream=1",
+      expect.objectContaining({ method: "POST" })
+    );
+    expect(events).toEqual([
+      { type: "status", message: "준비 중..." },
+      { type: "result", data: { ok: true } },
+    ]);
+  });
+
+  it("streamNdjson은 무활동 타임아웃 초과 시 STREAM_TIMEOUT HttpErrorData를 throw해야 한다", async () => {
+    vi.useFakeTimers();
+    try {
+      const encoder = new TextEncoder();
+      const hangingStream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(encoder.encode('{"type":"status","message":"첫 줄"}\n'));
+          // 의도적으로 close 하지 않고 대기 상태를 유지합니다.
+        },
+      });
+
+      global.fetch = vi.fn().mockResolvedValue(
+        new Response(hangingStream, {
+          status: 200,
+          headers: { "Content-Type": "application/x-ndjson; charset=utf-8" },
+        })
+      );
+
+      const events: unknown[] = [];
+      const streamPromise = httpClient.streamNdjson(
+        "/api/v1/navigator",
+        { prompt: "테스트" },
+        {
+          inactivityTimeoutMs: 5_000,
+          onEvent: (event) => {
+            events.push(event);
+          },
+        }
+      );
+
+      const assertion = expect(streamPromise).rejects.toMatchObject({
+        status: 408,
+        code: "STREAM_TIMEOUT",
+        isHttpError: true,
+      });
+
+      await vi.advanceTimersByTimeAsync(5_500);
+      await assertion;
+      expect(events).toEqual([{ type: "status", message: "첫 줄" }]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

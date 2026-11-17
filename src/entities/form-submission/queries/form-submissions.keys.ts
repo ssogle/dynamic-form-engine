@@ -14,6 +14,9 @@ export const formSubmissionsKeys = {
           sort?: string | undefined;
           filters?: string | undefined;
           limit?: number | undefined;
+          startDate?: string | undefined;
+          endDate?: string | undefined;
+          dateFieldId?: string | undefined;
         }
       | undefined
   ) => [...formSubmissionsKeys.all, "infinite", formId, params ?? {}] as const,

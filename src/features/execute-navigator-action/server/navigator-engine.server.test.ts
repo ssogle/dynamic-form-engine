@@ -39,6 +39,16 @@ vi.mock("@/entities/form/server", () => ({
 vi.mock("@/entities/form-submission/server", () => ({
   hasSubmissionsByFormId: vi.fn().mockResolvedValue(false),
   softDeleteSubmissionsByIds: vi.fn(),
+  aggregateFormSubmissions: vi.fn(),
+  queryFormSubmissionsForAnalysis: vi.fn(),
+}));
+
+vi.mock("@/entities/analysis-view/server", () => ({
+  findAnalysisViewById: vi.fn(),
+  insertAnalysisView: vi.fn(),
+  updateAnalysisViewById: vi.fn(),
+  publishAnalysisViewById: vi.fn(),
+  softDeleteAnalysisViewsByIds: vi.fn(),
 }));
 
 // 2. Vercel AI SDK generateText 모킹
@@ -276,6 +286,62 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
     }
   });
 
+  it("분석가 모드에서는 stepCountIs(10) 및 analyst 도구들이 주입되고 updatedAnalysisView를 추출해야 한다", async () => {
+    const createdView = {
+      id: "view-uuid-1",
+      title: "분기 비교 리포트",
+      description: "요약",
+      blocks: [],
+      publishedAt: null,
+      createdAt: new Date("2026-02-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-02-01T00:00:00.000Z"),
+      deletedAt: null,
+    };
+
+    mockGenerateText.mockResolvedValueOnce({
+      text: "분석 뷰를 생성했습니다.",
+      toolResults: [
+        {
+          toolName: "createAnalysisView",
+          input: { title: "분기 비교 리포트", blocks: [] },
+          output: {
+            success: true,
+            viewId: "view-uuid-1",
+            analysisView: createdView,
+            clientAction: {
+              type: "CREATE_ANALYSIS_VIEW",
+              viewId: "view-uuid-1",
+              title: "분기 비교 리포트",
+              blocks: [],
+              message: "분석 뷰를 생성했습니다.",
+            },
+          },
+        },
+      ],
+    });
+
+    const result = await runNavigatorEngine({
+      mode: "analyst",
+      prompt: "분기 비교 리포트 만들어줘",
+    });
+
+    const callArgs = mockGenerateText.mock.calls[0]?.[0];
+    expect(callArgs?.stopWhen).toEqual({ type: "stepCount", count: 10 });
+    expect(callArgs?.providerOptions).toEqual({
+      google: {
+        thinkingConfig: {
+          thinkingBudget: 512,
+        },
+      },
+    });
+    expect(callArgs?.tools).toHaveProperty("aggregateFormSubmissions");
+    expect(callArgs?.tools).toHaveProperty("computeSeriesMetric");
+    expect(callArgs?.tools).toHaveProperty("createAnalysisView");
+    expect(callArgs?.tools).toHaveProperty("searchForms");
+    expect(result.action?.type).toBe("CREATE_ANALYSIS_VIEW");
+    expect(result.updatedAnalysisView?.id).toBe("view-uuid-1");
+  });
+
   it("지원하지 않는 모드가 전달되면 명시적인 오류를 던져야 한다", async () => {
     await expect(
       runNavigatorEngine({
@@ -283,5 +349,75 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
         prompt: "테스트",
       })
     ).rejects.toThrow('지원하지 않는 네비게이터 모드입니다: "unknown_mode"');
+  });
+
+  it("maxRetries: 0, step/total timeout, 외부 abortSignal 및 onStepStart/onToolExecutionStart/onStepEnd 진행 메시지를 전달해야 한다", async () => {
+    const abortController = new AbortController();
+    const progressLogs: string[] = [];
+
+    mockGenerateText.mockImplementationOnce(
+      async (args: {
+        onStepStart?: (e: { stepNumber: number }) => void;
+        onToolExecutionStart?: (e: { toolCall: { toolName: string } }) => void;
+        onStepEnd?: (e: { toolCalls: Array<{ toolName: string }>; finishReason: string }) => void;
+      }) => {
+        args.onStepStart?.({ stepNumber: 0 });
+        args.onToolExecutionStart?.({ toolCall: { toolName: "aggregateFormSubmissions" } });
+        args.onStepEnd?.({
+          toolCalls: [{ toolName: "aggregateFormSubmissions" }],
+          finishReason: "tool-calls",
+        });
+        args.onStepStart?.({ stepNumber: 1 });
+        args.onToolExecutionStart?.({ toolCall: { toolName: "updateAnalysisView" } });
+        args.onStepEnd?.({
+          toolCalls: [{ toolName: "updateAnalysisView" }],
+          finishReason: "stop",
+        });
+
+        return {
+          text: "최신 데이터로 갱신했습니다.",
+          toolResults: [],
+        };
+      }
+    );
+
+    const result = await runNavigatorEngine(
+      { mode: "analyst", prompt: "갱신해줘" },
+      {
+        abortSignal: abortController.signal,
+        onProgress: (msg) => progressLogs.push(msg),
+      }
+    );
+
+    const callArgs = mockGenerateText.mock.calls[0]?.[0];
+    expect(callArgs?.maxRetries).toBe(0);
+    expect(callArgs?.timeout).toEqual({ stepMs: 25_000, totalMs: 65_000 });
+    expect(callArgs?.abortSignal).toBe(abortController.signal);
+    expect(result.reply).toBe("최신 데이터로 갱신했습니다.");
+    expect(progressLogs).toEqual([
+      "요청을 분석하고 필요한 작업을 준비하고 있습니다...",
+      "AI가 요청을 분석해 작업 계획을 세우고 있습니다...",
+      "데이터베이스에서 최신 데이터를 집계·조회하고 있습니다...",
+      "데이터 집계·조회를 마쳤습니다. 분석 결과를 구성하고 있습니다...",
+      "추가 분석 단계(2단계)를 진행하고 있습니다...",
+      "분석 뷰 문서를 최신 상태로 반영하고 있습니다...",
+      "응답 작성을 완료했습니다.",
+    ]);
+  });
+
+  it("최대 스텝 소진 등으로 finishReason이 stop이 아니고 텍스트·액션 없이 종료되면 미완료 안내 문구를 반환해야 한다", async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: "",
+      finishReason: "tool-calls",
+      toolResults: [],
+    });
+
+    const result = await runNavigatorEngine({
+      mode: "analyst",
+      prompt: "복잡한 다중 분석 실행해줘",
+    });
+
+    expect(result.reply).toContain("완료하지 못했습니다");
+    expect(result.reply).not.toBe("요청을 처리했습니다.");
   });
 });

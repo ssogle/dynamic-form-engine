@@ -8,7 +8,14 @@ import {
   type NavigatorAction,
   type NavigatorClientContext,
   type NavigatorMode,
+  type NavigatorProgressMeta,
 } from "@/features/execute-navigator-action";
+import {
+  analysisViewKeys,
+  extractAnalysisBlocks,
+  useAnalysisViewRefreshStore,
+  type AnalysisView,
+} from "@/entities/analysis-view";
 import {
   formKeys,
   type Form,
@@ -45,6 +52,22 @@ export interface UseNavigatorShellReturn {
    * AI 생성 또는 백엔드 요청 진행 중 여부
    */
   isBusy: boolean;
+  /**
+   * 다중 스텝 실행 중 서버 스트림으로부터 수신한 현재 진행 단계 메시지
+   */
+  progressMessage: string | null;
+  /**
+   * 현재 응답 생성 중 누적된 실제 수행 단계 목록 (heartbeat 제외)
+   */
+  progressSteps: string[];
+  /**
+   * 메시지별 수행 과정 패널 펼침 상태 맵 (`{ [messageId]: boolean }`)
+   */
+  expandedStepMessageIds: Record<string, boolean>;
+  /**
+   * 특정 메시지의 수행 과정 펼침/접힘 상태를 토글하는 핸들러
+   */
+  toggleStepsExpanded: (messageId: string) => void;
   /**
    * 입력창 텍스트 상태
    */
@@ -89,8 +112,12 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
   const setMode = useNavigatorChatStore((state) => state.setMode);
   const messages = useNavigatorChatStore((state) => state.messages);
   const isGenerating = useNavigatorChatStore((state) => state.isGenerating);
+  const progressMessage = useNavigatorChatStore((state) => state.progressMessage);
+  const progressSteps = useNavigatorChatStore((state) => state.progressSteps);
   const addMessage = useNavigatorChatStore((state) => state.addMessage);
   const setIsGenerating = useNavigatorChatStore((state) => state.setIsGenerating);
+  const setProgressMessage = useNavigatorChatStore((state) => state.setProgressMessage);
+  const appendProgressStep = useNavigatorChatStore((state) => state.appendProgressStep);
 
   React.useEffect(() => {
     if (currentMode !== mode) {
@@ -106,17 +133,47 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
 
   // 3. UI 로컬 상태
   const [inputValue, setInputValue] = React.useState("");
+  const [expandedStepMessageIds, setExpandedStepMessageIds] = React.useState<
+    Record<string, boolean>
+  >({});
+
+  const toggleStepsExpanded = React.useCallback((messageId: string) => {
+    setExpandedStepMessageIds((prev) => ({
+      ...prev,
+      [messageId]: !prev[messageId],
+    }));
+  }, []);
 
   const messagesEndRef = React.useRef<HTMLDivElement | null>(null);
   const inputRef = React.useRef<HTMLInputElement | null>(null);
 
-  // 4. AI 통신 훅
-  const { mutateAsync: executeAction, isPending } = useNavigatorMutation();
+  /**
+   * 스트림 진행 이벤트 핸들러
+   * - `progressMessage`는 heartbeat를 포함해 항상 최신 상태로 갱신하여 로딩 인디케이터에 표시합니다.
+   * - `progressSteps`에는 heartbeat를 제외한 실제 수행 단계만 누적해 채팅 기록으로 남깁니다.
+   */
+  const handleProgress = React.useCallback(
+    (statusText: string, meta?: NavigatorProgressMeta) => {
+      setProgressMessage(statusText);
+      if (!meta?.isHeartbeat) {
+        appendProgressStep(statusText);
+      }
+    },
+    [setProgressMessage, appendProgressStep]
+  );
+
+  // 4. AI 통신 훅 (스트리밍 진행 메시지 수신 연동) 및 분석 뷰 AI 재집계 요청 구독
+  const { mutateAsync: executeAction, isPending } = useNavigatorMutation({
+    onProgress: handleProgress,
+  });
   const isBusy = isGenerating || isPending;
+  const pendingRefresh = useAnalysisViewRefreshStore((state) => state.pendingRefresh);
+  const clearPendingRefresh = useAnalysisViewRefreshStore((state) => state.clearPendingRefresh);
+  const setIsRefreshingByAi = useAnalysisViewRefreshStore((state) => state.setIsRefreshingByAi);
 
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
-  }, [messages, isBusy]);
+  }, [messages, isBusy, progressSteps.length]);
 
   // AI 응답 완료 및 disabled 해제 시 입력창으로 포커스 자동 복원
   React.useEffect(() => {
@@ -174,6 +231,23 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
           queryClient.invalidateQueries({ queryKey: formSubmissionsKeys.all });
           break;
 
+        case "CREATE_ANALYSIS_VIEW":
+          queryClient.invalidateQueries({ queryKey: analysisViewKeys.all });
+          if (action.viewId) {
+            router.push(`/analyst/views/${action.viewId}`);
+          }
+          break;
+
+        case "UPDATE_ANALYSIS_VIEW":
+        case "PUBLISH_ANALYSIS_VIEW":
+          queryClient.invalidateQueries({ queryKey: analysisViewKeys.all });
+          break;
+
+        case "DELETE_ANALYSIS_VIEWS":
+          queryClient.invalidateQueries({ queryKey: analysisViewKeys.all });
+          router.push("/analyst/views");
+          break;
+
         default:
           break;
       }
@@ -215,7 +289,7 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
           id: f.id,
           title: f.title,
           summary: f.description ?? undefined,
-          createdAt: f.createdAt ? new Date(f.createdAt).toISOString() : undefined,
+          createdAt: toUtcIso(f.createdAt) ?? undefined,
         }));
       }
     } else if (mode === "consumer") {
@@ -298,6 +372,35 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
           };
         });
       }
+    } else if (mode === "analyst") {
+      // 1. 개별 분석 뷰 문서 상세 화면일 때
+      const match = pathname.match(/\/analyst\/views\/([^/]+)/);
+      if (match && match[1]) {
+        const viewId = match[1];
+        const cachedView = queryClient.getQueryData<AnalysisView>(
+          analysisViewKeys.detail(viewId, false)
+        );
+        if (cachedView) {
+          context.currentAnalysisView = {
+            id: cachedView.id,
+            title: cachedView.title,
+            description: cachedView.description ?? undefined,
+            isPublished: Boolean(cachedView.publishedAt),
+            blocks: extractAnalysisBlocks(cachedView),
+          };
+        }
+      }
+
+      // 2. 분석 뷰 목록 캐시가 존재할 때 (상위 10개 요약 주입)
+      const cachedViews = queryClient.getQueryData<AnalysisView[]>(analysisViewKeys.lists());
+      if (cachedViews && cachedViews.length > 0) {
+        context.visibleAnalysisViews = cachedViews.slice(0, 10).map((v) => ({
+          id: v.id,
+          title: v.title,
+          summary: v.description ?? undefined,
+          createdAt: toUtcIso(v.createdAt) ?? undefined,
+        }));
+      }
     }
 
     return context;
@@ -316,10 +419,12 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
         content: trimmed,
       });
       setInputValue("");
+      setProgressMessage("요청을 준비하고 있습니다...");
       setIsGenerating(true);
 
       try {
-        const historyMessages = messages.map((m) => ({
+        // 과도한 과거 대화 누적으로 인한 LLM 토큰·레이턴시 급증을 방지하기 위해 최근 12개 메시지만 전달합니다.
+        const historyMessages = messages.slice(-12).map((m) => ({
           role: m.role,
           content: m.content,
         }));
@@ -333,13 +438,23 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
           currentContext,
         });
 
+        // 비동기 스트리밍 중 누적된 최신 단계 목록을 스토어에서 직접 읽어 Stale Closure를 방지합니다.
+        const recordedSteps = useNavigatorChatStore.getState().progressSteps;
         const replyText =
           response.reply || response.message || response.action?.message || "요청을 처리했습니다.";
         addMessage({
           role: "assistant",
           content: replyText,
+          steps: recordedSteps.length > 0 ? [...recordedSteps] : undefined,
           action: response.action ?? undefined,
         });
+
+        if (response.updatedAnalysisView) {
+          queryClient.setQueryData?.(
+            analysisViewKeys.detail(response.updatedAnalysisView.id, false),
+            response.updatedAnalysisView
+          );
+        }
 
         // 복합 액션 및 단일 액션 추출
         const actionsToExecute: NavigatorAction[] =
@@ -361,23 +476,28 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
         }
       } catch (err) {
         console.error("AI Navigator 통신 오류:", err);
+        const recordedSteps = useNavigatorChatStore.getState().progressSteps;
         addMessage({
           role: "assistant",
           content:
             "죄송합니다. 요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+          steps: recordedSteps.length > 0 ? [...recordedSteps] : undefined,
         });
       } finally {
         setIsGenerating(false);
+        setProgressMessage(null);
       }
     },
     [
       isBusy,
       addMessage,
       setIsGenerating,
+      setProgressMessage,
       messages,
       resolveCurrentContext,
       executeAction,
       mode,
+      queryClient,
       dispatchAction,
     ]
   );
@@ -390,10 +510,32 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
     [handleExecutePrompt, inputValue]
   );
 
+  React.useEffect(() => {
+    setIsRefreshingByAi(mode === "analyst" && isBusy);
+  }, [mode, isBusy, setIsRefreshingByAi]);
+
+  React.useEffect(() => {
+    if (mode !== "analyst" || !pendingRefresh || isBusy) {
+      return;
+    }
+    if (!pathname.includes(pendingRefresh.viewId)) {
+      return;
+    }
+    const promptToRun = pendingRefresh.prompt;
+    clearPendingRefresh();
+    queueMicrotask(() => {
+      void handleExecutePrompt(promptToRun);
+    });
+  }, [mode, pendingRefresh, isBusy, pathname, clearPendingRefresh, handleExecutePrompt]);
+
   return {
     config,
     messages,
     isBusy,
+    progressMessage,
+    progressSteps,
+    expandedStepMessageIds,
+    toggleStepsExpanded,
     inputValue,
     setInputValue,
     messagesEndRef,

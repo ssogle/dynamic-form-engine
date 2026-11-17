@@ -140,6 +140,23 @@ export function formatDateToYmd(date: Date): string {
 }
 
 /**
+ * 지정된 IANA 시간대(기본값: Asia/Seoul) 기준 현재 서버 날짜를 'YYYY-MM-DD' 문자열로 반환합니다.
+ * UTC 컨테이너 환경에서도 한국 비즈니스 날짜 기준으로 안전하게 오늘 날짜를 계산할 때 사용합니다.
+ */
+export function todayYmd(timezone = "Asia/Seoul"): string {
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+  } catch {
+    return formatDateToYmd(new Date());
+  }
+}
+
+/**
  * 'YYYY-MM-DD' 문자열을 실제 달력 유효성(윤년/월말 초과 포함) 검증 후 로컬 Date 객체로 파싱합니다.
  *
  * @param ymd 'YYYY-MM-DD' 형식의 날짜 문자열

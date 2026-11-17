@@ -108,4 +108,86 @@ describe("POST /api/v1/navigator (AI Navigator Thin Route Handler)", () => {
       })
     );
   });
+
+  it("?stream=1 요청 시 NDJSON 스트림으로 status 이벤트와 최종 result 이벤트를 반환해야 한다", async () => {
+    const mockStreamResponse = {
+      reply: "집계 완료",
+      action: null,
+    };
+
+    vi.spyOn(navigatorServer, "runNavigatorEngine").mockImplementationOnce(
+      async (_payload, options) => {
+        options?.onProgress?.("데이터를 집계하고 있습니다...");
+        return mockStreamResponse;
+      }
+    );
+
+    const request = new NextRequest("http://localhost:3000/api/v1/navigator?stream=1", {
+      method: "POST",
+      body: JSON.stringify({
+        mode: "analyst",
+        prompt: "비용 집계해줘",
+      }),
+    });
+
+    const response = await POST(request, {});
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/x-ndjson");
+
+    const text = await response.text();
+    const lines = text
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as { type: string; message?: string; data?: unknown });
+
+    expect(lines).toEqual([
+      { type: "status", message: "데이터를 집계하고 있습니다..." },
+      { type: "result", data: mockStreamResponse },
+    ]);
+  });
+
+  it("?stream=1 요청 중 응답이 지연되면 3초 간격으로 status와 구분된 heartbeat 이벤트를 전송해야 한다", async () => {
+    vi.useFakeTimers();
+    try {
+      const mockStreamResponse = {
+        reply: "지연 후 완료",
+        action: null,
+      };
+
+      let resolveEngine: ((value: typeof mockStreamResponse) => void) | undefined;
+      vi.spyOn(navigatorServer, "runNavigatorEngine").mockImplementationOnce(
+        async (_payload, options) => {
+          options?.onProgress?.("스키마를 분석하고 있습니다...");
+          return new Promise((resolve) => {
+            resolveEngine = resolve;
+          });
+        }
+      );
+
+      const request = new NextRequest("http://localhost:3000/api/v1/navigator?stream=1", {
+        method: "POST",
+        body: JSON.stringify({
+          mode: "builder",
+          prompt: "폼 분석해줘",
+        }),
+      });
+
+      const response = await POST(request, {});
+      // onProgress 직후 lastEventAt이 갱신되므로 3초 + 3초 경과시켜 heartbeat 발생 유도
+      await vi.advanceTimersByTimeAsync(6_200);
+      resolveEngine?.(mockStreamResponse);
+
+      const text = await response.text();
+      const lines = text
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line) as { type: string; message?: string; data?: unknown });
+
+      expect(lines[0]).toEqual({ type: "status", message: "스키마를 분석하고 있습니다..." });
+      expect(lines.some((line) => line.type === "heartbeat")).toBe(true);
+      expect(lines[lines.length - 1]).toEqual({ type: "result", data: mockStreamResponse });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

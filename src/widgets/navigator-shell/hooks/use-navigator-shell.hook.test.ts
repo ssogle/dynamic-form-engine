@@ -2,6 +2,7 @@ import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useNavigatorChatStore } from "../store/navigator-chat.store";
 import { useConsumerFormDraftStore } from "@/entities/form-submission";
+import { useAnalysisViewRefreshStore } from "@/entities/analysis-view";
 import { useNavigatorShell } from "./use-navigator-shell.hook";
 
 // Router & Pathname 모킹
@@ -30,29 +31,43 @@ vi.mock("@tanstack/react-query", () => ({
 
 // AI Mutation 모킹
 const mockMutateAsync = vi.fn();
+let capturedOnProgress:
+  ((statusText: string, meta?: { isHeartbeat?: boolean }) => void) | undefined;
 vi.mock("@/features/execute-navigator-action", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/features/execute-navigator-action")>();
   return {
     ...actual,
-    useNavigatorMutation: () => ({
-      mutateAsync: mockMutateAsync,
-      isPending: false,
-    }),
+    useNavigatorMutation: (options?: {
+      onProgress?: (statusText: string, meta?: { isHeartbeat?: boolean }) => void;
+    }) => {
+      capturedOnProgress = options?.onProgress;
+      return {
+        mutateAsync: mockMutateAsync,
+        isPending: false,
+      };
+    },
   };
 });
 
 describe("useNavigatorShell (widgets/navigator-shell/hooks)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    capturedOnProgress = undefined;
     useNavigatorChatStore.setState({
       messages: [],
       currentMode: "consumer",
       isGenerating: false,
+      progressMessage: null,
+      progressSteps: [],
     });
     useConsumerFormDraftStore.setState({
       currentFormId: null,
       draftValues: {},
       submitTriggerCount: 0,
+    });
+    useAnalysisViewRefreshStore.setState({
+      pendingRefresh: null,
+      isRefreshingByAi: false,
     });
     currentPathname = "/consumer/forms/form-uuid-1/new";
   });
@@ -232,5 +247,163 @@ describe("useNavigatorShell (widgets/navigator-shell/hooks)", () => {
     expect(callArg.currentContext?.visibleSubmissions?.[0]?.title).not.toContain(
       "신규 입사자 메모"
     );
+  });
+
+  it("analyst 모드에서 currentAnalysisView와 visibleAnalysisViews 컨텍스트를 추출하고 CREATE/UPDATE/DELETE 액션을 디스패치해야 한다", async () => {
+    currentPathname = "/analyst/views/view-1";
+    mockGetQueryData.mockImplementation((key: readonly unknown[]) => {
+      if (Array.isArray(key) && key[1] === "detail" && key[2] === "view-1") {
+        return {
+          id: "view-1",
+          title: "1분기 리포트",
+          description: "요약",
+          blocks: [{ id: "b1", type: "text", content: "본문" }],
+          publishedAt: null,
+          createdAt: new Date("2026-02-01T00:00:00.000Z"),
+        };
+      }
+      if (Array.isArray(key) && key[1] === "list" && key.length === 2) {
+        return [
+          {
+            id: "view-1",
+            title: "1분기 리포트",
+            description: "요약",
+            blocks: [],
+            publishedAt: null,
+            createdAt: new Date("2026-02-01T00:00:00.000Z"),
+          },
+        ];
+      }
+      return undefined;
+    });
+
+    mockMutateAsync.mockResolvedValueOnce({
+      reply: "새 뷰 생성 및 수정",
+      actions: [
+        {
+          type: "CREATE_ANALYSIS_VIEW",
+          viewId: "view-2",
+          title: "새 리포트",
+          blocks: [],
+        },
+        {
+          type: "UPDATE_ANALYSIS_VIEW",
+          operation: "ADD_BLOCK",
+          viewId: "view-2",
+          blocks: [],
+        },
+        {
+          type: "PUBLISH_ANALYSIS_VIEW",
+          viewId: "view-2",
+          isPublished: true,
+        },
+        {
+          type: "DELETE_ANALYSIS_VIEWS",
+          deletedIds: ["view-1"],
+        },
+      ],
+    });
+
+    const { result } = renderHook(() => useNavigatorShell({ mode: "analyst" }));
+    expect(result.current.config.badgeLabel).toBe("Analyst");
+
+    await act(async () => {
+      await result.current.handleExecutePrompt("새 분석 뷰 만들어줘");
+    });
+
+    const callArg = mockMutateAsync.mock.calls[0]?.[0] as {
+      mode: string;
+      currentContext?: {
+        currentAnalysisView?: { id: string; blocks: unknown[] };
+        visibleAnalysisViews?: Array<{ id: string }>;
+      };
+    };
+    expect(callArg.mode).toBe("analyst");
+    expect(callArg.currentContext?.currentAnalysisView?.id).toBe("view-1");
+    expect(callArg.currentContext?.currentAnalysisView?.blocks).toHaveLength(1);
+    expect(callArg.currentContext?.visibleAnalysisViews?.[0]?.id).toBe("view-1");
+
+    expect(mockInvalidateQueries).toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith("/analyst/views/view-2");
+    expect(mockPush).toHaveBeenCalledWith("/analyst/views");
+  });
+
+  it("analyst 모드에서 pendingRefresh가 요청되면 자동으로 AI 프롬프트를 실행하고 스토어 요청을 비워야 한다", async () => {
+    currentPathname = "/analyst/views/view-1";
+    mockGetQueryData.mockReturnValue(undefined);
+    mockMutateAsync.mockResolvedValueOnce({
+      reply: "최신 데이터로 재집계했습니다.",
+      actions: [
+        {
+          type: "UPDATE_ANALYSIS_VIEW",
+          operation: "SET_ALL_BLOCKS",
+          viewId: "view-1",
+          blocks: [],
+        },
+      ],
+    });
+
+    renderHook(() => useNavigatorShell({ mode: "analyst" }));
+
+    await act(async () => {
+      useAnalysisViewRefreshStore.getState().requestAiRefresh({
+        viewId: "view-1",
+        viewTitle: "11월 리포트",
+        prompt: "최신 데이터로 갱신해 주세요.",
+        requestedAt: 1000,
+      });
+    });
+
+    expect(useAnalysisViewRefreshStore.getState().pendingRefresh).toBeNull();
+    expect(mockMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: "analyst",
+        prompt: "최신 데이터로 갱신해 주세요.",
+      })
+    );
+  });
+
+  it("스트리밍 실행 중 status 단계만 누적하여 응답 메시지의 steps로 저장하고 heartbeat는 제외해야 한다", async () => {
+    mockMutateAsync.mockImplementationOnce(async () => {
+      capturedOnProgress?.("폼 목록 조회 중...", { isHeartbeat: false });
+      capturedOnProgress?.("AI가 분석 작업을 진행하고 있습니다... (3초 경과)", {
+        isHeartbeat: true,
+      });
+      capturedOnProgress?.("필드 스키마 검증 중...", { isHeartbeat: false });
+      return {
+        reply: "폼을 생성했습니다.",
+        action: null,
+      };
+    });
+
+    const { result } = renderHook(() => useNavigatorShell({ mode: "builder" }));
+
+    await act(async () => {
+      await result.current.handleExecutePrompt("문의 폼 만들어줘");
+    });
+
+    const assistantMessage = result.current.messages[result.current.messages.length - 1];
+    expect(assistantMessage?.role).toBe("assistant");
+    expect(assistantMessage?.content).toBe("폼을 생성했습니다.");
+    expect(assistantMessage?.steps).toEqual(["폼 목록 조회 중...", "필드 스키마 검증 중..."]);
+    // 실행 완료 후 현재 진행 중 상태는 초기화되어야 함
+    expect(result.current.progressSteps).toEqual([]);
+    expect(result.current.progressMessage).toBeNull();
+  });
+
+  it("toggleStepsExpanded 호출 시 특정 메시지의 수행 과정 펼침 상태를 토글해야 한다", () => {
+    const { result } = renderHook(() => useNavigatorShell({ mode: "builder" }));
+
+    expect(result.current.expandedStepMessageIds["msg-1"]).toBeUndefined();
+
+    act(() => {
+      result.current.toggleStepsExpanded("msg-1");
+    });
+    expect(result.current.expandedStepMessageIds["msg-1"]).toBe(true);
+
+    act(() => {
+      result.current.toggleStepsExpanded("msg-1");
+    });
+    expect(result.current.expandedStepMessageIds["msg-1"]).toBe(false);
   });
 });

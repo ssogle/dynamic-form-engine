@@ -31,7 +31,7 @@ describe("Navigator Request Schema Validation (src/features/execute-navigator-ac
       }
     });
 
-    it("mode에 올바른 열거형 값('builder', 'consumer')이 주어지면 정상 파싱해야 한다", () => {
+    it("mode에 올바른 열거형 값('builder', 'consumer', 'analyst')이 주어지면 정상 파싱해야 한다", () => {
       const builderResult = navigatorRequestSchema.safeParse({
         mode: "builder",
         prompt: "폼 빌더 명령",
@@ -40,9 +40,14 @@ describe("Navigator Request Schema Validation (src/features/execute-navigator-ac
         mode: "consumer",
         prompt: "컨슈머 응답 명령",
       });
+      const analystResult = navigatorRequestSchema.safeParse({
+        mode: "analyst",
+        prompt: "분석 뷰 생성 명령",
+      });
 
       expect(builderResult.success).toBe(true);
       expect(consumerResult.success).toBe(true);
+      expect(analystResult.success).toBe(true);
     });
 
     it("mode에 지원하지 않는 잘못된 값이 전달되면 파싱에 실패해야 한다", () => {
@@ -250,6 +255,56 @@ describe("Navigator Request Schema Validation (src/features/execute-navigator-ac
               options: ["Frontend", "Backend"],
             },
           ],
+        },
+      };
+
+      expect(navigatorRequestSchema.safeParse(payload).success).toBe(false);
+    });
+  });
+
+  describe("currentContext (Analyst 화면 맥락 검증)", () => {
+    it("분석가 활성 분석 뷰(currentAnalysisView)와 목록 캐시(visibleAnalysisViews)를 정상 파싱해야 한다", () => {
+      const payload = {
+        mode: "analyst",
+        prompt: "이 문서 맨 아래에 텍스트 요약을 추가해줘",
+        currentContext: {
+          currentPath: "/analyst/views/view-uuid-1",
+          currentAnalysisView: {
+            id: "view-uuid-1",
+            title: "2월 만족도 리포트",
+            description: "요약",
+            isPublished: false,
+            blocks: [
+              {
+                id: "block-1",
+                type: "text",
+                title: "개요",
+                content: "핵심 지표 분석입니다.",
+              },
+            ],
+          },
+          visibleAnalysisViews: [{ id: "view-uuid-1", title: "2월 만족도 리포트" }],
+        },
+      };
+
+      const result = navigatorRequestSchema.safeParse(payload);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.currentContext?.currentAnalysisView?.blocks).toHaveLength(1);
+        expect(result.data.currentContext?.visibleAnalysisViews).toHaveLength(1);
+      }
+    });
+
+    it("currentAnalysisView.blocks에 유효하지 않은 블록 타입이 포함되면 실패해야 한다", () => {
+      const payload = {
+        mode: "analyst",
+        prompt: "차트 수정",
+        currentContext: {
+          currentAnalysisView: {
+            id: "view-uuid-1",
+            title: "잘못된 리포트",
+            blocks: [{ id: "b1", type: "video", url: "https://example.com" }],
+          },
         },
       };
 

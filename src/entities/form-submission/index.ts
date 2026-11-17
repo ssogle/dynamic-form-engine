@@ -62,3 +62,43 @@ export {
   useConsumerFormDraftStore,
   type ConsumerFormDraftState,
 } from "./store/consumer-form-draft.store";
+
+export {
+  analyticsMetricSchema,
+  analyticsTimeBucketSchema,
+  analyticsDateAxisSchema,
+  analyticsFieldFilterSchema,
+  analyticsAggregationQuerySchema,
+  seriesMetricPointSchema,
+  computeSeriesMetricInputSchema,
+  querySubmissionsForAnalysisSchema,
+  type AnalyticsMetric,
+  type AnalyticsTimeBucket,
+  type AnalyticsDateAxis,
+  type AnalyticsFieldFilter,
+  type AnalyticsAggregationQuery,
+  type SeriesMetricPoint,
+  type ComputeSeriesMetricInput,
+  type QuerySubmissionsForAnalysisInput,
+} from "./schema/analytics-query.schema";
+
+export {
+  isValidCalendarDate,
+  isValidTimezone,
+  calendarDateStringSchema,
+  type SubmissionDateRangeFilter,
+} from "./schema/date-range.schema";
+
+export {
+  roundFloatingPoint,
+  parseNumericValue,
+  resolveFieldOptionLabelMap,
+  formatFieldDisplayKey,
+  formatTimeBucketKey,
+  buildContinuousTimeBucketKeys,
+  mergeSeriesWithZeroFill,
+  computeSeriesMetric,
+  type AnalyticsFieldMeta,
+  type ComputedSeriesMetricRow,
+  type ComputeSeriesMetricResult,
+} from "./lib/analytics-calculator";

@@ -17,7 +17,6 @@ export default function BuilderLayout({ children }: { children: React.ReactNode 
   const pathname = usePathname();
 
   const isFormsActive = pathname.startsWith("/builder/forms");
-  const isViewsActive = pathname.startsWith("/builder/views");
 
   return (
     <div className="bg-background flex h-screen w-full overflow-hidden">
@@ -42,20 +41,21 @@ export default function BuilderLayout({ children }: { children: React.ReactNode 
             >
               폼 목록
             </Link>
-            <Link
-              href="/builder/views"
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                isViewsActive
-                  ? "bg-secondary text-secondary-foreground font-semibold shadow-2xs"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              뷰 목록
-            </Link>
           </nav>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/analyst/views"
+              className="text-muted-foreground hover:text-foreground text-xs font-medium transition-colors"
+            >
+              분석가로 이동
+            </Link>
+            <Link
+              href="/consumer"
+              className="text-muted-foreground hover:text-foreground text-xs font-medium transition-colors"
+            >
+              컨슈머로 이동
+            </Link>
             <Link
               href="/"
               className="text-muted-foreground hover:text-foreground text-xs transition-colors"

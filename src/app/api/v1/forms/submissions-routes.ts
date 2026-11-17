@@ -1,5 +1,9 @@
 import { extractActiveFields, validateSubmissionData } from "@/entities/form";
-import { extractSubmissionPayload, submissionQuerySchema } from "@/entities/form-submission";
+import {
+  extractSubmissionPayload,
+  isValidTimezone,
+  submissionQuerySchema,
+} from "@/entities/form-submission";
 import {
   findSubmissionsPaginated,
   insertSubmission,
@@ -32,6 +36,17 @@ submissionsRoutes.get("/:id/submissions", async (c) => {
     submissionQuerySchema,
     "유효하지 않은 조회 파라미터입니다."
   );
+
+  if (queryParams.dateFieldId) {
+    const targetField = extractActiveFields(form).find((f) => f.id === queryParams.dateFieldId);
+    if (!targetField || targetField.type !== "date") {
+      throw badRequest(`유효하지 않은 날짜 기준 필드입니다: '${queryParams.dateFieldId}'`);
+    }
+  }
+
+  if (queryParams.timezone && !isValidTimezone(queryParams.timezone)) {
+    throw badRequest(`유효하지 않은 시간대입니다: '${queryParams.timezone}'`);
+  }
 
   const paginatedResult = await findSubmissionsPaginated(form.id, queryParams);
   return apiResponse.ok(paginatedResult);

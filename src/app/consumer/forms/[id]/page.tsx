@@ -1,5 +1,6 @@
 import * as React from "react";
 import Link from "next/link";
+import { isValidCalendarDate, type SubmissionDateRangeFilter } from "@/entities/form-submission";
 import { Button } from "@/shared/ui/button";
 import { ManageFormSubmissions } from "@/features/manage-form-submissions";
 
@@ -7,16 +8,39 @@ interface ConsumerFormIdPageProps {
   params: Promise<{
     id: string;
   }>;
+  searchParams: Promise<{
+    startDate?: string | undefined;
+    endDate?: string | undefined;
+    dateFieldId?: string | undefined;
+  }>;
 }
 
 /**
  * 컨슈머 데이터 도메인 레코드 목록 관리 페이지 (/consumer/forms/[id])
  *
  * 공식 발행된 활성 폼의 제출 데이터를 조회/검색/정렬하는 기본 메인 뷰포트입니다.
- * 상단에서 신규 데이터 작성(/new) 및 전체 폼 목록 탐색 링크를 제공합니다.
+ * 분석 뷰의 `[원본 데이터 보기]` 링크로부터 전달된 `?startDate=...&endDate=...&dateFieldId=...` 쿼리를 수용합니다.
  */
-export default async function ConsumerFormIdPage({ params }: ConsumerFormIdPageProps) {
+export default async function ConsumerFormIdPage({
+  params,
+  searchParams,
+}: ConsumerFormIdPageProps) {
   const { id } = await params;
+  const rawQuery = await searchParams;
+
+  const validStartDate =
+    rawQuery.startDate && isValidCalendarDate(rawQuery.startDate) ? rawQuery.startDate : undefined;
+  const validEndDate =
+    rawQuery.endDate && isValidCalendarDate(rawQuery.endDate) ? rawQuery.endDate : undefined;
+
+  const initialDateRange: SubmissionDateRangeFilter | undefined =
+    validStartDate || validEndDate
+      ? {
+          startDate: validStartDate,
+          endDate: validEndDate,
+          dateFieldId: rawQuery.dateFieldId?.trim() || undefined,
+        }
+      : undefined;
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
@@ -32,7 +56,7 @@ export default async function ConsumerFormIdPage({ params }: ConsumerFormIdPageP
         </Button>
       </div>
 
-      <ManageFormSubmissions formId={id} />
+      <ManageFormSubmissions formId={id} initialDateRange={initialDateRange} />
     </div>
   );
 }

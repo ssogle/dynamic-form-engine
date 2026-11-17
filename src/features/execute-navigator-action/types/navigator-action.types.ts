@@ -1,15 +1,26 @@
+import type { AnalysisBlock, AnalysisView } from "@/entities/analysis-view";
 import type { ActiveForm, CoreFormField, Form, SelectOption } from "@/entities/form";
 
 /**
  * 네비게이터 동작 모드 구분
  */
-export type NavigatorMode = "builder" | "consumer";
+export type NavigatorMode = "builder" | "consumer" | "analyst";
+
+/**
+ * 폼 스키마 변경 오퍼레이션 상수 목록 (단일 진실 원천 - SSOT)
+ */
+export const SCHEMA_OPERATIONS = [
+  "ADD_FIELD",
+  "UPDATE_FIELD",
+  "REMOVE_FIELD",
+  "SET_ALL_FIELDS",
+  "SET_PRIMARY_FIELD",
+] as const;
 
 /**
  * 폼 스키마 변경 오퍼레이션 유형 (Builder 전용)
  */
-export type SchemaOperation =
-  "ADD_FIELD" | "UPDATE_FIELD" | "REMOVE_FIELD" | "SET_ALL_FIELDS" | "SET_PRIMARY_FIELD";
+export type SchemaOperation = (typeof SCHEMA_OPERATIONS)[number];
 
 // ==========================================
 // 1. 빌더 클라이언트 액션 규격 (Builder Actions)
@@ -85,10 +96,71 @@ export type NavigatorConsumerAction =
   NavigateAction | FillFieldsAction | SubmitFormAction | DeleteSubmissionsAction;
 
 // ==========================================
-// 3. 통합 액션 규격 (Unified Action)
+// 3. 분석가 클라이언트 액션 규격 (Analyst Actions)
 // ==========================================
 
-export type NavigatorAction = NavigatorBuilderAction | NavigatorConsumerAction;
+/**
+ * 분석 뷰 문서 편집 오퍼레이션 상수 목록 (단일 진실 원천 - SSOT)
+ */
+export const ANALYSIS_VIEW_OPERATIONS = [
+  "ADD_BLOCK",
+  "UPDATE_BLOCK",
+  "REMOVE_BLOCK",
+  "REORDER_BLOCKS",
+  "UPDATE_INFO",
+  "SET_ALL_BLOCKS",
+] as const;
+
+/**
+ * 분석 뷰 문서 편집 오퍼레이션 유형 (Analyst 전용)
+ */
+export type AnalysisViewOperation = (typeof ANALYSIS_VIEW_OPERATIONS)[number];
+
+export interface CreateAnalysisViewAction {
+  type: "CREATE_ANALYSIS_VIEW";
+  viewId: string;
+  title: string;
+  description?: string | undefined;
+  blocks: AnalysisBlock[];
+  message?: string | undefined;
+}
+
+export interface UpdateAnalysisViewAction {
+  type: "UPDATE_ANALYSIS_VIEW";
+  operation: AnalysisViewOperation;
+  viewId: string;
+  title?: string | undefined;
+  description?: string | undefined;
+  blocks: AnalysisBlock[];
+  message?: string | undefined;
+}
+
+export interface PublishAnalysisViewAction {
+  type: "PUBLISH_ANALYSIS_VIEW";
+  viewId: string;
+  isPublished: boolean;
+  message?: string | undefined;
+}
+
+export interface DeleteAnalysisViewsAction {
+  type: "DELETE_ANALYSIS_VIEWS";
+  deletedIds: string[];
+  message?: string | undefined;
+}
+
+export type NavigatorAnalystAction =
+  | NavigateAction
+  | CreateAnalysisViewAction
+  | UpdateAnalysisViewAction
+  | PublishAnalysisViewAction
+  | DeleteAnalysisViewsAction;
+
+// ==========================================
+// 4. 통합 액션 규격 (Unified Action)
+// ==========================================
+
+export type NavigatorAction =
+  NavigatorBuilderAction | NavigatorConsumerAction | NavigatorAnalystAction;
 
 /**
  * 대화 세션 메시지 DTO
@@ -154,6 +226,20 @@ export interface NavigatorClientContext {
   currentDraftValues?: Record<string, unknown> | undefined;
   /** 컨슈머 응답 목록 테이블의 렌더링 캐시 목록 */
   visibleSubmissions?: VisibleItemSummary[] | undefined;
+
+  // Analyst Context
+  /** 분석가 화면에서 열려있는 활성 분석 뷰 문서 정보 */
+  currentAnalysisView?:
+    | {
+        id: string;
+        title: string;
+        description?: string | undefined;
+        isPublished?: boolean | undefined;
+        blocks: AnalysisBlock[];
+      }
+    | undefined;
+  /** 분석가 분석 뷰 목록 화면의 렌더링 캐시 목록 */
+  visibleAnalysisViews?: VisibleItemSummary[] | undefined;
 }
 
 /**
@@ -182,6 +268,22 @@ export interface NavigatorExecutionResponse {
   actions?: NavigatorAction[] | undefined;
   /** 서버에서 갱신/생성된 폼 데이터 (존재하는 경우) */
   updatedForm?: ActiveForm | Form | null | undefined;
+  /** 서버에서 갱신/생성된 분석 뷰 문서 데이터 (존재하는 경우) */
+  updatedAnalysisView?: AnalysisView | null | undefined;
   /** 호환용 메시지 필드 */
   message?: string | undefined;
 }
+
+/**
+ * 네비게이터 NDJSON 스트림 이벤트 계약 (서버-클라이언트 단일 진실 원천)
+ *
+ * - `status`: 실제 AI 엔진 작업 단계 진행 메시지 (채팅 기록 누적 대상)
+ * - `heartbeat`: 장시간 LLM 대기 중 스트림 침묵 방지용 경과 알림 (채팅 기록 제외)
+ * - `result`: 최종 실행 결과 응답
+ * - `error`: 스트림 열린 이후 발생한 오류 메시지
+ */
+export type NavigatorStreamEvent =
+  | { type: "status"; message: string }
+  | { type: "heartbeat"; message: string }
+  | { type: "result"; data: NavigatorExecutionResponse }
+  | { type: "error"; message: string };
