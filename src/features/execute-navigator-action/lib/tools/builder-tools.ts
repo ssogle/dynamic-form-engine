@@ -27,6 +27,13 @@ export function extractFieldsFromForm(form?: Form | null): CoreFormField[] {
 }
 
 /**
+ * AI 도구가 새 필드를 추가할 때 1ms 이내 연속 호출에서도 충돌하지 않는 고유 필드 ID를 생성합니다.
+ */
+function createGeneratedFieldId(prefix: "f" | "f_rel"): string {
+  return `${prefix}_${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 6)}`;
+}
+
+/**
  * 필드 ID 또는 label과 일치하는지 지능적으로 대조하는 판별 함수
  */
 function matchesTargetField(field: CoreFormField, targetIdentifier?: string): boolean {
@@ -388,7 +395,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
           };
         }
         const newField: CoreFormField = {
-          id: fieldData.id ?? `f_${Date.now().toString(36)}`,
+          id: fieldData.id ?? createGeneratedFieldId("f"),
           label: fieldData.label,
           type: fieldData.type,
           required: fieldData.required ?? false,
@@ -663,7 +670,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
       }
 
       const currentFields = extractFieldsFromForm(currentForm);
-      const newFieldId = `f_rel_${Date.now().toString(36)}`;
+      const newFieldId = createGeneratedFieldId("f_rel");
       const newField: CoreFormField = {
         id: newFieldId,
         label,

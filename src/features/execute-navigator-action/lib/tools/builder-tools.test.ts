@@ -1175,5 +1175,52 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
 
       expect(result.success).toBe(false);
     });
+
+    it("ADD_FIELD: 동일 밀리초(Date.now 고정) 내 연속 호출 시에도 서로 다른 고유 필드 ID를 생성해야 한다", async () => {
+      const dateSpy = vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
+      try {
+        const tools = createBuilderTools(dependencies);
+        const first = (await tools.updateSchema.execute!(
+          {
+            formId: currentFormId,
+            operation: "ADD_FIELD",
+            fieldData: {
+              label: "첫 번째 항목",
+              type: "text",
+              description: "첫 번째 설명",
+            },
+          },
+          mockExecutionOptions
+        )) as { success: boolean; updatedForm?: Form };
+
+        const second = (await tools.updateSchema.execute!(
+          {
+            formId: currentFormId,
+            operation: "ADD_FIELD",
+            fieldData: {
+              label: "두 번째 항목",
+              type: "text",
+              description: "두 번째 설명",
+            },
+          },
+          mockExecutionOptions
+        )) as { success: boolean; updatedForm?: Form };
+
+        const firstFields = (first.updatedForm?.schemaDefinition as { fields: CoreFormField[] })
+          .fields;
+        const secondFields = (second.updatedForm?.schemaDefinition as { fields: CoreFormField[] })
+          .fields;
+        const firstAddedId = firstFields.find((f) => f.label === "첫 번째 항목")?.id;
+        const secondAddedId = secondFields.find((f) => f.label === "두 번째 항목")?.id;
+
+        expect(first.success).toBe(true);
+        expect(second.success).toBe(true);
+        expect(firstAddedId).toMatch(/^f_/);
+        expect(secondAddedId).toMatch(/^f_/);
+        expect(firstAddedId).not.toBe(secondAddedId);
+      } finally {
+        dateSpy.mockRestore();
+      }
+    });
   });
 });
