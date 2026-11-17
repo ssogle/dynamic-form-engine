@@ -51,4 +51,33 @@ describe("useNavigatorChatStore (widgets/navigator-shell/store)", () => {
     useNavigatorChatStore.getState().setIsGenerating(false);
     expect(useNavigatorChatStore.getState().progressMessage).toBeNull();
   });
+
+  it("appendProgressStep은 연속 중복 및 공백을 제외하고 단계를 누적하며 생성 종료 시 초기화해야 한다", () => {
+    const store = useNavigatorChatStore.getState();
+    store.setIsGenerating(true);
+    store.appendProgressStep("  폼 목록 조회 중...  ");
+    store.appendProgressStep("폼 목록 조회 중...");
+    store.appendProgressStep("   ");
+    store.appendProgressStep("응답 데이터를 집계하는 중...");
+
+    expect(useNavigatorChatStore.getState().progressSteps).toEqual([
+      "폼 목록 조회 중...",
+      "응답 데이터를 집계하는 중...",
+    ]);
+
+    useNavigatorChatStore.getState().setIsGenerating(false);
+    expect(useNavigatorChatStore.getState().progressSteps).toEqual([]);
+  });
+
+  it("addMessage는 수행 단계 기록(steps)을 포함하여 메시지에 저장할 수 있어야 한다", () => {
+    useNavigatorChatStore.getState().addMessage({
+      role: "assistant",
+      content: "분석을 완료했습니다.",
+      steps: ["폼 목록 조회 중...", "응답 데이터를 집계하는 중..."],
+    });
+
+    const { messages } = useNavigatorChatStore.getState();
+    const lastMessage = messages[messages.length - 1];
+    expect(lastMessage?.steps).toEqual(["폼 목록 조회 중...", "응답 데이터를 집계하는 중..."]);
+  });
 });

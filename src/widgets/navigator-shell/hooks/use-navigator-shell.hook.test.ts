@@ -31,24 +31,34 @@ vi.mock("@tanstack/react-query", () => ({
 
 // AI Mutation 모킹
 const mockMutateAsync = vi.fn();
+let capturedOnProgress:
+  ((statusText: string, meta?: { isHeartbeat?: boolean }) => void) | undefined;
 vi.mock("@/features/execute-navigator-action", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/features/execute-navigator-action")>();
   return {
     ...actual,
-    useNavigatorMutation: () => ({
-      mutateAsync: mockMutateAsync,
-      isPending: false,
-    }),
+    useNavigatorMutation: (options?: {
+      onProgress?: (statusText: string, meta?: { isHeartbeat?: boolean }) => void;
+    }) => {
+      capturedOnProgress = options?.onProgress;
+      return {
+        mutateAsync: mockMutateAsync,
+        isPending: false,
+      };
+    },
   };
 });
 
 describe("useNavigatorShell (widgets/navigator-shell/hooks)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    capturedOnProgress = undefined;
     useNavigatorChatStore.setState({
       messages: [],
       currentMode: "consumer",
       isGenerating: false,
+      progressMessage: null,
+      progressSteps: [],
     });
     useConsumerFormDraftStore.setState({
       currentFormId: null,
@@ -351,5 +361,49 @@ describe("useNavigatorShell (widgets/navigator-shell/hooks)", () => {
         prompt: "최신 데이터로 갱신해 주세요.",
       })
     );
+  });
+
+  it("스트리밍 실행 중 status 단계만 누적하여 응답 메시지의 steps로 저장하고 heartbeat는 제외해야 한다", async () => {
+    mockMutateAsync.mockImplementationOnce(async () => {
+      capturedOnProgress?.("폼 목록 조회 중...", { isHeartbeat: false });
+      capturedOnProgress?.("AI가 분석 작업을 진행하고 있습니다... (3초 경과)", {
+        isHeartbeat: true,
+      });
+      capturedOnProgress?.("필드 스키마 검증 중...", { isHeartbeat: false });
+      return {
+        reply: "폼을 생성했습니다.",
+        action: null,
+      };
+    });
+
+    const { result } = renderHook(() => useNavigatorShell({ mode: "builder" }));
+
+    await act(async () => {
+      await result.current.handleExecutePrompt("문의 폼 만들어줘");
+    });
+
+    const assistantMessage = result.current.messages[result.current.messages.length - 1];
+    expect(assistantMessage?.role).toBe("assistant");
+    expect(assistantMessage?.content).toBe("폼을 생성했습니다.");
+    expect(assistantMessage?.steps).toEqual(["폼 목록 조회 중...", "필드 스키마 검증 중..."]);
+    // 실행 완료 후 현재 진행 중 상태는 초기화되어야 함
+    expect(result.current.progressSteps).toEqual([]);
+    expect(result.current.progressMessage).toBeNull();
+  });
+
+  it("toggleStepsExpanded 호출 시 특정 메시지의 수행 과정 펼침 상태를 토글해야 한다", () => {
+    const { result } = renderHook(() => useNavigatorShell({ mode: "builder" }));
+
+    expect(result.current.expandedStepMessageIds["msg-1"]).toBeUndefined();
+
+    act(() => {
+      result.current.toggleStepsExpanded("msg-1");
+    });
+    expect(result.current.expandedStepMessageIds["msg-1"]).toBe(true);
+
+    act(() => {
+      result.current.toggleStepsExpanded("msg-1");
+    });
+    expect(result.current.expandedStepMessageIds["msg-1"]).toBe(false);
   });
 });

@@ -5,6 +5,8 @@ export interface NavigatorChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
+  /** AI 응답 생성 중 스트림으로부터 수신·누적된 수행 단계 목록 */
+  steps?: string[] | undefined;
   action?: NavigatorAction | undefined;
   createdAt: string;
 }
@@ -23,12 +25,16 @@ export interface NavigatorChatState {
   messages: NavigatorChatMessage[];
   isGenerating: boolean;
   progressMessage: string | null;
+  /** 현재 응답 생성 중 수신된 실제 수행 단계 누적 목록 (heartbeat 제외) */
+  progressSteps: string[];
   selectedFieldId: string | null;
 
   setMode: (mode: NavigatorMode) => void;
   addMessage: (message: Omit<NavigatorChatMessage, "id" | "createdAt">) => void;
   setIsGenerating: (isGenerating: boolean) => void;
   setProgressMessage: (progressMessage: string | null) => void;
+  /** 진행 단계 목록에 새 단계를 추가합니다 (빈 문자열 및 직전과 동일한 연속 중복은 무시). */
+  appendProgressStep: (step: string) => void;
   setSelectedFieldId: (fieldId: string | null) => void;
   clearMessages: () => void;
   reset: () => void;
@@ -46,6 +52,7 @@ export const useNavigatorChatStore = create<NavigatorChatState>()((set, get) => 
   ],
   isGenerating: false,
   progressMessage: null,
+  progressSteps: [],
   selectedFieldId: null,
 
   setMode: (mode) => {
@@ -65,6 +72,7 @@ export const useNavigatorChatStore = create<NavigatorChatState>()((set, get) => 
       selectedFieldId: null,
       isGenerating: false,
       progressMessage: null,
+      progressSteps: [],
     });
   },
 
@@ -84,9 +92,23 @@ export const useNavigatorChatStore = create<NavigatorChatState>()((set, get) => 
     set((state) => ({
       isGenerating,
       progressMessage: isGenerating ? state.progressMessage : null,
+      progressSteps: isGenerating ? state.progressSteps : [],
     })),
 
   setProgressMessage: (progressMessage) => set({ progressMessage }),
+
+  appendProgressStep: (step) =>
+    set((state) => {
+      const trimmed = step.trim();
+      if (!trimmed) return state;
+
+      const lastStep = state.progressSteps[state.progressSteps.length - 1];
+      if (lastStep === trimmed) return state;
+
+      return {
+        progressSteps: [...state.progressSteps, trimmed],
+      };
+    }),
 
   setSelectedFieldId: (selectedFieldId) => set({ selectedFieldId }),
 
@@ -104,6 +126,7 @@ export const useNavigatorChatStore = create<NavigatorChatState>()((set, get) => 
       selectedFieldId: null,
       isGenerating: false,
       progressMessage: null,
+      progressSteps: [],
     });
   },
 
@@ -120,6 +143,7 @@ export const useNavigatorChatStore = create<NavigatorChatState>()((set, get) => 
       ],
       isGenerating: false,
       progressMessage: null,
+      progressSteps: [],
       selectedFieldId: null,
     });
   },

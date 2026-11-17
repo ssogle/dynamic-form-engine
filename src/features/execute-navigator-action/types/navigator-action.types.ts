@@ -273,3 +273,17 @@ export interface NavigatorExecutionResponse {
   /** 호환용 메시지 필드 */
   message?: string | undefined;
 }
+
+/**
+ * 네비게이터 NDJSON 스트림 이벤트 계약 (서버-클라이언트 단일 진실 원천)
+ *
+ * - `status`: 실제 AI 엔진 작업 단계 진행 메시지 (채팅 기록 누적 대상)
+ * - `heartbeat`: 장시간 LLM 대기 중 스트림 침묵 방지용 경과 알림 (채팅 기록 제외)
+ * - `result`: 최종 실행 결과 응답
+ * - `error`: 스트림 열린 이후 발생한 오류 메시지
+ */
+export type NavigatorStreamEvent =
+  | { type: "status"; message: string }
+  | { type: "heartbeat"; message: string }
+  | { type: "result"; data: NavigatorExecutionResponse }
+  | { type: "error"; message: string };

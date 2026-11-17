@@ -83,12 +83,60 @@ describe("useNavigatorMutation (features/execute-navigator-action/queries)", () 
       )
     );
 
-    const statuses: string[] = [];
-    const data = await executeNavigatorActionStream({ mode: "analyst", prompt: "갱신" }, (msg) =>
-      statuses.push(msg)
+    const statuses: Array<{ msg: string; isHeartbeat?: boolean | undefined }> = [];
+    const data = await executeNavigatorActionStream(
+      { mode: "analyst", prompt: "갱신" },
+      (msg, meta) => statuses.push({ msg, isHeartbeat: meta?.isHeartbeat })
     );
 
-    expect(statuses).toEqual(["집계 중..."]);
+    expect(statuses).toEqual([{ msg: "집계 중...", isHeartbeat: false }]);
+    expect(data).toEqual(mockResult);
+    vi.unstubAllGlobals();
+  });
+
+  it("executeNavigatorActionStream은 heartbeat 이벤트 수신 시 isHeartbeat: true 메타와 함께 onProgress를 호출해야 한다", async () => {
+    const encoder = new TextEncoder();
+    const mockResult: NavigatorExecutionResponse = {
+      reply: "완료",
+      action: null,
+    };
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(`${JSON.stringify({ type: "status", message: "데이터 조회 중..." })}\n`)
+        );
+        controller.enqueue(
+          encoder.encode(
+            `${JSON.stringify({ type: "heartbeat", message: "AI가 분석 작업을 진행하고 있습니다... (3초 경과)" })}\n`
+          )
+        );
+        controller.enqueue(
+          encoder.encode(`${JSON.stringify({ type: "result", data: mockResult })}\n`)
+        );
+        controller.close();
+      },
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(
+        new Response(stream, {
+          status: 200,
+          headers: { "Content-Type": "application/x-ndjson; charset=utf-8" },
+        })
+      )
+    );
+
+    const received: Array<{ msg: string; isHeartbeat?: boolean | undefined }> = [];
+    const data = await executeNavigatorActionStream(
+      { mode: "analyst", prompt: "갱신" },
+      (msg, meta) => received.push({ msg, isHeartbeat: meta?.isHeartbeat })
+    );
+
+    expect(received).toEqual([
+      { msg: "데이터 조회 중...", isHeartbeat: false },
+      { msg: "AI가 분석 작업을 진행하고 있습니다... (3초 경과)", isHeartbeat: true },
+    ]);
     expect(data).toEqual(mockResult);
     vi.unstubAllGlobals();
   });

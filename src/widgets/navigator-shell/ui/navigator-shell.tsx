@@ -1,8 +1,10 @@
 "use client";
 
 import * as React from "react";
+import { CheckCircle2, ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible";
 import { Input } from "@/shared/ui/input";
 import { cn } from "@/shared/lib/cn";
 import { useNavigatorShell } from "../hooks/use-navigator-shell.hook";
@@ -21,6 +23,9 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
     messages,
     isBusy,
     progressMessage,
+    progressSteps,
+    expandedStepMessageIds,
+    toggleStepsExpanded,
     inputValue,
     setInputValue,
     messagesEndRef,
@@ -46,34 +51,87 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
 
       {/* 대화 메시지 목록 영역 */}
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={cn(
-              "flex flex-col gap-1 text-xs/relaxed",
-              msg.role === "user" ? "items-end" : "items-start"
-            )}
-          >
+        {messages.map((msg) => {
+          const isStepsExpanded = Boolean(expandedStepMessageIds[msg.id]);
+
+          return (
             <div
+              key={msg.id}
               className={cn(
-                "max-w-[88%] rounded-lg px-3 py-2 text-xs",
-                msg.role === "user"
-                  ? "bg-primary text-primary-foreground font-medium"
-                  : "bg-muted/70 text-foreground border-border/40 border"
+                "flex flex-col gap-1 text-xs/relaxed",
+                msg.role === "user" ? "items-end" : "items-start"
               )}
             >
-              {msg.content}
+              <div
+                className={cn(
+                  "max-w-[88%] rounded-lg px-3 py-2 text-xs",
+                  msg.role === "user"
+                    ? "bg-primary text-primary-foreground font-medium"
+                    : "bg-muted/70 text-foreground border-border/40 border"
+                )}
+              >
+                {msg.steps && msg.steps.length > 0 && (
+                  <Collapsible
+                    open={isStepsExpanded}
+                    onOpenChange={() => toggleStepsExpanded(msg.id)}
+                    className="border-border/50 mb-2 border-b pb-1.5"
+                  >
+                    <CollapsibleTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-foreground h-6 px-1.5 text-[11px] font-normal"
+                      >
+                        {isStepsExpanded ? (
+                          <ChevronDown className="size-3" />
+                        ) : (
+                          <ChevronRight className="size-3" />
+                        )}
+                        <span>수행 과정 ({msg.steps.length}단계)</span>
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-1.5 space-y-1 pl-1">
+                      {msg.steps.map((step, index) => (
+                        <div
+                          key={`${msg.id}-step-${index}`}
+                          className="text-muted-foreground flex items-start gap-1.5 text-[11px] leading-snug"
+                        >
+                          <CheckCircle2 className="text-primary/70 mt-0.5 size-3 shrink-0" />
+                          <span>{step}</span>
+                        </div>
+                      ))}
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+                {msg.content}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {isBusy && (
           <div className="flex items-start">
-            <div className="bg-muted/50 text-muted-foreground border-border/40 flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs">
-              <span className="size-1.5 animate-bounce rounded-full bg-current" />
-              <span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:0.2s]" />
-              <span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:0.4s]" />
-              <span className="ml-1 text-[11px]">{progressMessage || "생각 중..."}</span>
+            <div className="bg-muted/50 text-muted-foreground border-border/40 flex max-w-[88%] flex-col gap-1.5 rounded-lg border px-3 py-2 text-xs">
+              {progressSteps.length > 0 && (
+                <div className="border-border/40 space-y-1 border-b pb-1.5">
+                  {progressSteps.map((step, index) => (
+                    <div
+                      key={`active-step-${index}`}
+                      className="flex items-start gap-1.5 text-[11px] leading-snug"
+                    >
+                      <CheckCircle2 className="text-primary/70 mt-0.5 size-3 shrink-0" />
+                      <span>{step}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-center gap-1.5">
+                <span className="size-1.5 animate-bounce rounded-full bg-current" />
+                <span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:0.2s]" />
+                <span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:0.4s]" />
+                <span className="ml-1 text-[11px]">{progressMessage || "생각 중..."}</span>
+              </div>
             </div>
           </div>
         )}

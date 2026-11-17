@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import {
   runNavigatorEngine,
   navigatorRequestSchema,
+  type NavigatorStreamEvent,
 } from "@/features/execute-navigator-action/server";
 import { apiResponse, parseRequestData, withErrorHandler } from "@/shared/lib/http";
 
@@ -47,7 +48,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       const startedAt = Date.now();
       let lastEventAt = startedAt;
 
-      const enqueueEvent = (event: Record<string, unknown>) => {
+      const enqueueEvent = (event: NavigatorStreamEvent) => {
         if (isClosed) return;
         try {
           controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
@@ -67,13 +68,13 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
         request.signal.addEventListener("abort", onRequestAbort, { once: true });
       }
 
-      // LLM 단일 스텝이 길어져도 첫 청크 이후 스트림 침묵이 발생하지 않도록 3초마다 경과 상태를 전송합니다.
+      // LLM 단일 스텝이 길어져도 첫 청크 이후 스트림 침묵이 발생하지 않도록 3초마다 경과 heartbeat를 전송합니다.
       heartbeatTimer = setInterval(() => {
         if (isClosed || streamAbortController.signal.aborted) return;
         if (Date.now() - lastEventAt >= 2_800) {
           const elapsedSec = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
           enqueueEvent({
-            type: "status",
+            type: "heartbeat",
             message: `AI가 분석 작업을 진행하고 있습니다... (${elapsedSec}초 경과)`,
           });
         }

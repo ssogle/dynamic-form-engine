@@ -6,3 +6,4 @@ export {
   navigatorRequestSchema,
   type NavigatorRequestDto,
 } from "./schema/navigator-request.schema";
+export type { NavigatorStreamEvent } from "./types/navigator-action.types";

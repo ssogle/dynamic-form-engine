@@ -3,6 +3,8 @@ export {
   useNavigatorMutation,
   executeNavigatorAction,
   executeNavigatorActionStream,
+  type NavigatorProgressMeta,
+  type NavigatorProgressHandler,
   type UseNavigatorMutationOptions,
 } from "./queries/use-navigator.mutation";
 
@@ -15,6 +17,7 @@ export type {
   AnalysisViewOperation,
   ExecuteNavigatorPayload,
   NavigatorExecutionResponse,
+  NavigatorStreamEvent,
   NavigatorChatMessageDto,
   NavigatorClientContext,
   VisibleItemSummary,

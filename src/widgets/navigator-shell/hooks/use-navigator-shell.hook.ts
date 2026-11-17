@@ -8,6 +8,7 @@ import {
   type NavigatorAction,
   type NavigatorClientContext,
   type NavigatorMode,
+  type NavigatorProgressMeta,
 } from "@/features/execute-navigator-action";
 import {
   analysisViewKeys,
@@ -56,6 +57,18 @@ export interface UseNavigatorShellReturn {
    */
   progressMessage: string | null;
   /**
+   * 현재 응답 생성 중 누적된 실제 수행 단계 목록 (heartbeat 제외)
+   */
+  progressSteps: string[];
+  /**
+   * 메시지별 수행 과정 패널 펼침 상태 맵 (`{ [messageId]: boolean }`)
+   */
+  expandedStepMessageIds: Record<string, boolean>;
+  /**
+   * 특정 메시지의 수행 과정 펼침/접힘 상태를 토글하는 핸들러
+   */
+  toggleStepsExpanded: (messageId: string) => void;
+  /**
    * 입력창 텍스트 상태
    */
   inputValue: string;
@@ -100,9 +113,11 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
   const messages = useNavigatorChatStore((state) => state.messages);
   const isGenerating = useNavigatorChatStore((state) => state.isGenerating);
   const progressMessage = useNavigatorChatStore((state) => state.progressMessage);
+  const progressSteps = useNavigatorChatStore((state) => state.progressSteps);
   const addMessage = useNavigatorChatStore((state) => state.addMessage);
   const setIsGenerating = useNavigatorChatStore((state) => state.setIsGenerating);
   const setProgressMessage = useNavigatorChatStore((state) => state.setProgressMessage);
+  const appendProgressStep = useNavigatorChatStore((state) => state.appendProgressStep);
 
   React.useEffect(() => {
     if (currentMode !== mode) {
@@ -118,13 +133,38 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
 
   // 3. UI 로컬 상태
   const [inputValue, setInputValue] = React.useState("");
+  const [expandedStepMessageIds, setExpandedStepMessageIds] = React.useState<
+    Record<string, boolean>
+  >({});
+
+  const toggleStepsExpanded = React.useCallback((messageId: string) => {
+    setExpandedStepMessageIds((prev) => ({
+      ...prev,
+      [messageId]: !prev[messageId],
+    }));
+  }, []);
 
   const messagesEndRef = React.useRef<HTMLDivElement | null>(null);
   const inputRef = React.useRef<HTMLInputElement | null>(null);
 
+  /**
+   * 스트림 진행 이벤트 핸들러
+   * - `progressMessage`는 heartbeat를 포함해 항상 최신 상태로 갱신하여 로딩 인디케이터에 표시합니다.
+   * - `progressSteps`에는 heartbeat를 제외한 실제 수행 단계만 누적해 채팅 기록으로 남깁니다.
+   */
+  const handleProgress = React.useCallback(
+    (statusText: string, meta?: NavigatorProgressMeta) => {
+      setProgressMessage(statusText);
+      if (!meta?.isHeartbeat) {
+        appendProgressStep(statusText);
+      }
+    },
+    [setProgressMessage, appendProgressStep]
+  );
+
   // 4. AI 통신 훅 (스트리밍 진행 메시지 수신 연동) 및 분석 뷰 AI 재집계 요청 구독
   const { mutateAsync: executeAction, isPending } = useNavigatorMutation({
-    onProgress: setProgressMessage,
+    onProgress: handleProgress,
   });
   const isBusy = isGenerating || isPending;
   const pendingRefresh = useAnalysisViewRefreshStore((state) => state.pendingRefresh);
@@ -133,7 +173,7 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
 
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
-  }, [messages, isBusy]);
+  }, [messages, isBusy, progressSteps.length]);
 
   // AI 응답 완료 및 disabled 해제 시 입력창으로 포커스 자동 복원
   React.useEffect(() => {
@@ -398,11 +438,14 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
           currentContext,
         });
 
+        // 비동기 스트리밍 중 누적된 최신 단계 목록을 스토어에서 직접 읽어 Stale Closure를 방지합니다.
+        const recordedSteps = useNavigatorChatStore.getState().progressSteps;
         const replyText =
           response.reply || response.message || response.action?.message || "요청을 처리했습니다.";
         addMessage({
           role: "assistant",
           content: replyText,
+          steps: recordedSteps.length > 0 ? [...recordedSteps] : undefined,
           action: response.action ?? undefined,
         });
 
@@ -433,10 +476,12 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
         }
       } catch (err) {
         console.error("AI Navigator 통신 오류:", err);
+        const recordedSteps = useNavigatorChatStore.getState().progressSteps;
         addMessage({
           role: "assistant",
           content:
             "죄송합니다. 요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+          steps: recordedSteps.length > 0 ? [...recordedSteps] : undefined,
         });
       } finally {
         setIsGenerating(false);
@@ -488,6 +533,9 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
     messages,
     isBusy,
     progressMessage,
+    progressSteps,
+    expandedStepMessageIds,
+    toggleStepsExpanded,
     inputValue,
     setInputValue,
     messagesEndRef,

@@ -4,12 +4,21 @@ import { formKeys } from "@/entities/form";
 import type {
   ExecuteNavigatorPayload,
   NavigatorExecutionResponse,
+  NavigatorStreamEvent,
 } from "../types/navigator-action.types";
 
-type NavigatorStreamEvent =
-  | { type: "status"; message: string }
-  | { type: "result"; data: NavigatorExecutionResponse }
-  | { type: "error"; message: string };
+/**
+ * 진행 상태 콜백에 전달되는 메타데이터
+ * - `isHeartbeat`: 실제 작업 단계가 아닌 스트림 유휴 방지용 경과 알림 여부
+ */
+export interface NavigatorProgressMeta {
+  isHeartbeat?: boolean;
+}
+
+/**
+ * 스트림 진행 상태 수신 콜백 타입
+ */
+export type NavigatorProgressHandler = (statusText: string, meta?: NavigatorProgressMeta) => void;
 
 /**
  * 네비게이터 서버 액션 실행 API 호출 순수 함수 (단건 JSON 응답)
@@ -24,17 +33,18 @@ export async function executeNavigatorAction(
 }
 
 /**
- * 실시간 진행 단계(`status`)를 공용 httpClient.streamNdjson으로 수신하면서 네비게이터 서버 액션을 실행합니다.
+ * 실시간 진행 단계(`status`) 및 경과 알림(`heartbeat`)을 공용 httpClient.streamNdjson으로 수신하면서
+ * 네비게이터 서버 액션을 실행합니다.
  *
  * - 30초 무활동 타임아웃 및 75초 전체 요청 타임아웃을 적용하여 스트림 정체 시 UI 대기를 방지합니다.
  *
  * @param payload 실행 요청 페이로드
- * @param onProgress 단계별 상태 메시지 수신 콜백
+ * @param onProgress 단계별 상태 메시지 및 heartbeat 메타 수신 콜백
  * @returns 최종 AI 답변 및 브라우저 제어 액션
  */
 export async function executeNavigatorActionStream(
   payload: ExecuteNavigatorPayload,
-  onProgress?: (statusText: string) => void
+  onProgress?: NavigatorProgressHandler
 ): Promise<NavigatorExecutionResponse> {
   let finalResult: NavigatorExecutionResponse | null = null;
 
@@ -44,7 +54,9 @@ export async function executeNavigatorActionStream(
     totalTimeoutMs: 75_000,
     onEvent: (event) => {
       if (event.type === "status") {
-        onProgress?.(event.message);
+        onProgress?.(event.message, { isHeartbeat: false });
+      } else if (event.type === "heartbeat") {
+        onProgress?.(event.message, { isHeartbeat: true });
       } else if (event.type === "result") {
         finalResult = event.data;
       } else if (event.type === "error") {
@@ -62,7 +74,7 @@ export async function executeNavigatorActionStream(
 
 export interface UseNavigatorMutationOptions {
   /** 다중 스텝 실행 중 서버가 내려주는 진행 상태 메시지를 받을 콜백 */
-  onProgress?: ((statusText: string) => void) | undefined;
+  onProgress?: NavigatorProgressHandler | undefined;
 }
 
 /**
