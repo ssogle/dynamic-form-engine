@@ -345,11 +345,18 @@ export function mergeSeriesWithZeroFill(
  * - ratio 분모가 0인 경우 0으로 나누기를 방어하여 null을 반환하며, 소수점 둘째 자리까지 반올림합니다.
  */
 export function computeSeriesMetric(input: ComputeSeriesMetricInput): ComputeSeriesMetricResult {
-  const { operation, baseSeries, targetSeries, resultKey } = input;
+  const { operation, baseSeries, targetSeries, includeKeys, resultKey } = input;
 
   const baseMap = new Map<string, number>();
   const targetMap = new Map<string, number>();
   const unionKeys = new Set<string>();
+
+  for (const key of includeKeys ?? []) {
+    const trimmed = key.trim();
+    if (trimmed) {
+      unionKeys.add(trimmed);
+    }
+  }
 
   for (const point of baseSeries) {
     unionKeys.add(point.key);

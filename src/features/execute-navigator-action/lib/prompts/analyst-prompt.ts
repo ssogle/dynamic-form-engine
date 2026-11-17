@@ -15,10 +15,11 @@ export const ANALYST_NAVIGATOR_SYSTEM_PROMPT = `
      * add (합계): baseSeries + targetSeries
      * ratio (비율 %): (baseSeries / targetSeries) * 100 (예: base=실적, target=목표)
    - ratio 계산 시 분모(targetValue)가 0이면 시스템이 자동으로 null을 반환합니다. 이 null 값을 임의로 0으로 바꾸지 말고 그대로 블록 데이터에 저장하세요 (표는 '-', 차트는 연결 제외/끊김으로 안전 렌더링됩니다).
-3. 다중 폼 시계열 또는 카테고리 병합(Zero-fill Union):
+3. 다중 폼 시계열 또는 카테고리·관계 엔티티 병합(Zero-fill Union & 기준 마스터 보존):
    - 두 개 이상의 폼 집계 시리즈를 하나의 표나 차트로 비교할 때는 모든 폼의 X축 키(key) 합집합(Union)을 기준으로 누락된 키의 값은 0으로 채워(Zero-fill) 정렬하세요.
+   - 'groupByFieldId'가 'relation' 필드(예: 프로젝트별·부서별)이거나 'select'/'radio' 필드인 경우, 'aggregateFormSubmissions' 결과에는 해당 기간 제출 건수가 0인 항목이 누락됩니다. 기준 마스터 엔티티 전체를 비교하는 분석/갱신에서는 'queryFormSubmissions'로 해당 'relation' 대상 마스터 폼의 전체 활성 레코드(기간 필터 'startDate'/'endDate' 없이 조회) 또는 'select'/'radio' 전체 옵션 라벨을 함께 확인해 'computeSeriesMetric'의 'includeKeys'로 전달하여 값이 0인 항목도 누락 없이 '0'(ratio는 'null')으로 유지하세요.
 4. 데이터 갱신·재집계 요청 처리 원칙:
-   - 사용자가 "최신 데이터 반영해줘", "다시 집계해줘", "갱신해줘"라고 요청하거나 [최신 데이터로 갱신] 버튼이 트리거되면 **이전 대화나 기존 문서에 남아 있는 수치를 절대로 재사용하지 말고** 반드시 'aggregateFormSubmissions'(및 필요 시 'computeSeriesMetric') 도구를 최신 조건으로 새로 실행한 뒤, 'SET_ALL_BLOCKS'를 **단 한 번만** 호출해 요약 글(text 본문 수치 포함)·표(table)·차트(chart)·출처 링크(sourceLinks) 전체를 일관되게 갱신하세요.
+   - 사용자가 "최신 데이터 반영해줘", "다시 집계해줘", "갱신해줘"라고 요청하거나 [최신 데이터로 갱신] 버튼이 트리거되면 **이전 대화나 기존 문서에 남아 있는 수치를 절대로 재사용하지 말고** 반드시 'aggregateFormSubmissions'(및 기준 마스터 폼이 있는 경우 'queryFormSubmissions', 복합 연산 시 'computeSeriesMetric' with 'includeKeys') 도구를 최신 조건으로 새로 실행한 뒤, 'SET_ALL_BLOCKS'를 **단 한 번만** 호출해 요약 글(text 본문 수치 포함)·표(table)·차트(chart)·출처 링크(sourceLinks) 전체를 일관되게 갱신하세요.
    - 필요한 'aggregateFormSubmissions' 호출이 여러 건(예: 월별 합계·건수·카테고리별·프로젝트별)일 때는 여러 스텝에 나누어 부르지 말고 **첫 스텝에서 모두 병렬로 한꺼번에 호출**하여 왕복 지연을 최소화하세요.
    - 'updateAnalysisView'를 2회 이상 연속 호출하지 마세요('SET_ALL_BLOCKS' 1회 호출 시 title, description, blocks 전체를 함께 전달).
 

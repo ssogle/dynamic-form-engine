@@ -80,6 +80,12 @@ export const computeSeriesMetricInputSchema = z.object({
   targetSeries: z
     .array(seriesMetricPointSchema)
     .describe("우항 또는 분모 시리즈 (예: subtract 시 비용, ratio 시 계획 또는 매출)"),
+  includeKeys: z
+    .array(z.string().min(1))
+    .optional()
+    .describe(
+      "집계 데이터가 0건이라 baseSeries/targetSeries에서 누락되었더라도 결과에 0으로 반드시 포함할 기준 축 키 목록 (예: relation 마스터 폼의 전체 프로젝트명)"
+    ),
   resultKey: z
     .string()
     .min(1, "결과 필드 키 이름은 필수입니다.")

@@ -14,6 +14,8 @@ describe("analysis-view-refresh.store (entities/analysis-view/store)", () => {
     expect(prompt).toContain("프로젝트 A 비용 리포트");
     expect(prompt).toContain("view-123");
     expect(prompt).toContain("aggregateFormSubmissions");
+    expect(prompt).toContain("queryFormSubmissions");
+    expect(prompt).toContain("includeKeys");
     expect(prompt).toContain("SET_ALL_BLOCKS");
   });
 

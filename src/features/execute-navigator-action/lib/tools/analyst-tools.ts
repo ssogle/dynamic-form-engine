@@ -214,7 +214,7 @@ export function createAnalystTools(deps: AnalystToolsDependencies) {
 
   const computeSeriesMetricTool = tool({
     description:
-      "두 집계 시리즈(baseSeries, targetSeries)의 키를 합집합 Zero-fill로 정렬한 뒤 차액(subtract: base - target), 합산(add: base + target), 백분율 비율(ratio: (base / target) * 100, 분모 0이면 null)을 부동소수점 오차 없이 계산합니다.",
+      "두 집계 시리즈(baseSeries, targetSeries)와 선택적 기준 키 목록(includeKeys)의 합집합 Zero-fill로 정렬한 뒤 차액(subtract: base - target), 합산(add: base + target), 백분율 비율(ratio: (base / target) * 100, 분모 0이면 null)을 부동소수점 오차 없이 계산합니다.",
     inputSchema: computeSeriesMetricInputSchema,
     execute: async (input: z.infer<typeof computeSeriesMetricInputSchema>) => {
       const computed = computeSeriesMetric(input);

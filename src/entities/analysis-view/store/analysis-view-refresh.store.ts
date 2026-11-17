@@ -26,6 +26,7 @@ export function buildAnalysisViewRefreshPrompt(view: { id: string; title: string
   return [
     `현재 열려 있는 분석 뷰('${view.title}', ID: ${view.id})를 최신 DB 데이터로 갱신해 주세요.`,
     "기존 문서의 분석 대상 폼, 조회 기간, 필터 조건, 블록 구성을 유지한 채 'aggregateFormSubmissions'로 최신 수치를 다시 집계하고,",
+    "관계형(relation) 마스터 폼 등 기준 항목 전체를 비교하는 블록이 있다면 기간 필터 없이 'queryFormSubmissions'로 기준 목록을 함께 조회해 실적이 0건인 항목도 'includeKeys'로 누락 없이 '0'으로 유지한 뒤,",
     "'SET_ALL_BLOCKS' 한 번으로 요약 글(text), 표(table), 차트(chart), 출처 링크(sourceLinks) 전체를 최신 값으로 일괄 업데이트해 주세요.",
   ].join(" ");
 }

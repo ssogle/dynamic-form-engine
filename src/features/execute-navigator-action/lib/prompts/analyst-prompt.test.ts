@@ -61,6 +61,7 @@ describe("analyst-prompt (features/execute-navigator-action/lib/prompts)", () =>
     expect(ANALYST_NAVIGATOR_SYSTEM_PROMPT).toContain("sourceLinks");
     expect(ANALYST_NAVIGATOR_SYSTEM_PROMPT).toContain("/consumer/forms/[formId]");
     expect(ANALYST_NAVIGATOR_SYSTEM_PROMPT).toContain("isTruncated");
+    expect(ANALYST_NAVIGATOR_SYSTEM_PROMPT).toContain("includeKeys");
   });
 
   it("formatAnalystContextPrompt는 text 블록 본문을 1500자까지 보존하고 getFormDetails 확인 안내를 포함해야 한다", () => {

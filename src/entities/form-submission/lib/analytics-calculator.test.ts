@@ -185,6 +185,34 @@ describe("Analytics Calculator (entities/form-submission/lib)", () => {
         { key: "2026-Q3", baseValue: 0, targetValue: 100, execution_rate: 0 },
       ]);
     });
+
+    it("includeKeys가 전달되면 baseSeries/targetSeries에 없는 기준 축 키도 0값(ratio는 null)으로 결과에 포함해야 한다", () => {
+      const subtractWithInclude = computeSeriesMetric({
+        operation: "subtract",
+        baseSeries: [{ key: "프로젝트 A", value: 1000 }],
+        targetSeries: [{ key: "프로젝트 A", value: 400 }],
+        includeKeys: ["프로젝트 A", "프로젝트 B", "  "],
+        resultKey: "net_profit",
+      });
+
+      expect(subtractWithInclude.rows).toEqual([
+        { key: "프로젝트 A", baseValue: 1000, targetValue: 400, net_profit: 600 },
+        { key: "프로젝트 B", baseValue: 0, targetValue: 0, net_profit: 0 },
+      ]);
+
+      const ratioWithInclude = computeSeriesMetric({
+        operation: "ratio",
+        baseSeries: [{ key: "프로젝트 A", value: 100 }],
+        targetSeries: [{ key: "프로젝트 A", value: 200 }],
+        includeKeys: ["프로젝트 B"],
+        resultKey: "margin_rate",
+      });
+
+      expect(ratioWithInclude.rows).toEqual([
+        { key: "프로젝트 A", baseValue: 100, targetValue: 200, margin_rate: 50 },
+        { key: "프로젝트 B", baseValue: 0, targetValue: 0, margin_rate: null },
+      ]);
+    });
   });
 
   describe("buildContinuousTimeBucketKeys (0건 구간 포함 연속 버킷 생성)", () => {
