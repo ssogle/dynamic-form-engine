@@ -73,14 +73,15 @@ export function buildDateRangeConditions(options: BuildDateFilterOptions): SQL[]
 
   if (dateFieldId) {
     const fieldDateExpr = buildValidFieldDateSql(dateFieldId);
-    if (requireValidDateField || startDate || endDate) {
-      conditions.push(sql`${fieldDateExpr} IS NOT NULL`);
-    }
-    if (startDate) {
+    // BETWEEN 및 >=, <= 비교 자체가 NULL 행을 제외하므로 IS NOT NULL 중복 절을 생략해 SQL 크기와 파라미터 수를 최소화합니다.
+    if (startDate && endDate) {
+      conditions.push(sql`${fieldDateExpr} BETWEEN (${startDate})::date AND (${endDate})::date`);
+    } else if (startDate) {
       conditions.push(sql`${fieldDateExpr} >= (${startDate})::date`);
-    }
-    if (endDate) {
+    } else if (endDate) {
       conditions.push(sql`${fieldDateExpr} <= (${endDate})::date`);
+    } else if (requireValidDateField) {
+      conditions.push(sql`${fieldDateExpr} IS NOT NULL`);
     }
     return conditions;
   }

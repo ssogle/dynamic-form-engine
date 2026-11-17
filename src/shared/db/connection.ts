@@ -19,7 +19,9 @@ if (!connectionString) {
 
 /**
  * PostgreSQL 연결 드라이버
- * max: 10으로 풀 크기를 제어하고, Transaction Pooler 및 서버리스 환경에 최적화된 옵션(prepare: false)을 적용합니다.
+ * - max: 10으로 풀 크기를 제어합니다.
+ * - prepare: false, max_pipeline: 1, fetch_types: false를 적용하여 Supabase Transaction Pooler(포트 6543)에서
+ *   다중 쿼리 파이프라이닝 및 2단계 Extended Query(Flush)로 인한 프로토콜 프레이밍 충돌(08P01)을 방지합니다.
  */
 const client =
   globalThis.__globalPostgresClient ??
@@ -27,6 +29,8 @@ const client =
     max: 10,
     idle_timeout: 20,
     connect_timeout: 10,
+    max_pipeline: 1,
+    fetch_types: false,
     prepare: false,
   });
 

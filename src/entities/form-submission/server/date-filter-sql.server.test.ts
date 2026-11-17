@@ -10,13 +10,19 @@ describe("Date Filter SQL Helpers (date-filter-sql)", () => {
   });
 
   it("dateFieldId 기준 및 createdAt 폴백 기준에 따라 조건 목록 개수를 알맞게 생성해야 한다", () => {
-    const withField = buildDateRangeConditions({
+    const withFieldBoth = buildDateRangeConditions({
       dateFieldId: "f_expense_date",
       startDate: "2026-10-01",
       endDate: "2026-10-31",
     });
-    // IS NOT NULL + >= startDate + <= endDate
-    expect(withField).toHaveLength(3);
+    // BETWEEN 단일 조건으로 CASE 식 중복 평가를 제거함
+    expect(withFieldBoth).toHaveLength(1);
+
+    const withFieldStartOnly = buildDateRangeConditions({
+      dateFieldId: "f_expense_date",
+      startDate: "2026-10-01",
+    });
+    expect(withFieldStartOnly).toHaveLength(1);
 
     const withFieldNoRangeRequireValid = buildDateRangeConditions({
       dateFieldId: "f_expense_date",
