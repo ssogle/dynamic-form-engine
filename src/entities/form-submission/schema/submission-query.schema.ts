@@ -37,6 +37,16 @@ export const submissionQuerySchema = z
 export type SubmissionQueryParams = z.infer<typeof submissionQuerySchema>;
 
 /**
+ * 페이지네이션/필터 조회 호출자 입력 옵션 타입
+ *
+ * `submissionQuerySchema` 파생 타입(`SubmissionQueryParams`)을 단일 진실 원천으로 삼아
+ * 기본값이 적용되는 필드들도 호출 시 선택적으로 생략할 수 있도록 허용합니다.
+ */
+export type SubmissionQueryInput = {
+  [K in keyof SubmissionQueryParams]?: SubmissionQueryParams[K] | undefined;
+};
+
+/**
  * 단일 정렬 항목 인터페이스
  */
 export interface SortItem {
@@ -163,3 +173,15 @@ export const relationsQuerySchema = z.object({
  * 역참조 관계 조회 쿼리 파라미터 TypeScript 정적 타입
  */
 export type RelationsQueryParams = z.infer<typeof relationsQuerySchema>;
+
+/**
+ * 동적 경로 파라미터 `:submissionId` 검증용 Zod 스키마 (UUID 표준 포맷 검사)
+ */
+export const submissionIdParamSchema = z.object({
+  submissionId: z.uuid("올바른 응답 ID(UUID) 형식이 아닙니다."),
+});
+
+/**
+ * 동적 경로 파라미터 `:submissionId` TypeScript 정적 타입
+ */
+export type SubmissionIdParam = z.infer<typeof submissionIdParamSchema>;

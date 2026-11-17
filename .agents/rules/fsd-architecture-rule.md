@@ -112,9 +112,10 @@ flowchart TD
 1. **`src/shared/tables/*.table.ts` (DB 테이블 정의)**:
    - Drizzle ORM의 `pgTable` 정의 전용입니다.
    - RDBMS 외래키, 인덱스, CASCADE 무결성을 보장하기 위해 모든 물리 테이블 DDL은 이곳에 집중 배치합니다.
-2. **`src/{entities,features}/*/schema/*.schema.ts` (Zod 검증 스키마)**:
-   - 런타임에 실행되는 Zod 유효성 검증기(`z.object`, `createInsertSchema` 등) 및 정규식, 도구 파라미터 스키마 전용입니다.
-   - 스키마로부터 파생되는 TypeScript 정적 타입(`z.infer`)은 해당 스키마 파일 하단에서 함께 export합니다.
+2. **`src/{shared,entities,features}/**/schema/*.schema.ts` (Zod 검증 스키마)**:
+   - 런타임에 실행되는 Zod 유효성 검증기(`z.object`, `createInsertSchema` 등), 정규식, API 계약(Path/Query/Body), 도구 파라미터 스키마 전용입니다.
+   - 스키마로부터 파생되는 TypeScript 정적 타입(`z.infer`, `z.input`)은 해당 스키마 파일 하단에서 함께 export합니다.
+   - 상세 배치 및 중복 타입 금지 기준은 [.agents/rules/zod-schema-governance-rule.md](.agents/rules/zod-schema-governance-rule.md)를 반드시 따릅니다.
 3. **`src/{entities,features}/*/types/*.types.ts` (순수 TypeScript 타입)**:
    - 컴파일 타임에만 존재하는 순수 TypeScript `type` 및 `interface` 전용입니다.
    - **가드레일**: `types/` 폴더 내부 파일에서는 `import { z } from "zod"`를 통한 런타임 검증기 선언이 엄격히 금지됩니다.

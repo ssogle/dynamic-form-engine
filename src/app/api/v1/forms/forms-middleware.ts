@@ -1,8 +1,7 @@
 import type { MiddlewareHandler } from "hono";
-import { z } from "zod";
-import type { Form } from "@/entities/form";
+import { formIdParamSchema, type Form } from "@/entities/form";
 import { findFormById } from "@/entities/form/server";
-import type { FormSubmission } from "@/entities/form-submission";
+import { submissionIdParamSchema, type FormSubmission } from "@/entities/form-submission";
 import { findSubmissionById } from "@/entities/form-submission/server";
 import { notFound } from "@/shared/lib/http";
 import { parseRouteParams } from "../_lib/request-helpers";
@@ -28,21 +27,6 @@ export interface FormsRouterVariables {
  * Hono `MiddlewareHandler`용 Forms 라우터 환경 타입 별칭
  */
 export type FormsMiddleware = MiddlewareHandler<{ Variables: FormsRouterVariables }>;
-
-/**
- * 동적 경로 파라미터 `:id` 검증용 Zod 스키마 (UUID v4 등 표준 UUID 포맷 검사)
- */
-const formIdParamSchema = z.object({
-  id: z.uuid("올바른 폼 ID(UUID) 형식이 아닙니다."),
-});
-
-/**
- * 동적 경로 파라미터 `:submissionId` 검증용 Zod 스키마
- * - 상위 `/:id/*` 미들웨어가 `:id`를 이미 검증하므로 `:submissionId`만 독립 검증하여 중복 검증을 방지합니다.
- */
-const submissionIdParamSchema = z.object({
-  submissionId: z.uuid("올바른 응답 ID(UUID) 형식이 아닙니다."),
-});
 
 /**
  * 경로 파라미터 `:id`의 UUID 형식을 검증하고 `formId` 컨텍스트 변수에 주입하는 미들웨어

@@ -15,6 +15,7 @@ import {
   parseIdsParam,
   parseSortParam,
   type PaginatedSubmissionsResponse,
+  type SubmissionQueryInput,
 } from "../schema/submission-query.schema";
 import { isValidTimezone } from "../schema/date-range.schema";
 import { buildDateRangeConditions } from "./date-filter-sql.server";
@@ -133,19 +134,9 @@ export const hasSubmissionsByFormId = async (formId: string): Promise<boolean> =
 };
 
 /**
- * 페이지네이션 조회 옵션 인터페이스
+ * 페이지네이션 조회 옵션 타입 (`submissionQuerySchema` 파생 단일 진실 원천 재사용)
  */
-export interface FindSubmissionsPaginatedOptions {
-  page?: number | undefined;
-  limit?: number | undefined;
-  sort?: string | undefined;
-  filters?: string | undefined;
-  ids?: string | undefined;
-  dateFieldId?: string | undefined;
-  startDate?: string | undefined;
-  endDate?: string | undefined;
-  timezone?: string | undefined;
-}
+export type FindSubmissionsPaginatedOptions = SubmissionQueryInput;
 
 /**
  * 특정 폼 ID의 응답 목록을 페이지네이션, 동적 JSONB 멀티 정렬, 컬럼별 ILIKE 필터, 배치 ID 조건을 적용하여 조회합니다.

@@ -243,6 +243,102 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+
+  // 10. Zod 스키마 정의 위치 단일화 가드레일 (schema/*.schema.ts 외 도메인/피처/라우트에서 zod 직접 import 차단)
+  // ESLint flat config는 동일 규칙명을 마지막 매칭 블록으로 덮어쓰므로, 9번의 date-fns/cn 차단을 함께 병합합니다.
+  {
+    files: ["src/**/*.ts", "src/**/*.tsx"],
+    ignores: [
+      "src/**/schema/*.schema.ts",
+      "src/shared/lib/http/server.ts",
+      "src/shared/lib/date/date.ts",
+      "src/shared/lib/cn/cn.ts",
+      "src/app/api/v1/_lib/request-helpers.ts",
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/*.spec.ts",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "date-fns",
+              message:
+                "서드파티 시간 라이브러리 직접 import는 금지됩니다. 반드시 '@/shared/lib/date'의 formatDate, formatRelativeTime 등을 사용하세요.",
+            },
+            {
+              name: "date-fns/locale",
+              message:
+                "서드파티 로케일 직접 import는 금지됩니다. 반드시 '@/shared/lib/date'의 날짜 함수를 사용하세요.",
+            },
+            {
+              name: "cn",
+              message:
+                "외부 'cn' 패키지 직접 import는 금지됩니다. 반드시 '@/shared/lib/cn'을 사용하세요.",
+            },
+            {
+              name: "zod",
+              message:
+                "런타임 Zod 스키마는 반드시 'schema/*.schema.ts' 세그먼트에만 정의해야 합니다. 다른 세그먼트에서는 스키마 파일이 export한 스키마 심볼이나 z.infer/z.input 파생 타입만 import하세요.",
+            },
+            {
+              name: "drizzle-zod",
+              message:
+                "drizzle-zod 스키마 생성은 반드시 'schema/*.schema.ts' 세그먼트 내부에서만 수행해야 합니다.",
+            },
+          ],
+          patterns: [
+            {
+              group: ["date-fns/*"],
+              message:
+                "서드파티 시간 라이브러리 하위 모듈 직접 import는 금지됩니다. 반드시 '@/shared/lib/date'를 사용하세요.",
+            },
+            {
+              group: ["cn/*"],
+              message:
+                "외부 'cn' 패키지 하위 모듈 직접 import는 금지됩니다. 반드시 '@/shared/lib/cn'을 사용하세요.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/shared/lib/cn/cn.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "date-fns",
+              message:
+                "서드파티 시간 라이브러리 직접 import는 금지됩니다. 반드시 '@/shared/lib/date'를 사용하세요.",
+            },
+            {
+              name: "zod",
+              message:
+                "런타임 Zod 스키마는 반드시 'schema/*.schema.ts' 세그먼트에만 정의해야 합니다.",
+            },
+            {
+              name: "drizzle-zod",
+              message:
+                "drizzle-zod 스키마 생성은 반드시 'schema/*.schema.ts' 세그먼트 내부에서만 수행해야 합니다.",
+            },
+          ],
+          patterns: [
+            {
+              group: ["date-fns/*"],
+              message:
+                "서드파티 시간 라이브러리 하위 모듈 직접 import는 금지됩니다. 반드시 '@/shared/lib/date'를 사용하세요.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

@@ -1,14 +1,11 @@
 import { tool } from "ai";
-import { z } from "zod";
 import {
-  coreFormFieldSchema,
   extractActiveFields,
   extractPrimaryFieldId,
   extractRawFields,
   mergeOptionsWithPreservation,
   normalizeSelectOption,
   normalizeSelectOptions,
-  selectOptionSchema,
   validatePrimaryFieldSelection,
   type CoreFormField,
   type Form,
@@ -17,7 +14,33 @@ import {
   type UpdateForm,
 } from "@/entities/form";
 import { nowUtcIso } from "@/shared/lib/date";
-import { SCHEMA_OPERATIONS, type NavigatorBuilderAction } from "../../types/navigator-action.types";
+import {
+  addRelationFieldInputSchema,
+  createFormInputSchema,
+  deleteFormsInputSchema,
+  navigateInputSchema,
+  publishFormInputSchema,
+  updateFieldOptionsInputSchema,
+  updateSchemaInputSchema,
+  type AddRelationFieldInput,
+  type CreateFormInput,
+  type DeleteFormsInput,
+  type NavigateInput,
+  type PublishFormInput,
+  type UpdateFieldOptionsInput,
+  type UpdateSchemaInput,
+} from "../../schema/navigator-tools.schema";
+import type { NavigatorBuilderAction } from "../../types/navigator-action.types";
+
+export {
+  addRelationFieldInputSchema,
+  createFormInputSchema,
+  deleteFormsInputSchema,
+  navigateInputSchema,
+  publishFormInputSchema,
+  updateFieldOptionsInputSchema,
+  updateSchemaInputSchema,
+};
 
 /**
  * 폼 엔티티의 schemaDefinition 내부에서 CoreFormField 배열을 안전하게 추출하는 유틸리티
@@ -86,137 +109,6 @@ async function isFormHistoryProtected(
   return false;
 }
 
-// 1. navigate 입력 스키마
-export const navigateInputSchema = z.object({
-  targetPath: z.string().describe("이동할 절대 경로 (예: /builder/forms, /builder/forms/[id])"),
-  reason: z.string().optional().describe("이동 사유 또는 목적"),
-});
-
-// 2. createForm 입력 스키마
-export const createFormInputSchema = z
-  .object({
-    title: z.string().min(1, "폼 제목은 필수입니다.").describe("폼 제목"),
-    description: z.string().optional().describe("폼에 대한 설명"),
-    primaryFieldId: z
-      .string({ message: "대표 식별자 필드(primaryFieldId) 지정은 필수입니다." })
-      .trim()
-      .min(1, "대표 식별자 필드(primaryFieldId) 지정은 필수입니다.")
-      .describe(
-        "이 도메인 레코드를 대표하여 식별할 기본 필드 ID (반드시 fields에 포함되고 checkbox·relation이 아닌 활성 필드 ID여야 함)"
-      ),
-    fields: z
-      .array(coreFormFieldSchema)
-      .min(1, "폼에는 최소 1개 이상의 필드가 포함되어야 합니다.")
-      .describe(
-        "생성할 초기 필드 배열 (text, textarea, number, select, radio, checkbox, date, switch, relation — 모든 필드에 description 필수)"
-      ),
-  })
-  .superRefine((val, ctx) => {
-    const check = validatePrimaryFieldSelection(val.fields, val.primaryFieldId);
-    if (!check.isValid) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["primaryFieldId"],
-        message: check.reason ?? "유효하지 않은 대표 필드(primaryFieldId)입니다.",
-      });
-    }
-  });
-
-// 3. updateSchema 입력 스키마
-export const updateSchemaInputSchema = z.object({
-  formId: z.uuid("수정 대상 폼의 ID(UUID)는 필수입니다.").describe("수정할 대상 폼의 고유 ID"),
-  operation: z
-    .enum(SCHEMA_OPERATIONS)
-    .describe(
-      "수행할 스키마 조작 유형 (단일 필드 수정은 UPDATE_FIELD, 다중 수정이나 복합 필드 변경 시에는 SET_ALL_FIELDS, 대표 식별 필드 변경 시에는 SET_PRIMARY_FIELD 사용)"
-    ),
-  targetFieldId: z
-    .string()
-    .optional()
-    .describe("수정/삭제 대상 필드 식별자 (단일 필드 ADD/REMOVE/UPDATE 시 사용)"),
-  primaryFieldId: z
-    .string()
-    .optional()
-    .describe(
-      "대표 식별자 필드(primaryFieldId)로 지정하거나 교체할 활성 필드의 ID 또는 라벨 (SET_PRIMARY_FIELD 시 필수, SET_ALL_FIELDS에서 기존 대표 필드를 대체할 때도 전달)"
-    ),
-  fieldData: coreFormFieldSchema.partial().optional().describe("추가 또는 변경할 단일 필드 데이터"),
-  fields: z
-    .array(coreFormFieldSchema)
-    .optional()
-    .describe("전체 필드 일괄 교체 시 전달하는 완성된 필드 목록 (SET_ALL_FIELDS 시 필수)"),
-  formTitle: z.string().optional().describe("변경할 폼 제목"),
-});
-
-// 4. publishForm 입력 스키마
-export const publishFormInputSchema = z.object({
-  formId: z
-    .uuid("발행 대상 폼의 ID(UUID)는 필수입니다.")
-    .describe("발행 상태를 변경할 대상 폼의 고유 ID"),
-  isPublished: z.boolean().describe("발행 여부 (true: 공개 발행, false: 비발행/초안 회수)"),
-});
-
-// 5. deleteForms 입력 스키마
-export const deleteFormsInputSchema = z.object({
-  formIds: z
-    .array(z.uuid())
-    .min(1, "삭제할 폼 ID는 최소 1개 이상이어야 합니다.")
-    .describe("삭제할 대상 폼의 UUID 배열 (단일 폼 삭제 시에도 원소가 1개인 배열로 전달)"),
-  reason: z.string().optional().describe("삭제 사유"),
-});
-
-// 6. addRelationField 입력 스키마
-export const addRelationFieldInputSchema = z.object({
-  formId: z
-    .uuid("현재 작업 중인 폼의 ID(UUID)는 필수입니다.")
-    .describe("관계형 필드를 추가할 폼의 ID"),
-  label: z
-    .string()
-    .min(1, "필드 라벨을 입력해 주세요.")
-    .describe("화면에 표시될 관계형 필드 라벨 (예: '참조 프로젝트', '소속 부서')"),
-  targetFormId: z
-    .uuid("참조할 대상 폼의 ID(UUID)는 필수입니다.")
-    .describe("관계(외래키)를 맺을 타깃 도메인 폼의 UUID"),
-  multiple: z
-    .boolean()
-    .default(false)
-    .describe("다중 선택 허용 여부 (기본값: false - 단일 레코드 참조)"),
-  required: z.boolean().default(false).describe("필수 선택 여부"),
-  description: z
-    .string()
-    .trim()
-    .min(1, "관계형 필드의 연결 의미 설명은 필수입니다.")
-    .describe(
-      "이 관계형 필드가 타깃 폼과 어떤 비즈니스 의미로 연결되는지 설명하는 1문장 (예: '이 업무를 요청한 담당자를 연결합니다.')"
-    ),
-});
-
-// 7. updateFieldOptions 입력 스키마
-export const updateFieldOptionsInputSchema = z.object({
-  formId: z
-    .uuid("수정 대상 폼의 ID(UUID)는 필수입니다.")
-    .describe("옵션을 수정할 대상 폼의 고유 ID"),
-  targetFieldId: z
-    .string()
-    .min(1, "대상 필드 식별자는 필수입니다.")
-    .describe("옵션을 수정할 대상 필드의 ID 또는 라벨"),
-  operation: z
-    .enum(["ADD_OPTIONS", "REMOVE_OPTION", "DISABLE_OPTION", "ENABLE_OPTION", "SET_OPTIONS"])
-    .describe(
-      "옵션 조작 유형: 'DISABLE_OPTION'(소프트 비활성화 - 과거 데이터 무결성 보존을 위해 삭제 대신 강력 권장), 'ENABLE_OPTION'(비활성화 해제), 'ADD_OPTIONS'(옵션 추가), 'REMOVE_OPTION'(물리 삭제), 'SET_OPTIONS'(전체 옵션 교체)"
-    ),
-  options: z
-    .array(selectOptionSchema)
-    .optional()
-    .describe("SET_OPTIONS 또는 ADD_OPTIONS 시 추가/교체할 옵션 목록"),
-  targetOptionValue: z
-    .string()
-    .optional()
-    .describe(
-      "DISABLE_OPTION, ENABLE_OPTION, REMOVE_OPTION 시 조작 대상 옵션의 불변 코드값(value) 또는 표시 라벨(label)"
-    ),
-});
-
 /**
  * AI Builder Navigator Vercel AI SDK 도구 카탈로그 생성 팩토리 함수
  *
@@ -228,7 +120,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
     description:
       "애플리케이션 내의 다른 화면으로 이동합니다. 폼 목록(/builder/forms), 라이브 캔버스(/builder/forms/[id]) 등으로 이동할 때 호출합니다.",
     inputSchema: navigateInputSchema,
-    execute: async ({ targetPath, reason }: z.infer<typeof navigateInputSchema>) => {
+    execute: async ({ targetPath, reason }: NavigateInput) => {
       const action: NavigatorBuilderAction = {
         type: "NAVIGATE",
         targetPath,
@@ -247,12 +139,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
     description:
       "새로운 폼을 생성하고 데이터베이스에 영속화합니다. 폼 생성 후 즉시 해당 폼의 라이브 캔버스(/builder/forms/[id])로 이동하도록 처리됩니다.",
     inputSchema: createFormInputSchema,
-    execute: async ({
-      title,
-      description,
-      primaryFieldId,
-      fields,
-    }: z.infer<typeof createFormInputSchema>) => {
+    execute: async ({ title, description, primaryFieldId, fields }: CreateFormInput) => {
       const created = await deps.insertForm({
         title,
         description: description ?? null,
@@ -290,7 +177,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
       fieldData,
       fields: newFieldsList,
       formTitle,
-    }: z.infer<typeof updateSchemaInputSchema>) => {
+    }: UpdateSchemaInput) => {
       const existing = await deps.findFormById(formId);
       if (!existing) {
         return {
@@ -548,7 +435,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
   const publishFormTool = tool({
     description: "폼의 공식 발행 상태를 설정하거나 취소(초안 복귀)합니다.",
     inputSchema: publishFormInputSchema,
-    execute: async ({ formId, isPublished }: z.infer<typeof publishFormInputSchema>) => {
+    execute: async ({ formId, isPublished }: PublishFormInput) => {
       const existing = await deps.findFormById(formId);
       if (!existing) {
         return {
@@ -600,7 +487,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
   const deleteFormsTool = tool({
     description: "지정된 ID의 폼을 소프트 삭제합니다.",
     inputSchema: deleteFormsInputSchema,
-    execute: async ({ formIds, reason }: z.infer<typeof deleteFormsInputSchema>) => {
+    execute: async ({ formIds, reason }: DeleteFormsInput) => {
       const deleted = await deps.softDeleteFormsByIds(formIds);
 
       const action: NavigatorBuilderAction = {
@@ -631,7 +518,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
       multiple,
       required,
       description,
-    }: z.infer<typeof addRelationFieldInputSchema>) => {
+    }: AddRelationFieldInput) => {
       // 1. 현재 작업 중인 폼 및 대표 필드 유효성 검증
       const currentForm = await deps.findFormById(formId);
       if (!currentForm) {
@@ -721,7 +608,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
       operation,
       options: newOptionsInput,
       targetOptionValue,
-    }: z.infer<typeof updateFieldOptionsInputSchema>) => {
+    }: UpdateFieldOptionsInput) => {
       const existing = await deps.findFormById(formId);
       if (!existing) {
         return {

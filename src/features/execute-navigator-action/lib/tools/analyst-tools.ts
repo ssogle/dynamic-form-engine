@@ -1,7 +1,5 @@
 import { tool } from "ai";
-import { z } from "zod";
 import {
-  analysisBlockSchema,
   extractAnalysisBlocks,
   type AnalysisBlock,
   type AnalysisView,
@@ -14,6 +12,7 @@ import {
   computeSeriesMetricInputSchema,
   querySubmissionsForAnalysisSchema,
   type AnalyticsAggregationQuery,
+  type ComputeSeriesMetricInput,
   type QuerySubmissionsForAnalysisInput,
 } from "@/entities/form-submission";
 import type {
@@ -22,10 +21,25 @@ import type {
   AnalyticsResult,
 } from "@/entities/form-submission/server";
 import {
-  ANALYSIS_VIEW_OPERATIONS,
-  type NavigatorAnalystAction,
-} from "../../types/navigator-action.types";
-import { navigateInputSchema } from "./builder-tools";
+  createAnalysisViewInputSchema,
+  deleteAnalysisViewsInputSchema,
+  navigateInputSchema,
+  publishAnalysisViewInputSchema,
+  updateAnalysisViewInputSchema,
+  type CreateAnalysisViewInput,
+  type DeleteAnalysisViewsInput,
+  type NavigateInput,
+  type PublishAnalysisViewInput,
+  type UpdateAnalysisViewInput,
+} from "../../schema/navigator-tools.schema";
+import type { NavigatorAnalystAction } from "../../types/navigator-action.types";
+
+export {
+  createAnalysisViewInputSchema,
+  deleteAnalysisViewsInputSchema,
+  publishAnalysisViewInputSchema,
+  updateAnalysisViewInputSchema,
+};
 
 /**
  * 분석가 도구 카탈로그에서 사용할 서버 저장소 및 집계 엔진 의존성 인터페이스
@@ -46,65 +60,6 @@ export interface AnalystToolsDependencies {
     input: QuerySubmissionsForAnalysisInput
   ) => Promise<AnalyticsResult<AnalysisRecordsResult>>;
 }
-
-export const createAnalysisViewInputSchema = z.object({
-  title: z
-    .string()
-    .min(1, "분석 뷰 제목은 필수입니다.")
-    .max(255, "분석 뷰 제목은 최대 255자까지 가능합니다.")
-    .describe("생성할 분석 뷰 문서의 제목"),
-  description: z.string().optional().describe("분석 뷰 문서의 부제목 또는 요약 설명"),
-  blocks: z
-    .array(analysisBlockSchema)
-    .default([])
-    .describe("문서를 구성하는 초기 콘텐츠 블록 목록 (text, table, chart)"),
-});
-
-export const updateAnalysisViewInputSchema = z.object({
-  viewId: z.uuid("수정할 분석 뷰의 고유 ID(UUID)는 필수입니다."),
-  operation: z
-    .enum(ANALYSIS_VIEW_OPERATIONS)
-    .describe(
-      "수행할 오퍼레이션: ADD_BLOCK, UPDATE_BLOCK, REMOVE_BLOCK, REORDER_BLOCKS, UPDATE_INFO, SET_ALL_BLOCKS"
-    ),
-  targetBlockId: z
-    .string()
-    .optional()
-    .describe("UPDATE_BLOCK, REMOVE_BLOCK 시 조작 대상 블록의 id"),
-  block: analysisBlockSchema
-    .optional()
-    .describe("ADD_BLOCK 또는 UPDATE_BLOCK 시 추가/교체할 단일 블록 객체"),
-  insertIndex: z
-    .number()
-    .int()
-    .min(0)
-    .optional()
-    .describe("ADD_BLOCK 시 삽입할 0-based 위치 인덱스 (생략 시 맨 뒤에 추가)"),
-  blockIds: z
-    .array(z.string().min(1))
-    .optional()
-    .describe("REORDER_BLOCKS 시 기존 블록 ID들의 새로운 전체 순서 배열"),
-  blocks: z
-    .array(analysisBlockSchema)
-    .optional()
-    .describe("SET_ALL_BLOCKS 시 문서 전체를 교체할 블록 배열"),
-  title: z.string().min(1).max(255).optional().describe("UPDATE_INFO 시 변경할 문서 제목"),
-  description: z.string().optional().describe("UPDATE_INFO 시 변경할 문서 설명"),
-});
-
-export const publishAnalysisViewInputSchema = z.object({
-  viewId: z.uuid("발행 상태를 변경할 분석 뷰 ID(UUID)는 필수입니다."),
-  isPublished: z
-    .boolean()
-    .default(true)
-    .describe("true: 컨슈머 포털에 공식 발행, false: 초안으로 회수"),
-});
-
-export const deleteAnalysisViewsInputSchema = z.object({
-  viewIds: z
-    .array(z.uuid("유효한 분석 뷰 UUID가 필요합니다."))
-    .min(1, "최소 1개 이상의 분석 뷰 ID가 필요합니다."),
-});
 
 /**
  * 블록 ID 중복 여부를 검증합니다.
@@ -142,7 +97,7 @@ export function createAnalystTools(deps: AnalystToolsDependencies) {
     description:
       "분석가 작업 공간 내의 화면(/analyst/views, /analyst/views/[id]) 또는 원천 데이터 전체 목록 확인이 필요한 컨슈머 폼 데이터 뷰(/consumer/forms/[id])로 이동합니다.",
     inputSchema: navigateInputSchema,
-    execute: async ({ targetPath, reason }: z.infer<typeof navigateInputSchema>) => {
+    execute: async ({ targetPath, reason }: NavigateInput) => {
       const action: NavigatorAnalystAction = {
         type: "NAVIGATE",
         targetPath,
@@ -216,7 +171,7 @@ export function createAnalystTools(deps: AnalystToolsDependencies) {
     description:
       "두 집계 시리즈(baseSeries, targetSeries)와 선택적 기준 키 목록(includeKeys)의 합집합 Zero-fill로 정렬한 뒤 차액(subtract: base - target), 합산(add: base + target), 백분율 비율(ratio: (base / target) * 100, 분모 0이면 null)을 부동소수점 오차 없이 계산합니다.",
     inputSchema: computeSeriesMetricInputSchema,
-    execute: async (input: z.infer<typeof computeSeriesMetricInputSchema>) => {
+    execute: async (input: ComputeSeriesMetricInput) => {
       const computed = computeSeriesMetric(input);
       return {
         success: true,
@@ -229,11 +184,7 @@ export function createAnalystTools(deps: AnalystToolsDependencies) {
     description:
       "새로운 블록 기반 분석 뷰 문서를 생성하여 데이터베이스에 저장하고 해당 분석 뷰 상세 화면(/analyst/views/[id])으로 이동합니다. 각 블록에는 [원본 데이터 보기] 새 탭 링크가 노출되도록 sourceLinks를 함께 기록하세요.",
     inputSchema: createAnalysisViewInputSchema,
-    execute: async ({
-      title,
-      description,
-      blocks,
-    }: z.infer<typeof createAnalysisViewInputSchema>) => {
+    execute: async ({ title, description, blocks }: CreateAnalysisViewInput) => {
       if (hasDuplicateBlockIds(blocks)) {
         return {
           success: false,
@@ -281,7 +232,7 @@ export function createAnalystTools(deps: AnalystToolsDependencies) {
       blocks: nextAllBlocks,
       title,
       description,
-    }: z.infer<typeof updateAnalysisViewInputSchema>) =>
+    }: UpdateAnalysisViewInput) =>
       withViewLock(viewId, async () => {
         const existing = await deps.findAnalysisViewById(viewId);
         if (!existing) {
@@ -456,7 +407,7 @@ export function createAnalystTools(deps: AnalystToolsDependencies) {
     description:
       "분석 뷰를 공식 발행(isPublished: true)하여 컨슈머 포털(/consumer/views)에 공유하거나 초안(isPublished: false)으로 회수합니다.",
     inputSchema: publishAnalysisViewInputSchema,
-    execute: async ({ viewId, isPublished }: z.infer<typeof publishAnalysisViewInputSchema>) =>
+    execute: async ({ viewId, isPublished }: PublishAnalysisViewInput) =>
       withViewLock(viewId, async () => {
         const existing = await deps.findAnalysisViewById(viewId);
         if (!existing) {
@@ -501,7 +452,7 @@ export function createAnalystTools(deps: AnalystToolsDependencies) {
   const deleteAnalysisViewsTool = tool({
     description: "지정된 하나 이상의 분석 뷰 문서를 소프트 삭제(Soft Delete) 처리합니다.",
     inputSchema: deleteAnalysisViewsInputSchema,
-    execute: async ({ viewIds }: z.infer<typeof deleteAnalysisViewsInputSchema>) => {
+    execute: async ({ viewIds }: DeleteAnalysisViewsInput) => {
       const deleted = await deps.softDeleteAnalysisViewsByIds(viewIds);
       if (deleted.length === 0) {
         return {

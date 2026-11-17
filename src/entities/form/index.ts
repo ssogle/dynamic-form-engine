@@ -6,12 +6,18 @@
  */
 export {
   forms,
+  formIdParamSchema,
+  formsListQuerySchema,
   formSchemaDefinitionSchema,
   insertFormSchema,
+  publishFormBodySchema,
   selectFormSchema,
   updateFormSchema,
   type Form,
+  type FormIdParam,
+  type FormsListQuery,
   type InsertForm,
+  type PublishFormBody,
   type UpdateForm,
 } from "./schema/form.schema";
 

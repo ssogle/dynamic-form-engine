@@ -1,6 +1,5 @@
 import type { MiddlewareHandler } from "hono";
-import { z } from "zod";
-import type { AnalysisView } from "@/entities/analysis-view";
+import { analysisViewIdParamSchema, type AnalysisView } from "@/entities/analysis-view";
 import { findAnalysisViewById } from "@/entities/analysis-view/server";
 import { notFound } from "@/shared/lib/http";
 import { parseRouteParams } from "../_lib/request-helpers";
@@ -16,10 +15,6 @@ export interface AnalysisViewsRouterVariables {
 export type AnalysisViewsMiddleware = MiddlewareHandler<{
   Variables: AnalysisViewsRouterVariables;
 }>;
-
-const analysisViewIdParamSchema = z.object({
-  id: z.uuid("올바른 분석 뷰 ID(UUID) 형식이 아닙니다."),
-});
 
 /**
  * 경로 파라미터 `:id` UUID 검증 미들웨어

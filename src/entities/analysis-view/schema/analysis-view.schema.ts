@@ -1,5 +1,6 @@
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
+import { calendarDateStringSchema } from "@/shared/schema";
 import { analysisViews, type AnalysisViewBlockRecord } from "@/shared/tables";
 
 /**
@@ -25,14 +26,8 @@ const systemManagedFields = {
 export const analysisBlockSourceLinkSchema = z.object({
   formId: z.uuid("유효한 폼 ID(UUID)가 필요합니다."),
   label: z.string().min(1, "출처 링크 라벨은 필수입니다."),
-  startDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "시작일은 YYYY-MM-DD 형식이어야 합니다.")
-    .optional(),
-  endDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "종료일은 YYYY-MM-DD 형식이어야 합니다.")
-    .optional(),
+  startDate: calendarDateStringSchema.optional(),
+  endDate: calendarDateStringSchema.optional(),
   dateFieldId: z.string().min(1).optional(),
 });
 
@@ -159,3 +154,33 @@ export type AnalysisBlock = z.infer<typeof analysisBlockSchema>;
 export type AnalysisView = typeof analysisViews.$inferSelect;
 export type InsertAnalysisView = z.infer<typeof insertAnalysisViewSchema>;
 export type UpdateAnalysisView = z.infer<typeof updateAnalysisViewSchema>;
+
+/**
+ * 분석 뷰 경로 파라미터 `:id` UUID 검증 스키마
+ */
+export const analysisViewIdParamSchema = z.object({
+  id: z.uuid("올바른 분석 뷰 ID(UUID) 형식이 아닙니다."),
+});
+export type AnalysisViewIdParam = z.infer<typeof analysisViewIdParamSchema>;
+
+/**
+ * 분석 뷰 목록/상세 조회(`GET /api/v1/analysis-views`) 쿼리 파라미터 검증 스키마
+ *
+ * - `?published=true` 전달 시 컨슈머 포털용 공식 발행 문서만 필터링합니다.
+ */
+export const analysisViewsQuerySchema = z.object({
+  published: z.enum(["true", "false"]).optional(),
+});
+export type AnalysisViewsQuery = z.infer<typeof analysisViewsQuerySchema>;
+
+/**
+ * 분석 뷰 발행 상태 토글(`POST /api/v1/analysis-views/:id/publish`) 요청 본문 검증 스키마
+ *
+ * - 본문이 비어 있거나 `isPublished`가 생략된 경우 기본값 `true`(공식 발행)로 처리합니다.
+ */
+export const publishAnalysisViewBodySchema = z.object({
+  isPublished: z
+    .boolean({ message: "발행 여부(isPublished)는 불리언 값이어야 합니다." })
+    .default(true),
+});
+export type PublishAnalysisViewBody = z.infer<typeof publishAnalysisViewBodySchema>;
