@@ -5,7 +5,7 @@ import { AnalysisViewList } from "@/features/manage-analysis-views";
  */
 export default function AnalystViewsPage() {
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6">
+    <div className="w-full space-y-6">
       <div className="flex flex-col gap-1.5">
         <h1 className="text-foreground text-2xl font-bold tracking-tight">분석 뷰 문서 목록</h1>
         <p className="text-muted-foreground text-sm">

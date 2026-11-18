@@ -21,8 +21,8 @@ export default async function ConsumerFormNewSubmissionPage({
   const { id } = await params;
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4 px-2">
+    <div className="w-full space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <Button asChild variant="ghost" size="sm" className="text-muted-foreground text-xs">
             <Link href={`/consumer/forms/${id}`}>← 데이터 목록으로 돌아가기</Link>

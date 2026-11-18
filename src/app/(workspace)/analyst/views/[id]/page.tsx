@@ -14,7 +14,7 @@ export default async function AnalystViewDetailPage({ params }: AnalystViewDetai
   const { id } = await params;
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6">
+    <div className="w-full space-y-6">
       <AnalysisViewActionBar viewId={id} />
       <AnalysisViewRenderer viewId={id} />
     </div>

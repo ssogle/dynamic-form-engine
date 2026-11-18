@@ -25,9 +25,11 @@ export function WorkspaceSplitShell({ mode, children }: WorkspaceSplitShellProps
         <NavigatorShell mode={mode} />
       </div>
 
-      {/* 우측 본문 작업 화면 (상단 앱 바 아래 단일 캔버스) */}
+      {/* 우측 본문 작업 화면 (상단 앱 바 아래 1024px 통일 캔버스) */}
       <main className="bg-muted/10 min-w-0 flex-1 overflow-y-auto">
-        <div className="container mx-auto min-h-full px-4 py-8 sm:px-6 lg:px-8">{children}</div>
+        <div className="mx-auto min-h-full w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+          {children}
+        </div>
       </main>
     </div>
   );

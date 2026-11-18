@@ -65,7 +65,7 @@ export function SubmissionDetailView({ formId, submissionId }: SubmissionDetailV
   // 1. 로딩 상태 스켈레톤
   if (isLoading) {
     return (
-      <div className="mx-auto w-full max-w-3xl space-y-6">
+      <div className="w-full space-y-6">
         <div className="flex items-center justify-between">
           <Skeleton className="h-8 w-40 rounded-md" />
           <div className="flex gap-2">
@@ -91,7 +91,7 @@ export function SubmissionDetailView({ formId, submissionId }: SubmissionDetailV
   // 2. 에러 상태
   if (isError || !submission || !form) {
     return (
-      <div className="mx-auto w-full max-w-3xl space-y-6">
+      <div className="w-full space-y-6">
         <Button asChild variant="ghost" size="sm" className="gap-1.5 text-xs">
           <Link href={`/consumer/forms/${formId}`}>
             <ArrowLeft className="size-3.5" />
@@ -114,7 +114,7 @@ export function SubmissionDetailView({ formId, submissionId }: SubmissionDetailV
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
+    <div className="w-full space-y-6">
       {/* 1. 상단 네비게이션 및 액션 툴바 */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <Button asChild variant="ghost" size="sm" className="gap-1.5 text-xs">

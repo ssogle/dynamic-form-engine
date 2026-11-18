@@ -56,7 +56,7 @@ export function DynamicFormRenderer({
   // 1. 쿼리 로딩 상태 스켈레톤 렌더링
   if (isLoading) {
     return (
-      <div className={cn("mx-auto w-full max-w-3xl space-y-6", className)}>
+      <div className={cn("w-full space-y-6", className)}>
         <Card className="border-border/60 shadow-xs">
           <CardHeader className="space-y-3 pb-6">
             <div className="flex items-center justify-between">
@@ -83,7 +83,7 @@ export function DynamicFormRenderer({
   // 2. 쿼리 에러 상태 렌더링
   if (isError) {
     return (
-      <div className={cn("mx-auto w-full max-w-3xl", className)}>
+      <div className={cn("w-full", className)}>
         <Card className="border-destructive/30 bg-destructive/5 shadow-xs">
           <CardHeader>
             <CardTitle className="text-destructive text-base">
@@ -101,7 +101,7 @@ export function DynamicFormRenderer({
   // 3. 폼 데이터를 찾을 수 없는 경우
   if (!activeForm) {
     return (
-      <div className={cn("mx-auto w-full max-w-3xl", className)}>
+      <div className={cn("w-full", className)}>
         <Card className="border-border/60 shadow-xs">
           <CardContent className="flex min-h-55 flex-col items-center justify-center p-8 text-center">
             <p className="text-muted-foreground text-sm font-medium">
@@ -116,7 +116,7 @@ export function DynamicFormRenderer({
   // 4. 정상 폼 렌더링
   return (
     <FormProvider {...methods}>
-      <div className={cn("mx-auto w-full max-w-3xl space-y-6", className)}>
+      <div className={cn("w-full space-y-6", className)}>
         <Card className="border-border/60 shadow-xs">
           {/* 폼 메타데이터 헤더 */}
           <CardHeader className="space-y-3 pb-6">

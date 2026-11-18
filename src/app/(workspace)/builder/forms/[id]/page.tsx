@@ -23,8 +23,8 @@ export default async function BuilderFormIdPage({ params }: BuilderFormIdPagePro
   const { id } = await params;
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4 px-6">
+    <div className="w-full space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-foreground text-2xl font-bold tracking-tight">
             실시간 폼 라이브 캔버스

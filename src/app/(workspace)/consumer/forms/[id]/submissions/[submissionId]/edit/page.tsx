@@ -24,9 +24,5 @@ export default async function ConsumerSubmissionEditPage({
 }: ConsumerSubmissionEditPageProps) {
   const { id, submissionId } = await params;
 
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <ConsumerSubmissionEditor formId={id} submissionId={submissionId} />
-    </div>
-  );
+  return <ConsumerSubmissionEditor formId={id} submissionId={submissionId} />;
 }

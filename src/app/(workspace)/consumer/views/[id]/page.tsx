@@ -18,7 +18,7 @@ export default async function ConsumerViewDetailPage({ params }: ConsumerViewDet
   const { id } = await params;
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6">
+    <div className="w-full space-y-6">
       <Button asChild variant="ghost" size="sm" className="text-muted-foreground gap-1.5">
         <Link href="/consumer">
           <ArrowLeft className="size-4" />

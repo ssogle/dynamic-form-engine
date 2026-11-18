@@ -10,7 +10,7 @@ import { Separator } from "@/shared/ui/separator";
  */
 export default function ConsumerPortalPage() {
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-10">
+    <div className="w-full space-y-10">
       <div className="flex flex-col gap-2">
         <h1 className="text-foreground text-2xl font-bold tracking-tight">컨슈머 포털</h1>
         <p className="text-muted-foreground text-sm/relaxed">

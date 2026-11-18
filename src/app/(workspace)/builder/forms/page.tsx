@@ -9,7 +9,7 @@ import { BuilderFormList } from "@/features/manage-builder-forms";
  */
 export default function BuilderFormsPage() {
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-8">
+    <div className="w-full space-y-8">
       <div className="flex flex-col gap-2">
         <h1 className="text-foreground text-2xl font-bold tracking-tight">등록된 폼 목록</h1>
         <p className="text-muted-foreground text-sm/relaxed">

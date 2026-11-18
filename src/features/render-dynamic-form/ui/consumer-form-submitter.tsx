@@ -45,7 +45,7 @@ export function ConsumerFormSubmitter({ formId }: ConsumerFormSubmitterProps) {
   // 1. 서버 SSR 및 클라이언트 초기 하이드레이션, 데이터 로딩 단계 스켈레톤
   if (isLoading || (!form && !isError)) {
     return (
-      <div className="mx-auto w-full max-w-3xl space-y-6">
+      <div className="w-full space-y-6">
         <Card className="border-border/60 shadow-xs">
           <CardHeader className="space-y-3 pb-6">
             <Skeleton className="h-7 w-48 rounded-md" />
@@ -64,7 +64,7 @@ export function ConsumerFormSubmitter({ formId }: ConsumerFormSubmitterProps) {
   // 2. 조회 에러 상태 (에러 확정 또는 로딩 완료 후에도 폼 부재)
   if (isError || !form) {
     return (
-      <div className="mx-auto w-full max-w-3xl">
+      <div className="w-full">
         <Card className="border-destructive/30 bg-destructive/5 shadow-xs">
           <CardHeader>
             <CardTitle className="text-destructive text-base">폼을 불러오지 못했습니다</CardTitle>
@@ -85,7 +85,7 @@ export function ConsumerFormSubmitter({ formId }: ConsumerFormSubmitterProps) {
   // 3. 미발행 폼 접근 방어
   if (!form.publishedAt) {
     return (
-      <div className="mx-auto w-full max-w-3xl">
+      <div className="w-full">
         <Card className="border-border/80 bg-muted/20 border-dashed py-12 text-center shadow-none">
           <CardHeader className="pb-3">
             <CardTitle className="text-foreground text-base font-semibold">
@@ -108,7 +108,7 @@ export function ConsumerFormSubmitter({ formId }: ConsumerFormSubmitterProps) {
   // 4. 제출 완료 화면
   if (isSuccessSubmitted) {
     return (
-      <div className="mx-auto w-full max-w-3xl">
+      <div className="w-full">
         <Card className="border-border/60 py-8 text-center shadow-xs">
           <CardHeader className="space-y-2 pb-4">
             <CardTitle className="text-foreground text-2xl font-bold tracking-tight">
