@@ -1,5 +1,6 @@
 import { tool } from "ai";
 import type { Form } from "@/entities/form";
+import { resolveFieldQueryCapability } from "@/shared/schema";
 import {
   getFormDetailsInputSchema,
   searchFormsInputSchema,
@@ -83,13 +84,24 @@ export function createQueryTools(deps: QueryToolsDependencies) {
         title: form.title,
         description: form.description ?? undefined,
         isPublished: Boolean(form.publishedAt),
-        fields: activeFields.map((f) => ({
-          id: f.id,
-          label: f.label,
-          type: f.type,
-          required: Boolean(f.required),
-          options: f.options ?? undefined,
-        })),
+        fields: activeFields.map((f) => {
+          const capability = resolveFieldQueryCapability(f);
+          return {
+            id: f.id,
+            label: f.label,
+            type: f.type,
+            required: Boolean(f.required),
+            options: f.options ?? undefined,
+            capabilities: capability
+              ? {
+                  filterOperators: capability.filterOperators,
+                  aggregatableMetrics: capability.aggregatableMetrics,
+                  groupable: capability.groupable,
+                  isDateAxisCandidate: capability.isDateAxisCandidate,
+                }
+              : undefined,
+          };
+        }),
       };
     },
   });

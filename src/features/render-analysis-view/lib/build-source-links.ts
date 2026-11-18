@@ -1,4 +1,5 @@
 import type { AnalysisBlock, AnalysisBlockSourceLink } from "@/entities/analysis-view";
+import { serializeFieldFiltersParam, type FieldFilterCondition } from "@/shared/schema";
 
 /**
  * UI에 렌더링 가능한 형태로 정규화된 원천 폼 바로가기 링크 정보
@@ -12,10 +13,11 @@ export interface ResolvedSourceLink {
   startDate?: string;
   endDate?: string;
   dateFieldId?: string;
+  filters?: FieldFilterCondition[];
 }
 
 /**
- * 폼 ID와 선택적 기간 필터(startDate, endDate, dateFieldId)를 결합하여
+ * 폼 ID와 선택적 기간 필터(startDate, endDate, dateFieldId) 및 필드 필터(filters)를 결합하여
  * 컨슈머 원천 데이터 뷰(`/consumer/forms/[id]`) URL을 생성합니다.
  */
 export function buildRawDataHref(params: {
@@ -23,6 +25,7 @@ export function buildRawDataHref(params: {
   startDate?: string | undefined;
   endDate?: string | undefined;
   dateFieldId?: string | undefined;
+  filters?: ReadonlyArray<FieldFilterCondition> | undefined;
 }): string {
   const basePath = `/consumer/forms/${encodeURIComponent(params.formId)}`;
   const searchParams = new URLSearchParams();
@@ -37,6 +40,11 @@ export function buildRawDataHref(params: {
     searchParams.set("dateFieldId", params.dateFieldId);
   }
 
+  const serializedFilters = serializeFieldFiltersParam(params.filters);
+  if (serializedFilters) {
+    searchParams.set("filters", serializedFilters);
+  }
+
   const queryString = searchParams.toString();
   return queryString ? `${basePath}?${queryString}` : basePath;
 }
@@ -46,14 +54,21 @@ function makeDedupeKey(link: {
   startDate?: string | undefined;
   endDate?: string | undefined;
   dateFieldId?: string | undefined;
+  filters?: ReadonlyArray<FieldFilterCondition> | undefined;
 }): string {
-  return [link.formId, link.startDate ?? "", link.endDate ?? "", link.dateFieldId ?? ""].join("|");
+  return [
+    link.formId,
+    link.startDate ?? "",
+    link.endDate ?? "",
+    link.dateFieldId ?? "",
+    serializeFieldFiltersParam(link.filters) ?? "",
+  ].join("|");
 }
 
 function toResolvedLink(
   source: Pick<
     AnalysisBlockSourceLink,
-    "formId" | "label" | "startDate" | "endDate" | "dateFieldId"
+    "formId" | "label" | "startDate" | "endDate" | "dateFieldId" | "filters"
   >
 ): ResolvedSourceLink {
   return {
@@ -64,6 +79,7 @@ function toResolvedLink(
     ...(source.startDate ? { startDate: source.startDate } : {}),
     ...(source.endDate ? { endDate: source.endDate } : {}),
     ...(source.dateFieldId ? { dateFieldId: source.dateFieldId } : {}),
+    ...(source.filters && source.filters.length > 0 ? { filters: source.filters } : {}),
   };
 }
 

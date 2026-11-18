@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { normalizeStringIds } from "@/shared/lib/normalize";
+import { parseFieldFiltersParam, type NormalizedFieldFilterCondition } from "@/shared/schema";
 import { calendarDateStringSchema, refineDateRangeOrder } from "./date-range.schema";
 import type { FormSubmission } from "./form-submission.schema";
 
@@ -88,34 +89,16 @@ export function parseSortParam(sortStr?: string): SortItem[] {
 }
 
 /**
- * JSON 문자열 형태의 컬럼별 필터 쿼리를 Record<string, string> 객체로 안전하게 파싱합니다.
+ * JSON 문자열 형태의 컬럼별 필터 쿼리를 표준 NormalizedFieldFilterCondition[] 배열로 안전하게 파싱합니다.
  *
- * @param filtersStr JSON 문자열 (예: '{"f_name":"홍길동","f_role":"엔지니어"}')
- * @returns 필드 ID -> 검색어 키워드 매핑 객체 (파싱 실패 시 빈 객체 {})
+ * 신규 연산자 배열 형식(`[{"fieldId":"f_amount","op":"between","min":100,"max":500}]`)과
+ * 레거시 키-값 객체 형식(`{"f_name":"홍길동"}`)을 모두 수용하여 하위 호환을 보장합니다.
+ *
+ * @param filtersStr JSON 문자열 또는 원시 필터 입력
+ * @returns 정규화된 필터 조건 배열 (파싱 실패 시 빈 배열 [])
  */
-export function parseFiltersParam(filtersStr?: string): Record<string, string> {
-  if (!filtersStr || typeof filtersStr !== "string") {
-    return {};
-  }
-
-  try {
-    const parsed: unknown = JSON.parse(filtersStr);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return {};
-    }
-
-    const result: Record<string, string> = {};
-    for (const [key, val] of Object.entries(parsed)) {
-      if (typeof val === "string" && val.trim().length > 0) {
-        result[key] = val.trim();
-      } else if (typeof val === "number" || typeof val === "boolean") {
-        result[key] = String(val);
-      }
-    }
-    return result;
-  } catch {
-    return {};
-  }
+export function parseFiltersParam(filtersStr?: unknown): NormalizedFieldFilterCondition[] {
+  return parseFieldFiltersParam(filtersStr);
 }
 
 /**

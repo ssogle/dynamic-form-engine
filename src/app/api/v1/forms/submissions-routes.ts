@@ -11,6 +11,7 @@ import {
   updateSubmissionById,
 } from "@/entities/form-submission/server";
 import { apiResponse, badRequest, notFound } from "@/shared/lib/http";
+import { parseFieldFiltersStrict, validateFiltersAgainstFields } from "@/shared/schema";
 import { createSubRouter } from "../_lib/create-api-router";
 import { parseQueryParams, readJsonBody } from "../_lib/request-helpers";
 import type { FormsRouterVariables } from "./forms-middleware";
@@ -37,8 +38,10 @@ submissionsRoutes.get("/:id/submissions", async (c) => {
     "유효하지 않은 조회 파라미터입니다."
   );
 
+  const activeFields = extractActiveFields(form);
+
   if (queryParams.dateFieldId) {
-    const targetField = extractActiveFields(form).find((f) => f.id === queryParams.dateFieldId);
+    const targetField = activeFields.find((f) => f.id === queryParams.dateFieldId);
     if (!targetField || targetField.type !== "date") {
       throw badRequest(`유효하지 않은 날짜 기준 필드입니다: '${queryParams.dateFieldId}'`);
     }
@@ -48,7 +51,23 @@ submissionsRoutes.get("/:id/submissions", async (c) => {
     throw badRequest(`유효하지 않은 시간대입니다: '${queryParams.timezone}'`);
   }
 
-  const paginatedResult = await findSubmissionsPaginated(form.id, queryParams);
+  if (queryParams.filters !== undefined && queryParams.filters.trim().length > 0) {
+    const parsedFiltersResult = parseFieldFiltersStrict(queryParams.filters);
+    if (parsedFiltersResult.error !== null) {
+      throw badRequest(parsedFiltersResult.error);
+    }
+    const validationResult = validateFiltersAgainstFields(parsedFiltersResult.data, activeFields, {
+      allowSystemFields: true,
+    });
+    if (validationResult.error !== null) {
+      throw badRequest(validationResult.error);
+    }
+  }
+
+  const paginatedResult = await findSubmissionsPaginated(form.id, {
+    ...queryParams,
+    schemaDefinition: form.schemaDefinition,
+  });
   return apiResponse.ok(paginatedResult);
 });
 

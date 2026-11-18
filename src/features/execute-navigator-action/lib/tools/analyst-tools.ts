@@ -114,7 +114,7 @@ export function createAnalystTools(deps: AnalystToolsDependencies) {
 
   const aggregateFormSubmissionsTool = tool({
     description:
-      "단일 폼의 제출 응답을 PostgreSQL DB 레벨에서 count, sum, avg, min, max 기준으로 정확하게 집계합니다. 시계열(timeBucket: day|week|month|quarter), 선택형/관계형 필드 그룹화(groupByFieldId), 특정 필드 값 필터링(filters: [{ fieldId, value }] — relation 대상 레코드 ID/대표명, select 코드/라벨 등), 날짜 기준 축(dateFieldId: 대상 폼에 date 타입 필드가 있을 때 우선 지정, 없으면 생략하여 createdAt 폴백), 기간 범위(startDate/endDate YYYY-MM-DD)를 지원합니다. LIMIT 초과 시 전체 건수(totalCount)/요약값(summaryValue)과 isTruncated 여부를 함께 반환합니다.",
+      "단일 폼의 제출 응답을 PostgreSQL DB 레벨에서 count, sum, avg, min, max 기준으로 정확하게 집계합니다. 시계열(timeBucket: day|week|month|quarter), 선택형/관계형 필드 그룹화(groupByFieldId), 타입별 조건 필터링(filters: [{ fieldId, op, value?, values?, min?, max? }] — eq/neq/contains/gt/gte/lt/lte/between/in/notIn/hasAny/hasAll/isEmpty/isNotEmpty 지원), 날짜 기준 축(dateFieldId: 대상 폼에 date 타입 필드가 있을 때 우선 지정, 없으면 생략하여 createdAt 폴백), 기간 범위(startDate/endDate YYYY-MM-DD)를 지원합니다. LIMIT 초과 시 전체 건수(totalCount)/요약값(summaryValue)과 isTruncated 여부를 함께 반환합니다.",
     inputSchema: analyticsAggregationQuerySchema,
     execute: async (input: AnalyticsAggregationQuery) => {
       try {

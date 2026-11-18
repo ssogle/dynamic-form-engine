@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { fieldFilterConditionSchema, type FieldFilterCondition } from "@/shared/schema";
 import { calendarDateStringSchema, refineDateRangeOrder } from "./date-range.schema";
 
 /**
@@ -17,17 +18,9 @@ export const analyticsTimeBucketSchema = z.enum(["day", "week", "month", "quarte
 export const analyticsDateAxisSchema = z.enum(["field", "createdAt"]);
 
 /**
- * 특정 필드 값 일치 조건 필터 (relation 대상 레코드 ID/표시명, select/radio 옵션 값, 텍스트 등)
+ * 특정 필드 조건 필터 스키마 (공용 @/shared/schema/fieldFilterConditionSchema 단일 진실 원천)
  */
-export const analyticsFieldFilterSchema = z.object({
-  fieldId: z.string().min(1, "필터 대상 필드 ID는 필수입니다."),
-  value: z
-    .string()
-    .min(
-      1,
-      "필터 비교 값(relation 대상 레코드 UUID 또는 표시명, select 옵션 value/라벨 등)은 필수입니다."
-    ),
-});
+export const analyticsFieldFilterSchema = fieldFilterConditionSchema;
 
 /**
  * 서버 통계 집계 요청 파라미터 검증 스키마
@@ -111,7 +104,7 @@ export const querySubmissionsForAnalysisSchema = z
 export type AnalyticsMetric = z.infer<typeof analyticsMetricSchema>;
 export type AnalyticsTimeBucket = z.infer<typeof analyticsTimeBucketSchema>;
 export type AnalyticsDateAxis = z.infer<typeof analyticsDateAxisSchema>;
-export type AnalyticsFieldFilter = z.infer<typeof analyticsFieldFilterSchema>;
+export type AnalyticsFieldFilter = FieldFilterCondition;
 export type AnalyticsAggregationQuery = z.infer<typeof analyticsAggregationQuerySchema>;
 export type SeriesMetricPoint = z.infer<typeof seriesMetricPointSchema>;
 export type ComputeSeriesMetricInput = z.infer<typeof computeSeriesMetricInputSchema>;

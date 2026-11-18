@@ -66,6 +66,10 @@ describe("AnalysisView Schema Validation Engine", () => {
             startDate: "2026-01-01",
             endDate: "2026-12-31",
             dateFieldId: "f_date",
+            filters: [
+              { fieldId: "f_project", op: "in", values: [formUuid] },
+              { fieldId: "f_amount", op: "gte", value: 1000 },
+            ],
           },
         ],
       };

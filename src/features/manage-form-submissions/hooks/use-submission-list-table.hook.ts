@@ -11,8 +11,14 @@ import {
   type VisibilityState,
   type ColumnSizingState,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { TABLE_COLUMN_WIDTH } from "@/shared/lib/virtual-table";
+import {
+  normalizeFieldFilterCondition,
+  resolveTargetFieldCapability,
+  serializeFieldFiltersParam,
+  validateFiltersAgainstFields,
+  type FieldFilterCondition,
+} from "@/shared/schema";
 import type { Form, CoreFormField } from "@/entities/form";
 import {
   extractActiveFields,
@@ -26,7 +32,7 @@ import {
   type SubmissionDateRangeFilter,
 } from "@/entities/form-submission";
 import { formatDateTime } from "@/shared/lib/date";
-import { formatRelationSummaryCell } from "../lib/relation-summary";
+import { formatRelationSummaryCell, type RelationLookupMap } from "../lib/relation-summary";
 import { useRelationLookup } from "./use-relation-lookup.hook";
 import { ColumnHeaderFilter } from "../ui/column-header-filter";
 import { SubmissionActionCell } from "../ui/submission-action-cell";
@@ -61,6 +67,10 @@ export interface UseSubmissionListTableParams {
    * URL 쿼리 파라미터로부터 전달된 초기 기간 필터 (분석 뷰 드릴다운 연동)
    */
   initialDateRange?: SubmissionDateRangeFilter | undefined;
+  /**
+   * URL 쿼리 파라미터로부터 전달된 초기 컬럼 필터 목록 (분석 뷰 드릴다운 연동)
+   */
+  initialFilters?: FieldFilterCondition[] | undefined;
 }
 
 export interface UseSubmissionListTableReturn {
@@ -84,6 +94,14 @@ export interface UseSubmissionListTableReturn {
    * 현재 폼의 도메인 대표 식별 필드 ID
    */
   primaryFieldId: string | undefined;
+  /**
+   * 현재 적용 중인 컬럼별 필터 맵
+   */
+  columnFilters: Record<string, FieldFilterCondition>;
+  /**
+   * 관계형 필드 요약/배지 표시용 조회 딕셔너리
+   */
+  relationLookupMap: RelationLookupMap;
   /**
    * 현재 적용 중인 기간 필터 상태
    */
@@ -125,9 +143,9 @@ export interface UseSubmissionListTableReturn {
    */
   tableContainerRef: React.RefObject<HTMLDivElement | null>;
   /**
-   * 단일 컬럼 필터 값 설정 핸들러
+   * 단일 컬럼 필터 값 설정 핸들러 (구조화 조건 객체 또는 레거시 문자열 지원)
    */
-  handleSetFieldFilter: (fieldId: string, value: string) => void;
+  handleSetFieldFilter: (fieldId: string, value: FieldFilterCondition | string | undefined) => void;
   /**
    * 모든 활성 컬럼 및 기간 필터 초기화 핸들러
    */
@@ -146,19 +164,62 @@ export interface UseSubmissionListTableReturn {
   handleRowClick: (submissionId: string) => void;
 }
 
+function buildInitialFiltersMap(
+  initialFilters: FieldFilterCondition[] | undefined,
+  activeFields: CoreFormField[]
+): Record<string, FieldFilterCondition> {
+  if (!initialFilters || initialFilters.length === 0) {
+    return {};
+  }
+  const map: Record<string, FieldFilterCondition> = {};
+  for (const item of initialFilters) {
+    const check = validateFiltersAgainstFields([item], activeFields, { allowSystemFields: true });
+    if (check.error === null && check.data[0]) {
+      map[check.data[0].fieldId] = check.data[0];
+    }
+  }
+  return map;
+}
+
+function buildConsumerFormUrl(
+  formId: string,
+  dateRange?: SubmissionDateRangeFilter,
+  filters?: Record<string, FieldFilterCondition>
+): string {
+  const basePath = `/consumer/forms/${formId}`;
+  const searchParams = new URLSearchParams();
+  if (dateRange?.startDate) searchParams.set("startDate", dateRange.startDate);
+  if (dateRange?.endDate) searchParams.set("endDate", dateRange.endDate);
+  if (dateRange?.dateFieldId) searchParams.set("dateFieldId", dateRange.dateFieldId);
+
+  const serializedFilters = serializeFieldFiltersParam(
+    filters ? Object.values(filters) : undefined
+  );
+  if (serializedFilters) {
+    searchParams.set("filters", serializedFilters);
+  }
+  const qs = searchParams.toString();
+  return qs ? `${basePath}?${qs}` : basePath;
+}
+
 /**
  * 제출 응답 목록 가상화 테이블 비즈니스 오케스트레이션 전용 커스텀 훅 (useSubmissionListTable)
  *
- * 서버 무한 스크롤 연동, 다중 정렬/컬럼 필터 직렬화, 기간 필터 연동, TanStack Table 인스턴스화,
+ * 서버 무한 스크롤 연동, 다중 정렬/타입별 컬럼 필터 직렬화, 기간 필터 연동, TanStack Table 인스턴스화,
  * 컬럼 정의 생성, 삭제 인터랙션 및 라우팅 로직을 캡슐화합니다.
  */
 export function useSubmissionListTable({
   form,
   initialDateRange,
+  initialFilters,
 }: UseSubmissionListTableParams): UseSubmissionListTableReturn {
   const router = useRouter();
+  const activeFields = React.useMemo(() => extractActiveFields(form), [form]);
+  const primaryFieldId = extractPrimaryFieldId(form);
   const [sorting, setSorting] = React.useState<SortingState>([{ id: "createdAt", desc: true }]);
-  const [columnFilters, setColumnFilters] = React.useState<Record<string, string>>({});
+  const [columnFilters, setColumnFilters] = React.useState<Record<string, FieldFilterCondition>>(
+    () => buildInitialFiltersMap(initialFilters, activeFields)
+  );
   const [dateRangeFilter, setDateRangeFilter] = React.useState<
     SubmissionDateRangeFilter | undefined
   >(initialDateRange);
@@ -169,6 +230,7 @@ export function useSubmissionListTable({
   const initialStartDate = initialDateRange?.startDate;
   const initialEndDate = initialDateRange?.endDate;
   const initialDateFieldId = initialDateRange?.dateFieldId;
+  const initialFiltersSignature = serializeFieldFiltersParam(initialFilters) ?? "";
 
   React.useEffect(() => {
     setDateRangeFilter((prev) => {
@@ -190,8 +252,10 @@ export function useSubmissionListTable({
     });
   }, [initialStartDate, initialEndDate, initialDateFieldId]);
 
-  const activeFields = React.useMemo(() => extractActiveFields(form), [form]);
-  const primaryFieldId = extractPrimaryFieldId(form);
+  React.useEffect(() => {
+    setColumnFilters(buildInitialFiltersMap(initialFilters, activeFields));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFiltersSignature, activeFields]);
 
   // 활성 폼 스키마에 실제 존재하는 date 타입 필드인지 검증해 안전한 기준 축 ID/라벨 도출
   const resolvedDateMeta = React.useMemo(() => {
@@ -212,11 +276,9 @@ export function useSubmissionListTable({
     return sorting.map((s) => `${s.id}:${s.desc ? "desc" : "asc"}`).join(",");
   }, [sorting]);
 
-  // 2. 컬럼별 필터 파라미터 직렬화 (예: '{"f_applicant":"홍길동"}')
+  // 2. 컬럼별 필터 파라미터 직렬화 (표준 FieldFilterCondition[] JSON)
   const filtersQueryString = React.useMemo(() => {
-    const activeEntries = Object.entries(columnFilters).filter(([, val]) => Boolean(val?.trim()));
-    if (activeEntries.length === 0) return undefined;
-    return JSON.stringify(Object.fromEntries(activeEntries));
+    return serializeFieldFiltersParam(Object.values(columnFilters));
   }, [columnFilters]);
 
   // 3. 서버 무한 스크롤 쿼리 훅 연동
@@ -240,31 +302,51 @@ export function useSubmissionListTable({
   const totalCount = data?.pages[0]?.totalCount ?? flatSubmissions.length;
   const { lookupMap: relationLookupMap } = useRelationLookup(activeFields, flatSubmissions);
 
-  // 단일 컬럼 필터 갱신 핸들러
-  const handleSetFieldFilter = React.useCallback((fieldId: string, value: string) => {
-    setColumnFilters((prev) => {
-      if (!value) {
-        const next = { ...prev };
+  // 단일 컬럼 필터 갱신 핸들러 (문자열 전달 시 해당 필드의 기본 연산자로 자동 변환)
+  // React 19 Strict Mode/동시성 렌더링에서 setState 업데이터 내부 부수효과(router.replace)를 금지하므로,
+  // 다음 상태 객체를 외부에서 순수하게 계산한 뒤 상태 갱신과 URL 동기화를 분리 실행합니다.
+  const handleSetFieldFilter = React.useCallback(
+    (fieldId: string, value: FieldFilterCondition | string | undefined) => {
+      const targetField = activeFields.find((f) => f.id === fieldId);
+      const capability = resolveTargetFieldCapability(fieldId, targetField);
+
+      const next = { ...columnFilters };
+      if (value === undefined || value === "") {
         delete next[fieldId];
-        return next;
+      } else if (typeof value === "string") {
+        const trimmed = value.trim();
+        if (!trimmed) {
+          delete next[fieldId];
+        } else {
+          const defaultOp = capability?.filterOperators.includes("contains")
+            ? "contains"
+            : (capability?.defaultOperator ?? "contains");
+          next[fieldId] = { fieldId, op: defaultOp, value: trimmed };
+        }
+      } else {
+        next[fieldId] = normalizeFieldFilterCondition(value);
       }
-      return { ...prev, [fieldId]: value };
-    });
-  }, []);
+
+      setColumnFilters(next);
+      router.replace(buildConsumerFormUrl(form.id, dateRangeFilter, next), { scroll: false });
+    },
+    [activeFields, columnFilters, dateRangeFilter, form.id, router]
+  );
 
   // 기간 필터만 해제하고 URL 쿼리스트링도 함께 정리
   const handleClearDateRange = React.useCallback(() => {
     setDateRangeFilter(undefined);
-    router.replace(`/consumer/forms/${form.id}`, { scroll: false });
-  }, [router, form.id]);
+    router.replace(buildConsumerFormUrl(form.id, undefined, columnFilters), { scroll: false });
+  }, [router, form.id, columnFilters]);
 
   // 전체 필터 초기화
   const handleClearAllFilters = React.useCallback(() => {
     setColumnFilters({});
     if (hasActiveDateRange) {
-      handleClearDateRange();
+      setDateRangeFilter(undefined);
     }
-  }, [hasActiveDateRange, handleClearDateRange]);
+    router.replace(`/consumer/forms/${form.id}`, { scroll: false });
+  }, [hasActiveDateRange, router, form.id]);
 
   // 단건 응답 삭제 핸들러
   const handleDelete = React.useCallback(
@@ -301,14 +383,19 @@ export function useSubmissionListTable({
         accessorFn: (row) => row.data?.[field.id],
         header: ({ column }) =>
           React.createElement(ColumnHeaderFilter, {
+            fieldId: field.id,
             label: field.label,
+            fieldType: field.type,
+            options: field.options,
+            relationTargetFormId: field.relationConfig?.targetFormId,
             isPrimary,
             isSorted: column.getIsSorted(),
             onToggleSort: (e: React.MouseEvent) => {
               column.toggleSorting(undefined, e.shiftKey);
             },
-            filterValue: columnFilters[field.id] ?? "",
-            onApplyFilter: (val: string) => handleSetFieldFilter(field.id, val),
+            filterCondition: columnFilters[field.id],
+            onApplyFilter: (condition?: FieldFilterCondition) =>
+              handleSetFieldFilter(field.id, condition),
           }),
         cell: (info) => {
           const rawVal = info.getValue();
@@ -338,31 +425,19 @@ export function useSubmissionListTable({
     cols.push({
       id: "createdAt",
       accessorKey: "createdAt",
-      header: ({ column }) => {
-        const isSorted = column.getIsSorted();
-        return React.createElement(
-          "div",
-          { className: "flex items-center gap-1.5 pr-2" },
-          React.createElement(
-            "button",
-            {
-              type: "button",
-              onClick: (e: React.MouseEvent) => column.toggleSorting(undefined, e.shiftKey),
-              className:
-                "hover:text-foreground flex items-center gap-1.5 truncate font-semibold transition-colors",
-              title: `${SYSTEM_COLUMN_LABELS.createdAt} (클릭하여 정렬, Shift+클릭 다중 정렬)`,
-            },
-            React.createElement("span", null, SYSTEM_COLUMN_LABELS.createdAt),
-            isSorted === "asc"
-              ? React.createElement(ArrowUp, { className: "text-primary size-3.5 shrink-0" })
-              : isSorted === "desc"
-                ? React.createElement(ArrowDown, { className: "text-primary size-3.5 shrink-0" })
-                : React.createElement(ArrowUpDown, {
-                    className: "text-muted-foreground/60 size-3 shrink-0 opacity-70",
-                  })
-          )
-        );
-      },
+      header: ({ column }) =>
+        React.createElement(ColumnHeaderFilter, {
+          fieldId: "createdAt",
+          label: SYSTEM_COLUMN_LABELS.createdAt,
+          fieldType: "system_date",
+          isSorted: column.getIsSorted(),
+          onToggleSort: (e: React.MouseEvent) => {
+            column.toggleSorting(undefined, e.shiftKey);
+          },
+          filterCondition: columnFilters.createdAt,
+          onApplyFilter: (condition?: FieldFilterCondition) =>
+            handleSetFieldFilter("createdAt", condition),
+        }),
       cell: (info) => {
         const rawDate = info.getValue() as string | Date | undefined;
         const formatted = formatDateTime(rawDate);
@@ -384,31 +459,19 @@ export function useSubmissionListTable({
     cols.push({
       id: "updatedAt",
       accessorKey: "updatedAt",
-      header: ({ column }) => {
-        const isSorted = column.getIsSorted();
-        return React.createElement(
-          "div",
-          { className: "flex items-center gap-1.5 pr-2" },
-          React.createElement(
-            "button",
-            {
-              type: "button",
-              onClick: (e: React.MouseEvent) => column.toggleSorting(undefined, e.shiftKey),
-              className:
-                "hover:text-foreground flex items-center gap-1.5 truncate font-semibold transition-colors",
-              title: `${SYSTEM_COLUMN_LABELS.updatedAt} (클릭하여 정렬, Shift+클릭 다중 정렬)`,
-            },
-            React.createElement("span", null, SYSTEM_COLUMN_LABELS.updatedAt),
-            isSorted === "asc"
-              ? React.createElement(ArrowUp, { className: "text-primary size-3.5 shrink-0" })
-              : isSorted === "desc"
-                ? React.createElement(ArrowDown, { className: "text-primary size-3.5 shrink-0" })
-                : React.createElement(ArrowUpDown, {
-                    className: "text-muted-foreground/60 size-3 shrink-0 opacity-70",
-                  })
-          )
-        );
-      },
+      header: ({ column }) =>
+        React.createElement(ColumnHeaderFilter, {
+          fieldId: "updatedAt",
+          label: SYSTEM_COLUMN_LABELS.updatedAt,
+          fieldType: "system_date",
+          isSorted: column.getIsSorted(),
+          onToggleSort: (e: React.MouseEvent) => {
+            column.toggleSorting(undefined, e.shiftKey);
+          },
+          filterCondition: columnFilters.updatedAt,
+          onApplyFilter: (condition?: FieldFilterCondition) =>
+            handleSetFieldFilter("updatedAt", condition),
+        }),
       cell: (info) => {
         const rawDate = info.getValue() as string | Date | undefined;
         const formatted = formatDateTime(rawDate);
@@ -495,6 +558,8 @@ export function useSubmissionListTable({
     totalCount,
     activeFields,
     primaryFieldId,
+    columnFilters,
+    relationLookupMap,
     dateRangeFilter: hasActiveDateRange
       ? {
           startDate: dateRangeFilter?.startDate,

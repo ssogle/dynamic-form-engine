@@ -401,6 +401,7 @@ describe("formsApp (Hono Unified API Router)", () => {
         page: 2,
         limit: 10,
         sort: "createdAt:desc",
+        schemaDefinition: createMockForm().schemaDefinition,
       });
     });
 
@@ -462,6 +463,47 @@ describe("formsApp (Hono Unified API Router)", () => {
         `/api/v1/forms/${VALID_FORM_ID}/submissions?startDate=2026-10-01&dateFieldId=${FIELD_ID}`
       );
       expect(invalidFieldRes.status).toBe(400);
+    });
+
+    it("GET validates filters JSON and field capability operators before querying submissions", async () => {
+      vi.mocked(formServer.findFormById).mockResolvedValue(createMockForm());
+      vi.mocked(formSubmissionServer.findSubmissionsPaginated).mockResolvedValue({
+        items: [],
+        page: 1,
+        limit: 20,
+        totalCount: 0,
+        totalPages: 0,
+        hasMore: false,
+      });
+
+      const validFilters = encodeURIComponent(
+        JSON.stringify([{ fieldId: FIELD_ID, op: "contains", value: "홍길동" }])
+      );
+      const okRes = await formsApp.request(
+        `/api/v1/forms/${VALID_FORM_ID}/submissions?filters=${validFilters}`
+      );
+      expect(okRes.status).toBe(200);
+      expect(formSubmissionServer.findSubmissionsPaginated).toHaveBeenCalledWith(
+        VALID_FORM_ID,
+        expect.objectContaining({
+          filters: JSON.stringify([{ fieldId: FIELD_ID, op: "contains", value: "홍길동" }]),
+        })
+      );
+
+      // text 필드에서 between 연산자 사용 시 400 거부
+      const disallowedOp = encodeURIComponent(
+        JSON.stringify([{ fieldId: FIELD_ID, op: "between", min: "a", max: "z" }])
+      );
+      const badOpRes = await formsApp.request(
+        `/api/v1/forms/${VALID_FORM_ID}/submissions?filters=${disallowedOp}`
+      );
+      expect(badOpRes.status).toBe(400);
+
+      // 잘못된 JSON 포맷 시 400 거부
+      const badJsonRes = await formsApp.request(
+        `/api/v1/forms/${VALID_FORM_ID}/submissions?filters=%7Bbad`
+      );
+      expect(badJsonRes.status).toBe(400);
     });
 
     it("POST creates submission with dynamically validated and cleaned data (supports wrapped { data })", async () => {

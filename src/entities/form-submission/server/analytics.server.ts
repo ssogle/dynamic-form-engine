@@ -1,16 +1,5 @@
 import "server-only";
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  inArray,
-  isNull,
-  or,
-  sql,
-  type SQL,
-  type SQLWrapper,
-} from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import { db } from "@/shared/db/server";
 import { forms } from "@/shared/tables";
 import { formSubmissions } from "../schema/form-submission.schema";
@@ -33,6 +22,7 @@ import {
   buildTimeBucketSql,
   buildValidFieldDateSql,
 } from "./date-filter-sql.server";
+import { buildFieldFilterSqlConditions, buildSafeNumericSql } from "./field-filter-sql.server";
 
 /**
  * 집계 결과 단일 데이터 포인트
@@ -94,17 +84,6 @@ export interface AnalysisRecordsResult {
  * 표준 Result 반환 타입
  */
 export type AnalyticsResult<T> = { data: T; error: null } | { data: null; error: string };
-
-/**
- * JSONB 문자열 값을 안전하게 숫자(double precision)로 변환하는 SQL 표현식을 생성합니다.
- * 빈 문자열, 비수치 텍스트, 콤마 포함 숫자를 안전하게 정제합니다.
- */
-function buildSafeNumericSql(targetFieldId: string): SQL<number | null> {
-  const cleanedText = sql`NULLIF(REGEXP_REPLACE(TRIM(COALESCE(${formSubmissions.data}->>${targetFieldId}, '')), ',', '', 'g'), '')`;
-  return sql<
-    number | null
-  >`CASE WHEN ${cleanedText} ~ '^-?[0-9]+(\\.[0-9]+)?$' THEN (${cleanedText})::double precision ELSE NULL END`;
-}
 
 /**
  * 서브쿼리 투영 단계에서 집계 대상 수치 인자를 추출합니다.
@@ -246,157 +225,6 @@ async function resolveRelationDisplayMap(
 }
 
 /**
- * 관계형(`relation`) 필드 필터 값이 레코드 UUID 대신 대상 폼 대표명(예: "프로젝트 A")으로 전달된 경우,
- * 대상 폼의 대표 필드 일치 레코드 UUID 목록을 조회해 정밀한 필터링 조건으로 정규화합니다.
- */
-async function resolveRelationFilterCandidateIds(
-  targetFormId: string | undefined,
-  displayText: string
-): Promise<string[]> {
-  if (!targetFormId) {
-    return [];
-  }
-
-  const [targetForm] = await db
-    .select()
-    .from(forms)
-    .where(and(eq(forms.id, targetFormId), isNull(forms.deletedAt)))
-    .limit(1);
-
-  if (!targetForm) {
-    return [];
-  }
-
-  const fields = Array.isArray(targetForm.schemaDefinition?.fields)
-    ? targetForm.schemaDefinition.fields
-    : [];
-  const primaryFieldId =
-    targetForm.schemaDefinition?.primaryFieldId ||
-    fields.find((f) => !f.deletedAt && typeof f.id === "string" && f.type === "text")?.id;
-
-  if (typeof primaryFieldId !== "string" || !primaryFieldId) {
-    return [];
-  }
-
-  const normalized = displayText.trim();
-  const matchedRows = await db
-    .select({ id: formSubmissions.id })
-    .from(formSubmissions)
-    .where(
-      and(
-        eq(formSubmissions.formId, targetFormId),
-        isNull(formSubmissions.deletedAt),
-        sql`TRIM(COALESCE(${formSubmissions.data}->>${primaryFieldId}, '')) = ${normalized}`
-      )
-    )
-    .limit(50);
-
-  return matchedRows.map((r) => r.id);
-}
-
-/**
- * 통계 집계 및 샘플 조회용 필드 값 일치 필터(`filters`)를 PostgreSQL WHERE 조건으로 변환합니다.
- * - 동일 fieldId에 복수 필터가 전달되면 OR 결합, 서로 다른 fieldId 간에는 AND 결합합니다.
- * - 단일 스칼라(`data->>fieldId`)와 다중 배열(`data->fieldId @> [...]`) 저장 형식을 모두 안전하게 매칭합니다.
- * - select/radio 옵션 라벨 또는 relation 대표명이 전달되어도 실제 저장 코드/UUID로 자동 정규화합니다.
- */
-async function buildFieldFilterConditions(
-  filters: AnalyticsAggregationQuery["filters"],
-  fieldMetaMap: Map<
-    string,
-    ReturnType<typeof resolveFieldOptionLabelMap> extends Map<string, infer V> ? V : never
-  >
-): Promise<{ conditions: SQL[]; error: null } | { conditions: null; error: string }> {
-  if (!filters || filters.length === 0) {
-    return { conditions: [], error: null };
-  }
-
-  const groupedByField = new Map<string, string[]>();
-  for (const filter of filters) {
-    if (!fieldMetaMap.has(filter.fieldId)) {
-      return {
-        conditions: null,
-        error: `필터 기준 필드('${filter.fieldId}')가 폼 활성 스키마에 존재하지 않습니다.`,
-      };
-    }
-    const bucket = groupedByField.get(filter.fieldId) ?? [];
-    bucket.push(filter.value.trim());
-    groupedByField.set(filter.fieldId, bucket);
-  }
-
-  const conditions: SQL[] = [];
-
-  for (const [fieldId, rawValues] of groupedByField.entries()) {
-    const fieldMeta = fieldMetaMap.get(fieldId)!;
-    const candidateValues = new Set<string>();
-
-    for (const rawValue of rawValues) {
-      if (
-        fieldMeta.type === "select" ||
-        fieldMeta.type === "radio" ||
-        fieldMeta.type === "checkbox"
-      ) {
-        if (fieldMeta.optionsMap.has(rawValue)) {
-          candidateValues.add(rawValue);
-        } else {
-          // 옵션 코드가 아니라 표시 라벨(예: "교통비")이 들어온 경우 코드값(TRANSPORT)으로 치환
-          let matchedCode: string | undefined;
-          for (const [code, label] of fieldMeta.optionsMap.entries()) {
-            if (label === rawValue) {
-              matchedCode = code;
-              break;
-            }
-          }
-          candidateValues.add(matchedCode ?? rawValue);
-        }
-        continue;
-      }
-
-      if (fieldMeta.type === "relation") {
-        if (UUID_REGEX.test(rawValue)) {
-          candidateValues.add(rawValue);
-        } else {
-          const resolvedIds = await resolveRelationFilterCandidateIds(
-            fieldMeta.relationTargetFormId,
-            rawValue
-          );
-          for (const id of resolvedIds) {
-            candidateValues.add(id);
-          }
-        }
-        continue;
-      }
-
-      candidateValues.add(rawValue);
-    }
-
-    if (candidateValues.size === 0) {
-      // relation 라벨에 매칭되는 대상 레코드가 없으면 의도대로 0건이 반환되도록 FALSE 조건 추가
-      conditions.push(sql`FALSE`);
-      continue;
-    }
-
-    const perValuePredicates = Array.from(candidateValues).map(
-      (candidate) => sql`(
-        ${formSubmissions.data}->>${fieldId} = ${candidate}
-        OR (
-          jsonb_typeof(${formSubmissions.data}->${fieldId}) = 'array'
-          AND ${formSubmissions.data}->${fieldId} @> ${JSON.stringify([candidate])}::jsonb
-        )
-      )`
-    );
-
-    const fieldCondition =
-      perValuePredicates.length === 1 ? perValuePredicates[0]! : or(...perValuePredicates);
-    if (fieldCondition) {
-      conditions.push(fieldCondition);
-    }
-  }
-
-  return { conditions, error: null };
-}
-
-/**
  * JSON::text 직렬화 문자열을 원래 JS 값(배열, 문자열, 숫자, 불리언 등)으로 복원합니다.
  */
 function parseJsonTextValue(rawJsonText: unknown): unknown {
@@ -527,7 +355,12 @@ export async function aggregateFormSubmissions(
     }
   }
 
-  const fieldFilterResult = await buildFieldFilterConditions(filters, fieldMetaMap);
+  const fieldFilterResult = await buildFieldFilterSqlConditions({
+    filters,
+    schemaDefinition: targetForm.schemaDefinition,
+    timezone,
+    allowSystemFields: true,
+  });
   if (fieldFilterResult.error !== null) {
     return { data: null, error: fieldFilterResult.error };
   }
@@ -858,7 +691,12 @@ export async function queryFormSubmissionsForAnalysis(
     }
   }
 
-  const fieldFilterResult = await buildFieldFilterConditions(filters, fieldMetaMap);
+  const fieldFilterResult = await buildFieldFilterSqlConditions({
+    filters,
+    schemaDefinition: targetForm.schemaDefinition,
+    timezone,
+    allowSystemFields: true,
+  });
   if (fieldFilterResult.error !== null) {
     return { data: null, error: fieldFilterResult.error };
   }

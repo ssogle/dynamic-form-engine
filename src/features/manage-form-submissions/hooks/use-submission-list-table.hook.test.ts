@@ -413,4 +413,87 @@ describe("useSubmissionListTable (features/manage-form-submissions/hooks)", () =
     expect(result.current.activeFilterCount).toBe(0);
     expect(mockReplace).toHaveBeenCalledWith("/consumer/forms/form-uuid-1", { scroll: false });
   });
+
+  it("initialFilters 전달 시 직렬화된 filters 쿼리를 전송하고, 구조화 필터 설정 시 URL 쿼리를 동기화해야 한다", () => {
+    const formWithNumber: Form = {
+      ...dummyForm,
+      schemaDefinition: {
+        primaryFieldId: "field-name",
+        fields: [
+          ...dummyForm.schemaDefinition.fields,
+          {
+            id: "field-amount",
+            label: "금액",
+            type: "number",
+            required: false,
+            description: "지출 금액",
+          },
+        ],
+      },
+    };
+
+    const { result } = renderHook(
+      () =>
+        useSubmissionListTable({
+          form: formWithNumber,
+          initialFilters: [{ fieldId: "field-amount", op: "between", min: 1000, max: 5000 }],
+        }),
+      { wrapper: createWrapper() }
+    );
+
+    expect(result.current.activeFilterCount).toBe(1);
+    expect(mockUseInfiniteQuery).toHaveBeenLastCalledWith(
+      "form-uuid-1",
+      expect.objectContaining({
+        filters: JSON.stringify([{ fieldId: "field-amount", op: "between", min: 1000, max: 5000 }]),
+      })
+    );
+
+    act(() => {
+      result.current.handleSetFieldFilter("createdAt", {
+        fieldId: "createdAt",
+        op: "gte",
+        value: "2026-10-01",
+      });
+    });
+
+    expect(result.current.activeFilterCount).toBe(2);
+    expect(mockReplace).toHaveBeenLastCalledWith(expect.stringContaining("filters="), {
+      scroll: false,
+    });
+  });
+
+  it("initialFilters에 날짜 형식이 아닌 값이 포함된 경우 안전하게 무시해야 한다", () => {
+    const formWithDate: Form = {
+      ...dummyForm,
+      schemaDefinition: {
+        primaryFieldId: "field-name",
+        fields: [
+          ...dummyForm.schemaDefinition.fields,
+          {
+            id: "field-date",
+            label: "결제일",
+            type: "date",
+            required: false,
+            description: "결제 날짜",
+          },
+        ],
+      },
+    };
+
+    const { result } = renderHook(
+      () =>
+        useSubmissionListTable({
+          form: formWithDate,
+          initialFilters: [
+            { fieldId: "field-date", op: "eq", value: "not-a-date" },
+            { fieldId: "createdAt", op: "gte", value: "2026-02-31" },
+          ],
+        }),
+      { wrapper: createWrapper() }
+    );
+
+    expect(result.current.activeFilterCount).toBe(0);
+    expect(result.current.columnFilters).toEqual({});
+  });
 });

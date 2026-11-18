@@ -1,6 +1,6 @@
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
-import { calendarDateStringSchema } from "@/shared/schema";
+import { calendarDateStringSchema, fieldFilterConditionSchema } from "@/shared/schema";
 import { analysisViews, type AnalysisViewBlockRecord } from "@/shared/tables";
 
 /**
@@ -29,6 +29,7 @@ export const analysisBlockSourceLinkSchema = z.object({
   startDate: calendarDateStringSchema.optional(),
   endDate: calendarDateStringSchema.optional(),
   dateFieldId: z.string().min(1).optional(),
+  filters: z.array(fieldFilterConditionSchema).optional(),
 });
 
 /**
