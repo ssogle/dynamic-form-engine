@@ -1,19 +1,16 @@
-<!-- 아카이브(동결) 전환 시 아래 WARNING 주석을 해제하고 상단 NOTE 블록을 대체하세요 -->
-<!--
 > [!WARNING]
 > **ARCHIVED SPECIFICATION (READ-ONLY)**
 > 본 문서는 구현 완료 후 동결된 과거 기록입니다.
 > 현재 시스템의 구현 규격은 `/src` 실제 코드를 참조하세요. AI 에이전트는 이 문서를 최신 코드로 인용하지 마십시오.
--->
 
 # [Spec-009] Workspace Global App Switcher & Top-Level Layout Hierarchy
 
 > [!NOTE]
 >
-> - **상태 (Status)**: Active (기획/구현 중)
+> - **상태 (Status)**: Archived (구현 완료 및 동결)
 > - **브랜치 (Branch)**: `feat/spec-009-workspace-app-switcher-layout`
 > - **작성일 (Created)**: 2026-11-18
-> - **완료일 (Archived)**: -
+> - **완료일 (Archived)**: 2026-11-19
 
 ## 1. 배경 및 문제 정의 (Context & Problem Statement)
 
@@ -32,7 +29,7 @@
   2. 글로벌 앱 바 좌측에 홈(`/`) 복귀 링크와 **빌더(`/builder/forms`)**, **컨슈머(`/consumer`)**, **분석가(`/analyst/views`)** 3개 앱 전환 버튼을 배치해 각 항목 사이를 수직 구분선(`Separator`)으로 분리하고 진입 경로를 통일하며, 우측 끝에는 향후 확장을 위한 설정 버튼 및 임시 안내 `Popover`를 배치합니다.
   3. 각 앱 내부 우측 `<header>`를 제거하고 공통 좌우 분할 쉘(`WorkspaceSplitShell`)로 통합하여 2단 헤더 중복 및 레이아웃 코드 복제를 해소합니다.
   4. 컨슈머 진입점(`/consumer`)에서 `참여 가능한 폼`과 `공유된 분석 뷰` 목록을 단일 화면으로 통합 노출하고, 기존 `/consumer/forms`, `/consumer/views` 목록 경로는 `/consumer`로 리다이렉트하여 하위 호환성을 유지합니다.
-  5. 최상위 글로벌 바(`h-12`, `shrink-0`)와 하단 작업 공간(`min-h-0 flex-1`)의 높이를 정렬하고, 분할 쉘의 `h-full` 전환으로 뷰포트 오버플로우 및 이중 스크롤을 방지하며, `NavigatorShell` 헤더 타이틀로 앱별 정체성을 강화합니다.
+  5. 최상위 글로벌 바(`h-12`, `shrink-0`)와 하단 작업 공간(`min-h-0 flex-1`)의 높이를 정렬하고, 분할 쉘(`WorkspaceSplitShell`)의 `max-w-5xl`(1024px) 중앙 컨테이너 통일 및 `h-full` 전환으로 뷰포트 오버플로우 및 이중 스크롤을 방지하며, `NavigatorShell` 헤더 타이틀로 앱별 정체성을 강화합니다. (부가 개선으로 `/` 랜딩 페이지 3개 역할 카드 전체 클릭형 인터랙션도 함께 적용합니다.)
 
 - **Non-Goals**:
   1. 앱 전환 시 AI Navigator 대화 내역을 앱별로 분리 보존하는 기능은 이번 범위에서 제외합니다. (현행 `useNavigatorChatStore.setMode`의 전환 시 대화 초기화 동작을 유지합니다.)
@@ -45,9 +42,10 @@
   - `src/app/(workspace)/layout.tsx`: `builder`, `consumer`, `analyst` 라우트를 묶는 공통 작업 공간 레이아웃. 최상단에 `WorkspaceAppBar`를 렌더링하고 하단 `min-h-0 flex-1` 영역에 각 앱의 `children`을 배치합니다.
   - `src/app/(workspace)/_components/workspace-app-bar.tsx`: Client Component(`"use client"`). `usePathname()`으로 현재 활성 앱을 판별하고, `@/shared/ui/button`, `@/shared/ui/separator`, `@/shared/ui/popover`, `@/shared/lib/cn`, `lucide-react`를 조합해 최상위 앱 전환 바(좌측 홈·앱별 구분선 포함 스위처, 우측 설정 임시 `Popover`)를 렌더링합니다.
     - 도메인 엔티티나 피처 상태에 의존하지 않는 순수 라우팅 크롬(Chrome)이므로 `src/widgets/` 껍데기 위젯을 생성하지 않고 `src/app/(workspace)/_components/`에 배치합니다. (FSD `boundaries/dependencies` 규칙상 `app -> app` 및 `app -> shared` 참조 허용)
-  - `src/app/(workspace)/_components/workspace-split-shell.tsx`: `builder`, `consumer`, `analyst` 3개 앱 레이아웃이 공유하는 좌우 분할 쉘(`NavigatorShell` + 스크롤 가능한 `<main>`). 내부 `<header>`를 제거해 단일 캔버스 구조를 적용하며, 각 앱 `layout.tsx`는 `mode`만 전달합니다.
+  - `src/app/(workspace)/_components/workspace-split-shell.tsx`: `builder`, `consumer`, `analyst` 3개 앱 레이아웃이 공유하는 좌우 분할 쉘(`NavigatorShell` + `max-w-5xl`(1024px) 통일 스크롤 캔버스 `<main>`). 내부 `<header>`를 제거해 단일 캔버스 구조를 적용하며, 각 앱 `layout.tsx`는 `mode`만 전달합니다.
   - `src/features/browse-published-forms/ui/published-form-list.tsx` & `src/app/(workspace)/consumer/page.tsx`: 빌더가 발행한 폼 목록(`PublishedFormList`)을 FSD `features` 레이어로 분리하고, 분석가가 공유한 뷰 목록(`PublishedAnalysisViewList`)과 함께 `/consumer` 통합 포털 페이지에 섹션으로 렌더링합니다.
   - `src/app/(workspace)/consumer/forms/page.tsx` & `src/app/(workspace)/consumer/views/page.tsx`: 기존 목록 URL 접근 및 하위 호환성을 위해 각각 `/consumer#forms`, `/consumer#views`로 리다이렉트합니다.
+  - `src/app/page.tsx`: `/` 게이트웨이 역할 카드 3종 전체를 클릭 가능한 `<Link>` 버튼 형태로 개선하고 역할별 아이콘 배지 및 호버/눌림 피드백을 적용합니다.
   - `src/widgets/navigator-shell/lib/navigator-shell-config.ts` & `src/widgets/navigator-shell/ui/navigator-shell.tsx`: 앱별 Navigator 헤더 명칭을 구분해 각 앱에 특화된 AI 어시스턴트임을 표현합니다.
 
 - **데이터 계약 (Schema & Interfaces)**:
