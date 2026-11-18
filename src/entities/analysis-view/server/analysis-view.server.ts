@@ -23,7 +23,7 @@ export const findActiveAnalysisViews = async (): Promise<AnalysisView[]> => {
 
 /**
  * 공식 발행된 활성 분석 뷰 목록을 발행 일시 최신순으로 조회합니다.
- * 컨슈머 포털(`/consumer/views`)의 공유 뷰 목록 노출에 사용됩니다.
+ * 컨슈머 포털(`/consumer`)의 공유 뷰 목록 노출에 사용됩니다.
  *
  * @returns 발행된 AnalysisView[] 배열 반환
  */

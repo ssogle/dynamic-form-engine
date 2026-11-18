@@ -52,7 +52,7 @@ export function ConsumerSubmissionEditor({ formId, submissionId }: ConsumerSubmi
   // 1. 서버 SSR 및 클라이언트 초기 하이드레이션, 데이터 로딩 단계 스켈레톤
   if (isLoading || ((!form || !submission) && !isError)) {
     return (
-      <div className="mx-auto w-full max-w-3xl space-y-6">
+      <div className="w-full space-y-6">
         <div className="space-y-2">
           <Skeleton className="h-6 w-36 rounded-md" />
           <Skeleton className="h-8 w-64 rounded-md" />
@@ -76,7 +76,7 @@ export function ConsumerSubmissionEditor({ formId, submissionId }: ConsumerSubmi
   // 2. 조회 실패 에러 상태 (에러 확정 또는 로딩 완료 후에도 데이터 부재)
   if (isError || !form || !submission) {
     return (
-      <div className="mx-auto w-full max-w-3xl">
+      <div className="w-full">
         <Card className="border-destructive/30 bg-destructive/5 shadow-xs">
           <CardHeader>
             <CardTitle className="text-destructive text-base">
@@ -91,7 +91,7 @@ export function ConsumerSubmissionEditor({ formId, submissionId }: ConsumerSubmi
               <Link href={`/consumer/forms/${formId}/submissions`}>제출 목록으로 돌아가기</Link>
             </Button>
             <Button asChild variant="ghost" size="sm">
-              <Link href="/consumer/forms">폼 전체 목록</Link>
+              <Link href="/consumer">전체 목록</Link>
             </Button>
           </CardFooter>
         </Card>
@@ -102,7 +102,7 @@ export function ConsumerSubmissionEditor({ formId, submissionId }: ConsumerSubmi
   // 3. 수정 완료 성공 화면
   if (isSuccessUpdated) {
     return (
-      <div className="mx-auto w-full max-w-3xl">
+      <div className="w-full">
         <Card className="border-border/60 py-8 text-center shadow-xs">
           <CardHeader className="space-y-2 pb-4">
             <Badge variant="outline" className="mx-auto w-fit text-xs font-normal">
@@ -132,7 +132,7 @@ export function ConsumerSubmissionEditor({ formId, submissionId }: ConsumerSubmi
 
   // 4. 정상 응답 수정 폼 화면
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
+    <div className="w-full space-y-6">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
           <Button

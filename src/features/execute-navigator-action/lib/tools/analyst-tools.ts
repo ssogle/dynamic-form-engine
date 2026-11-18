@@ -405,7 +405,7 @@ export function createAnalystTools(deps: AnalystToolsDependencies) {
 
   const publishAnalysisViewTool = tool({
     description:
-      "분석 뷰를 공식 발행(isPublished: true)하여 컨슈머 포털(/consumer/views)에 공유하거나 초안(isPublished: false)으로 회수합니다.",
+      "분석 뷰를 공식 발행(isPublished: true)하여 컨슈머 포털(/consumer)에 공유하거나 초안(isPublished: false)으로 회수합니다.",
     inputSchema: publishAnalysisViewInputSchema,
     execute: async ({ viewId, isPublished }: PublishAnalysisViewInput) =>
       withViewLock(viewId, async () => {

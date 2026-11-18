@@ -15,7 +15,7 @@ export const getPublishedAnalysisViews = (): Promise<AnalysisView[]> =>
   });
 
 /**
- * 컨슈머 포털(`/consumer/views`)용 발행 완료 분석 뷰 목록 조회 TanStack Query 훅
+ * 컨슈머 포털(`/consumer`)용 발행 완료 분석 뷰 목록 조회 TanStack Query 훅
  */
 export const usePublishedAnalysisViewsQuery = () =>
   useQuery<AnalysisView[], HttpErrorData>({

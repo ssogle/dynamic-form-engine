@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { CheckCircle2, ChevronDown, ChevronRight } from "lucide-react";
-import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible";
 import { Input } from "@/shared/ui/input";
@@ -42,10 +41,7 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
       <header className="border-border/60 bg-muted/20 flex h-14 shrink-0 items-center justify-between border-b px-4">
         <div className="flex items-center gap-2">
           <span className="bg-primary size-2 animate-pulse rounded-full" />
-          <h2 className="text-foreground text-sm font-semibold tracking-tight">AI Navigator</h2>
-          <Badge variant="secondary" className="text-[10px] font-normal">
-            {config.badgeLabel}
-          </Badge>
+          <h2 className="text-foreground text-sm font-semibold tracking-tight">{config.title}</h2>
         </div>
       </header>
 
