@@ -6,6 +6,11 @@ import {
   type Form,
 } from "@/entities/form";
 import { normalizeStringIds } from "@/shared/lib/normalize";
+import {
+  resolveFieldQueryCapability,
+  serializeFieldFiltersParam,
+  type FieldFilterCondition,
+} from "@/shared/schema";
 
 /**
  * 관계형 필드의 폼 값(단일 UUID 문자열 또는 다중 UUID 배열)을
@@ -83,31 +88,41 @@ export function formatRelationCellValue(rawVal: unknown, field: CoreFormField): 
 
 /**
  * 피커 다이얼로그 내 빠른 검색어(대표 필드 대상)와 컬럼 헤더별 상세 필터를 결합하여
- * GET /api/v1/forms/[id]/submissions 의 `filters` 쿼리 JSON 문자열을 생성합니다.
+ * GET /api/v1/forms/[id]/submissions 의 `filters` 쿼리 JSON 문자열(FieldFilterCondition[])을 생성합니다.
  */
 export function buildPickerFilterString(params: {
   primaryFieldId?: string | undefined;
+  primaryFieldType?: string | undefined;
   searchQuery?: string | undefined;
   columnFilters: Record<string, string>;
 }): string | undefined {
-  const { primaryFieldId, searchQuery, columnFilters } = params;
-  const merged: Record<string, string> = {};
+  const { primaryFieldId, primaryFieldType, searchQuery, columnFilters } = params;
+  const filterMap = new Map<string, FieldFilterCondition>();
 
   for (const [key, val] of Object.entries(columnFilters)) {
     const trimmed = val.trim();
     if (trimmed.length > 0) {
-      merged[key] = trimmed;
+      filterMap.set(key, { fieldId: key, op: "contains", value: trimmed });
     }
   }
 
   const trimmedSearch = searchQuery?.trim() ?? "";
   if (trimmedSearch.length > 0 && primaryFieldId) {
-    merged[primaryFieldId] = trimmedSearch;
+    const cap = resolveFieldQueryCapability({ type: primaryFieldType ?? "text" });
+    if (cap?.filterOperators.includes("contains")) {
+      filterMap.set(primaryFieldId, {
+        fieldId: primaryFieldId,
+        op: "contains",
+        value: trimmedSearch,
+      });
+    } else if (cap?.filterOperators.includes("eq")) {
+      filterMap.set(primaryFieldId, {
+        fieldId: primaryFieldId,
+        op: "eq",
+        value: primaryFieldType === "number" ? Number(trimmedSearch) : trimmedSearch,
+      });
+    }
   }
 
-  if (Object.keys(merged).length === 0) {
-    return undefined;
-  }
-
-  return JSON.stringify(merged);
+  return serializeFieldFiltersParam(Array.from(filterMap.values()));
 }

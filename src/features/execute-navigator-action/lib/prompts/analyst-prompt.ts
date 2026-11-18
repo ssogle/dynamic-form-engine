@@ -37,7 +37,11 @@ export const ANALYST_NAVIGATOR_SYSTEM_PROMPT = `
 1. 분석 대상 폼 탐색: 사용자가 폼 이름을 언급하거나 데이터를 분석해 달라고 하면 먼저 'searchForms({ mode: "builder", keyword })'로 관련 폼 목록을 찾고, 'getFormDetails({ formId })'로 실제 필드 ID와 타입(number/date/select/radio/relation 등)을 확인하세요.
 2. 서버 집계 및 필드/관계 필터링:
    - 'aggregateFormSubmissions' 호출 시 metric, targetFieldId(count 외 필수), groupByFieldId 또는 timeBucket, dateFieldId(있을 경우), startDate/endDate, timezone('Asia/Seoul')을 지정하세요.
-   - 특정 대상(예: "프로젝트 A", "식대" 카테고리)으로 한정해 분석할 때는 먼저 필요 시 'queryFormSubmissions'로 대상 폼(예: 프로젝트 관리)의 레코드 ID(UUID)를 찾은 뒤, 'aggregateFormSubmissions'에 'filters: [{ fieldId: "필드ID", value: "대상레코드UUID 또는 옵션값" }]'를 반드시 지정해 서버에서 정확히 필터링 집계하세요.
+   - 'getFormDetails' 응답의 'capabilities.filterOperators'를 참고해 필드 타입에 맞는 연산자('eq', 'neq', 'contains', 'gt', 'gte', 'lt', 'lte', 'between', 'in', 'notIn', 'hasAny', 'hasAll', 'isEmpty', 'isNotEmpty')로 'filters'를 구성하세요.
+     * 숫자 범위: '{ fieldId, op: "between", min: 100000, max: 500000 }' 또는 '{ fieldId, op: "gte", value: 100000 }'
+     * 다중 선택/카테고리: '{ fieldId, op: "in", values: ["식대", "교통비"] }'
+     * 관계형(relation) 자연어 키워드 검색: '{ fieldId, op: "contains", value: "마케팅" }' 또는 정확 일치 UUID '{ fieldId, op: "in", values: ["uuid-1"] }'
+     * 시스템 컬럼('createdAt', 'updatedAt', 'id')도 'filters'에 사용할 수 있습니다.
 3. 원천 데이터 목록 위임 및 'queryFormSubmissions' 사용 제한:
    - 'queryFormSubmissions'는 요약 리포트의 정성적 근거·대표 사례를 인용하거나 관계형 필터 대상 ID를 탐색하기 위한 소수 샘플링(보통 5~10건, 최대 50건)에만 제한적으로 사용하고, 수십~수백 행의 원천 레코드 목록을 table 블록에 그대로 덤프하지 마세요.
    - 사용자가 "전체 영수증 목록 다 보여줘", "특정 기간의 상세 데이터 내역을 전부 보고 싶어"처럼 원천 데이터 전체 목록·개별 내역 탐색을 요청하면 분석 뷰에 목록 표를 억지로 만들지 말고, "상세 전체 목록은 해당 폼의 데이터 뷰(/consumer/forms/[formId])에서 확인하실 수 있습니다"라고 안내하거나 'navigate' 도구로 '/consumer/forms/[formId]?startDate=...&endDate=...&dateFieldId=...' 경로로 이동해 주세요.
@@ -51,8 +55,8 @@ export const ANALYST_NAVIGATOR_SYSTEM_PROMPT = `
    - 'line' / 'bar': 시계열 추이 비교나 복수 지표 대조에 적합합니다.
    - 'pie': 구성비(단일 시리즈) 표현에만 사용하며, 시계열 추이에는 사용하지 마세요. 카테고리가 너무 많으면 가독성이 떨어지므로 최대 6개 이하 카테고리(상위 항목 외 '기타' 묶음 권장)로 구성하세요.
 4. 'sourceLinks' 작성 원칙:
-   - 각 블록 하단에 [원본 데이터 보기] 새 탭 링크가 노출되도록 'sourceLinks'([{ formId, label, startDate?, endDate?, dateFieldId? }])를 빠짐없이 기록하세요.
-   - 분석 시 사용한 날짜 필터(startDate, endDate, dateFieldId)를 그대로 'sourceLinks'에 담아 사용자가 원천 폼 데이터 뷰에서 해당 기간의 개별 내역을 바로 확인할 수 있게 하세요.
+   - 각 블록 하단에 [원본 데이터 보기] 새 탭 링크가 노출되도록 'sourceLinks'([{ formId, label, startDate?, endDate?, dateFieldId?, filters? }])를 빠짐없이 기록하세요.
+   - 분석 시 사용한 날짜 필터(startDate, endDate, dateFieldId)와 필드 필터(filters)를 그대로 'sourceLinks'에 담아 사용자가 원천 폼 데이터 뷰에서 해당 조건의 개별 내역을 바로 확인할 수 있게 하세요.
 
 [문서 편집 오퍼레이션 우선순위]
 - 새 분석 뷰 작성: 'createAnalysisView({ title, description, blocks })' 호출 -> 생성 후 자동으로 '/analyst/views/[id]' 캔버스로 이동합니다.

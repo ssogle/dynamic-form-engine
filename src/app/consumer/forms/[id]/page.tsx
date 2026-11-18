@@ -1,6 +1,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { isValidCalendarDate, type SubmissionDateRangeFilter } from "@/entities/form-submission";
+import { parseFieldFiltersParam } from "@/shared/schema";
 import { Button } from "@/shared/ui/button";
 import { ManageFormSubmissions } from "@/features/manage-form-submissions";
 
@@ -12,6 +13,7 @@ interface ConsumerFormIdPageProps {
     startDate?: string | undefined;
     endDate?: string | undefined;
     dateFieldId?: string | undefined;
+    filters?: string | undefined;
   }>;
 }
 
@@ -19,7 +21,7 @@ interface ConsumerFormIdPageProps {
  * 컨슈머 데이터 도메인 레코드 목록 관리 페이지 (/consumer/forms/[id])
  *
  * 공식 발행된 활성 폼의 제출 데이터를 조회/검색/정렬하는 기본 메인 뷰포트입니다.
- * 분석 뷰의 `[원본 데이터 보기]` 링크로부터 전달된 `?startDate=...&endDate=...&dateFieldId=...` 쿼리를 수용합니다.
+ * 분석 뷰의 `[원본 데이터 보기]` 링크로부터 전달된 `?startDate=...&endDate=...&dateFieldId=...&filters=...` 쿼리를 수용합니다.
  */
 export default async function ConsumerFormIdPage({
   params,
@@ -42,6 +44,9 @@ export default async function ConsumerFormIdPage({
         }
       : undefined;
 
+  const parsedFilters = parseFieldFiltersParam(rawQuery.filters);
+  const initialFilters = parsedFilters.length > 0 ? parsedFilters : undefined;
+
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4 px-2">
@@ -56,7 +61,11 @@ export default async function ConsumerFormIdPage({
         </Button>
       </div>
 
-      <ManageFormSubmissions formId={id} initialDateRange={initialDateRange} />
+      <ManageFormSubmissions
+        formId={id}
+        initialDateRange={initialDateRange}
+        initialFilters={initialFilters}
+      />
     </div>
   );
 }

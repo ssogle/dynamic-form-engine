@@ -131,18 +131,19 @@ describe("relation-table (features/render-dynamic-form/lib)", () => {
   });
 
   describe("buildPickerFilterString", () => {
-    it("대표 필드 빠른 검색어와 개별 컬럼 필터를 결합해 서버 filters JSON 문자열을 생성해야 한다", () => {
+    it("대표 필드 빠른 검색어와 개별 컬럼 필터를 결합해 표준 FieldFilterCondition[] JSON 문자열을 생성해야 한다", () => {
       const result = buildPickerFilterString({
         primaryFieldId: "p_name",
+        primaryFieldType: "text",
         searchQuery: "차세대",
         columnFilters: { p_code: "ERP", p_empty: "  " },
       });
 
       expect(result).toBeDefined();
-      expect(JSON.parse(result!)).toEqual({
-        p_code: "ERP",
-        p_name: "차세대",
-      });
+      expect(JSON.parse(result!)).toEqual([
+        { fieldId: "p_code", op: "contains", value: "ERP" },
+        { fieldId: "p_name", op: "contains", value: "차세대" },
+      ]);
     });
 
     it("모든 필터와 검색어가 비어 있으면 undefined를 반환해야 한다", () => {

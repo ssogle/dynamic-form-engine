@@ -155,6 +155,12 @@ describe("createQueryTools (features/execute-navigator-action/lib/tools)", () =>
       type: "text",
       required: true,
       options: undefined,
+      capabilities: {
+        filterOperators: ["contains", "eq", "neq", "isEmpty", "isNotEmpty"],
+        aggregatableMetrics: ["count"],
+        groupable: true,
+        isDateAxisCandidate: false,
+      },
     });
   });
 

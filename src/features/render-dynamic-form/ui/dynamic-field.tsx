@@ -8,14 +8,10 @@ import { Textarea } from "@/shared/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group";
 import { Checkbox } from "@/shared/ui/checkbox";
+import { DatePickerInput } from "@/shared/ui/date-input";
 import { Switch } from "@/shared/ui/switch";
-import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
-import { Calendar } from "@/shared/ui/calendar";
-import { Button } from "@/shared/ui/button";
 import { Label } from "@/shared/ui/label";
-import { CalendarIcon } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
-import { formatDateToYmd, parseYmdToDate } from "@/shared/lib/date";
 import { filterSingleSelectOptions, filterMultiSelectOptions } from "../lib/filter-select-options";
 import { FormFieldWrapper } from "./form-field-wrapper";
 import { RelationFieldInput } from "./relation-field-input";
@@ -322,44 +318,17 @@ export function DynamicField({
             <Controller
               name={id}
               control={formContext.control}
-              render={({ field: controllerField }) => {
-                const dateValue = parseYmdToDate(controllerField.value);
-
-                return (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        id={id}
-                        type="button"
-                        variant="outline"
-                        disabled={disabled}
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !controllerField.value && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 size-4" />
-                        {typeof controllerField.value === "string" && controllerField.value
-                          ? controllerField.value
-                          : placeholder || "날짜를 선택하세요"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={dateValue}
-                        onSelect={(date) => {
-                          if (date) {
-                            controllerField.onChange(formatDateToYmd(date));
-                          } else {
-                            controllerField.onChange(undefined);
-                          }
-                        }}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                );
-              }}
+              render={({ field: controllerField }) => (
+                <DatePickerInput
+                  id={id}
+                  value={typeof controllerField.value === "string" ? controllerField.value : ""}
+                  onChange={(nextValue) =>
+                    controllerField.onChange(nextValue ? nextValue : undefined)
+                  }
+                  placeholder={placeholder || "YYYY-MM-DD"}
+                  disabled={disabled}
+                />
+              )}
             />
           );
         }
@@ -532,16 +501,7 @@ export function DynamicField({
 
       case "date":
         return (
-          <Button
-            id={id}
-            type="button"
-            variant="outline"
-            disabled={disabled}
-            className="text-muted-foreground w-full justify-start text-left font-normal"
-          >
-            <CalendarIcon className="mr-2 size-4" />
-            <span>{placeholder || "YYYY-MM-DD"}</span>
-          </Button>
+          <DatePickerInput id={id} placeholder={placeholder || "YYYY-MM-DD"} disabled={disabled} />
         );
 
       case "switch":

@@ -1,8 +1,9 @@
 import "server-only";
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/shared/db/server";
-import { forms, relations } from "@/shared/tables";
+import { forms, relations, type FormSchemaDefinition } from "@/shared/tables";
 import type { RelatedSubmissionsGroup } from "../types/relation.types";
+import { resolveFieldOptionLabelMap } from "../lib/analytics-calculator";
 import {
   formSubmissions,
   type FormSubmission,
@@ -15,9 +16,11 @@ import {
   parseIdsParam,
   parseSortParam,
   type PaginatedSubmissionsResponse,
+  type SubmissionQueryInput,
 } from "../schema/submission-query.schema";
 import { isValidTimezone } from "../schema/date-range.schema";
-import { buildDateRangeConditions } from "./date-filter-sql.server";
+import { buildDateRangeConditions, buildValidFieldDateSql } from "./date-filter-sql.server";
+import { buildFieldFilterSqlConditions, buildSafeNumericSql } from "./field-filter-sql.server";
 
 /**
  * 서브미션 데이터에 포함된 관계형 필드(relation) 값을 분석하여 relations 엣지 테이블을 동기화합니다.
@@ -133,25 +136,18 @@ export const hasSubmissionsByFormId = async (formId: string): Promise<boolean> =
 };
 
 /**
- * 페이지네이션 조회 옵션 인터페이스
+ * 페이지네이션 조회 옵션 타입 (`submissionQuerySchema` 파생 단일 진실 원천 재사용 + 스키마 메타 선택 전달)
  */
-export interface FindSubmissionsPaginatedOptions {
-  page?: number | undefined;
-  limit?: number | undefined;
-  sort?: string | undefined;
-  filters?: string | undefined;
-  ids?: string | undefined;
-  dateFieldId?: string | undefined;
-  startDate?: string | undefined;
-  endDate?: string | undefined;
-  timezone?: string | undefined;
+export interface FindSubmissionsPaginatedOptions extends SubmissionQueryInput {
+  /** 대상 폼의 스키마 정의 (중복 forms 테이블 조회 방지 및 타입별 필터/정렬 정밀 캐스팅용) */
+  schemaDefinition?: FormSchemaDefinition | null | undefined;
 }
 
 /**
- * 특정 폼 ID의 응답 목록을 페이지네이션, 동적 JSONB 멀티 정렬, 컬럼별 ILIKE 필터, 배치 ID 조건을 적용하여 조회합니다.
+ * 특정 폼 ID의 응답 목록을 페이지네이션, 동적 JSONB 멀티 정렬, 타입별 통합 필터, 배치 ID 조건을 적용하여 조회합니다.
  *
  * @param formId 조회 대상 폼 고유 식별자(UUID)
- * @param options 페이징, 정렬, 필터, 배치 ID 옵션
+ * @param options 페이징, 정렬, 필터, 배치 ID, 스키마 메타 옵션
  * @returns PaginatedSubmissionsResponse 페이징 응답 객체
  */
 export const findSubmissionsPaginated = async (
@@ -181,20 +177,33 @@ export const findSubmissionsPaginated = async (
     conditions.push(inArray(formSubmissions.id, parsedIds));
   }
 
-  // 2. 컬럼별 필터 조립 (JSONB 동적 필드 ILIKE 검색)
-  const filtersMap = parseFiltersParam(options.filters);
-  for (const [fieldId, keyword] of Object.entries(filtersMap)) {
-    if (!keyword) continue;
-    if (fieldId === "id") {
-      conditions.push(sql`${formSubmissions.id}::text ILIKE ${`%${keyword}%`}`);
-    } else {
-      conditions.push(sql`${formSubmissions.data}->>${fieldId} ILIKE ${`%${keyword}%`}`);
+  const resolvedTimezone =
+    options.timezone && isValidTimezone(options.timezone) ? options.timezone : "Asia/Seoul";
+
+  // 2. 컬럼별 통합 필터 조립 (타입별 연산자, 옵션 라벨-코드 매핑, relation 자연어/UUID 해석)
+  const parsedFilters = parseFiltersParam(options.filters);
+  if (parsedFilters.length > 0) {
+    const filterSqlResult = await buildFieldFilterSqlConditions({
+      filters: parsedFilters,
+      schemaDefinition: options.schemaDefinition,
+      timezone: resolvedTimezone,
+      allowSystemFields: true,
+      fallbackWithoutSchema: !options.schemaDefinition,
+    });
+    if (filterSqlResult.error !== null) {
+      return {
+        items: [],
+        page,
+        limit,
+        totalCount: 0,
+        totalPages: 0,
+        hasMore: false,
+      };
     }
+    conditions.push(...filterSqlResult.conditions);
   }
 
   // 2-1. 기간 범위 필터 조립 (분석 뷰 -> 원천 데이터 드릴다운 지원)
-  const resolvedTimezone =
-    options.timezone && isValidTimezone(options.timezone) ? options.timezone : "Asia/Seoul";
   if (options.startDate || options.endDate) {
     conditions.push(
       ...buildDateRangeConditions({
@@ -218,7 +227,8 @@ export const findSubmissionsPaginated = async (
   const totalCount = Number(countResult?.count ?? 0);
   const totalPages = Math.ceil(totalCount / limit);
 
-  // 4. 정렬(OrderBy) 표현식 조립
+  // 4. 정렬(OrderBy) 표현식 조립 (number/date 타입은 안전 캐스팅 + NULLS LAST 적용)
+  const fieldMetaMap = resolveFieldOptionLabelMap(options.schemaDefinition);
   const sortItems = parseSortParam(options.sort);
   const orderByExpressions = sortItems.map((item) => {
     if (item.id === "createdAt") {
@@ -230,7 +240,16 @@ export const findSubmissionsPaginated = async (
     if (item.id === "id") {
       return item.desc ? desc(formSubmissions.id) : asc(formSubmissions.id);
     }
-    // 동적 JSONB 필드 정렬
+    const fieldMeta = fieldMetaMap.get(item.id);
+    if (fieldMeta?.type === "number") {
+      const numericExpr = buildSafeNumericSql(item.id);
+      return item.desc ? sql`${numericExpr} DESC NULLS LAST` : sql`${numericExpr} ASC NULLS LAST`;
+    }
+    if (fieldMeta?.type === "date") {
+      const dateExpr = buildValidFieldDateSql(item.id);
+      return item.desc ? sql`${dateExpr} DESC NULLS LAST` : sql`${dateExpr} ASC NULLS LAST`;
+    }
+    // 동적 JSONB 필드 정렬 (텍스트 및 기타 타입)
     const jsonbField = sql`${formSubmissions.data}->>${item.id}`;
     return item.desc ? desc(jsonbField) : asc(jsonbField);
   });

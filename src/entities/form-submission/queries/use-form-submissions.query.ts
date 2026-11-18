@@ -1,22 +1,16 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { httpClient } from "@/shared/lib/http";
 import type { FormSubmission } from "../schema/form-submission.schema";
-import type { PaginatedSubmissionsResponse } from "../schema/submission-query.schema";
+import type {
+  PaginatedSubmissionsResponse,
+  SubmissionQueryInput,
+} from "../schema/submission-query.schema";
 import { formSubmissionsKeys } from "./form-submissions.keys";
 
 /**
- * 페이징 조회 요청 파라미터 타입 (exactOptionalPropertyTypes 준수)
+ * 페이징 조회 요청 파라미터 타입 (`submissionQuerySchema` 파생 단일 진실 원천 재사용)
  */
-export interface GetPaginatedSubmissionsParams {
-  page?: number | undefined;
-  limit?: number | undefined;
-  sort?: string | undefined;
-  filters?: string | undefined;
-  ids?: string | undefined;
-  startDate?: string | undefined;
-  endDate?: string | undefined;
-  dateFieldId?: string | undefined;
-}
+export type GetPaginatedSubmissionsParams = SubmissionQueryInput;
 
 /**
  * 폼 응답 목록을 페이지네이션, 멀티 정렬, 컬럼 필터, 배치 ID 조건과 함께 조회하는 순수 비동기 함수
@@ -73,16 +67,9 @@ export function useFormSubmissionsQuery(formId: string) {
 }
 
 /**
- * 무한 스크롤 쿼리 옵션 인터페이스
+ * 무한 스크롤 쿼리 옵션 타입 (`submissionQuerySchema` 파생 단일 진실 원천에서 `page`, `ids` 제외)
  */
-export interface UseInfiniteFormSubmissionsQueryOptions {
-  sort?: string | undefined;
-  filters?: string | undefined;
-  limit?: number | undefined;
-  startDate?: string | undefined;
-  endDate?: string | undefined;
-  dateFieldId?: string | undefined;
-}
+export type UseInfiniteFormSubmissionsQueryOptions = Omit<SubmissionQueryInput, "page" | "ids">;
 
 /**
  * 특정 폼의 응답 목록을 무한 스크롤(가상화 그리드 연동)로 조회하는 TanStack Query 커스텀 훅

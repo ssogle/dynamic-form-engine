@@ -30,6 +30,8 @@ export function BlockSourceLinksFooter({ block }: BlockSourceLinksFooterProps) {
           link.startDate || link.endDate
             ? ` (${link.startDate ?? ""} ~ ${link.endDate ?? ""})`
             : "";
+        const filterSuffix =
+          link.filters && link.filters.length > 0 ? ` · 필터 ${link.filters.length}개` : "";
 
         return (
           <Link
@@ -41,8 +43,11 @@ export function BlockSourceLinksFooter({ block }: BlockSourceLinksFooterProps) {
           >
             <span>
               {link.label}
-              {periodSuffix ? (
-                <span className="text-muted-foreground ml-0.5">{periodSuffix}</span>
+              {periodSuffix || filterSuffix ? (
+                <span className="text-muted-foreground ml-0.5">
+                  {periodSuffix}
+                  {filterSuffix}
+                </span>
               ) : null}
             </span>
             <ExternalLink className="size-3 shrink-0" />

@@ -16,11 +16,14 @@ export {
 
 export {
   submissionQuerySchema,
+  submissionIdParamSchema,
   relationsQuerySchema,
   parseSortParam,
   parseFiltersParam,
   parseIdsParam,
   type SubmissionQueryParams,
+  type SubmissionQueryInput,
+  type SubmissionIdParam,
   type RelationsQueryParams,
   type SortItem,
   type PaginatedSubmissionsResponse,
@@ -39,6 +42,7 @@ export {
   useFormSubmissionsByIdsQuery,
   useInfiniteFormSubmissionsQuery,
   useFormSubmissionDetailQuery,
+  type GetPaginatedSubmissionsParams,
   type UseInfiniteFormSubmissionsQueryOptions,
 } from "./queries/use-form-submissions.query";
 

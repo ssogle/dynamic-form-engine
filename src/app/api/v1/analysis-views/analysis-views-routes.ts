@@ -1,5 +1,8 @@
-import { z } from "zod";
-import { extractAnalysisBlocks } from "@/entities/analysis-view";
+import {
+  analysisViewsQuerySchema,
+  extractAnalysisBlocks,
+  publishAnalysisViewBodySchema,
+} from "@/entities/analysis-view";
 import {
   findActiveAnalysisViews,
   findPublishedAnalysisViews,
@@ -10,16 +13,6 @@ import { apiResponse, badRequest, notFound } from "@/shared/lib/http";
 import { createSubRouter } from "../_lib/create-api-router";
 import { parseJsonBody, parseQueryParams } from "../_lib/request-helpers";
 import type { AnalysisViewsRouterVariables } from "./analysis-views-middleware";
-
-const analysisViewsQuerySchema = z.object({
-  published: z.enum(["true", "false"]).optional(),
-});
-
-const publishAnalysisViewBodySchema = z.object({
-  isPublished: z
-    .boolean({ message: "발행 여부(isPublished)는 불리언 값이어야 합니다." })
-    .default(true),
-});
 
 /**
  * `/api/v1/analysis-views` 최소 HTTP 라우터

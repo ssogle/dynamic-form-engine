@@ -1,7 +1,15 @@
 import { tool } from "ai";
-import { z } from "zod";
 import type { Form } from "@/entities/form";
+import { resolveFieldQueryCapability } from "@/shared/schema";
+import {
+  getFormDetailsInputSchema,
+  searchFormsInputSchema,
+  type GetFormDetailsInput,
+  type SearchFormsInput,
+} from "../../schema/navigator-tools.schema";
 import { extractFieldsFromForm } from "./builder-tools";
+
+export { getFormDetailsInputSchema, searchFormsInputSchema };
 
 /**
  * 폼 조회 도구 카탈로그에서 사용할 데이터 의존성 인터페이스
@@ -11,26 +19,6 @@ export interface QueryToolsDependencies {
   findPublishedForms: () => Promise<Form[]>;
   findFormById: (id: string) => Promise<Form | undefined>;
 }
-
-// 1. searchForms 입력 스키마
-export const searchFormsInputSchema = z.object({
-  keyword: z
-    .string()
-    .optional()
-    .describe("검색할 폼 제목이나 설명 키워드 (생략 시 전체 폼 목록 반환)"),
-  mode: z
-    .enum(["builder", "consumer"])
-    .optional()
-    .default("consumer")
-    .describe("검색 대상 모드 (builder: 전체 활성 폼, consumer: 발행된 공개 폼)"),
-});
-
-// 2. getFormDetails 입력 스키마
-export const getFormDetailsInputSchema = z.object({
-  formId: z
-    .uuid("조회할 폼 ID(UUID)는 필수입니다.")
-    .describe("필드 스펙을 조회할 대상 폼의 고유 ID (UUID)"),
-});
 
 /**
  * AI Navigator용 가벼운 폼 조회 도구(Query Tools) 팩토리 함수
@@ -49,7 +37,7 @@ export function createQueryTools(deps: QueryToolsDependencies) {
     description:
       "등록된 폼 목록을 키워드로 검색하여 폼 ID, 제목, 기본 설명 등의 가벼운 식별 메타데이터를 반환합니다. 무거운 필드 스키마는 포함하지 않습니다.",
     inputSchema: searchFormsInputSchema,
-    execute: async ({ keyword, mode = "consumer" }: z.infer<typeof searchFormsInputSchema>) => {
+    execute: async ({ keyword, mode = "consumer" }: SearchFormsInput) => {
       const forms =
         mode === "builder" ? await deps.findActiveForms() : await deps.findPublishedForms();
 
@@ -79,7 +67,7 @@ export function createQueryTools(deps: QueryToolsDependencies) {
     description:
       "특정 폼의 전체 필드 스펙(라벨, 타입, 필수 여부, 선택지)을 정밀 조회합니다. 필드 값을 매핑하거나 스키마 구조를 확인할 때 호출합니다.",
     inputSchema: getFormDetailsInputSchema,
-    execute: async ({ formId }: z.infer<typeof getFormDetailsInputSchema>) => {
+    execute: async ({ formId }: GetFormDetailsInput) => {
       const form = await deps.findFormById(formId);
       if (!form) {
         return {
@@ -96,13 +84,24 @@ export function createQueryTools(deps: QueryToolsDependencies) {
         title: form.title,
         description: form.description ?? undefined,
         isPublished: Boolean(form.publishedAt),
-        fields: activeFields.map((f) => ({
-          id: f.id,
-          label: f.label,
-          type: f.type,
-          required: Boolean(f.required),
-          options: f.options ?? undefined,
-        })),
+        fields: activeFields.map((f) => {
+          const capability = resolveFieldQueryCapability(f);
+          return {
+            id: f.id,
+            label: f.label,
+            type: f.type,
+            required: Boolean(f.required),
+            options: f.options ?? undefined,
+            capabilities: capability
+              ? {
+                  filterOperators: capability.filterOperators,
+                  aggregatableMetrics: capability.aggregatableMetrics,
+                  groupable: capability.groupable,
+                  isDateAxisCandidate: capability.isDateAxisCandidate,
+                }
+              : undefined,
+          };
+        }),
       };
     },
   });

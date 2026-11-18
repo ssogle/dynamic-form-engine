@@ -83,14 +83,20 @@ function RelationPickerDialogBody({
     desc: true,
   });
 
+  const primaryFieldType = React.useMemo(
+    () => columns.find((col) => col.id === primaryFieldId)?.type,
+    [columns, primaryFieldId]
+  );
+
   const filtersParam = React.useMemo(
     () =>
       buildPickerFilterString({
         primaryFieldId,
+        primaryFieldType,
         searchQuery,
         columnFilters: {},
       }),
-    [primaryFieldId, searchQuery]
+    [primaryFieldId, primaryFieldType, searchQuery]
   );
 
   const sortParam = `${sortState.id}:${sortState.desc ? "desc" : "asc"}`;

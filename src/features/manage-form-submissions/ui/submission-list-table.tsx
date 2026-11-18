@@ -5,17 +5,20 @@ import { SlidersHorizontal, X } from "lucide-react";
 import { VirtualTable } from "@/shared/lib/virtual-table";
 import type { Form } from "@/entities/form";
 import type { SubmissionDateRangeFilter } from "@/entities/form-submission";
+import type { FieldFilterCondition } from "@/shared/schema";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { Badge } from "@/shared/ui/badge";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
+import { formatFilterConditionSummary, resolveFilterFieldLabel } from "../lib/filter-summary";
 import { useSubmissionListTable, getColumnLabel } from "../hooks/use-submission-list-table.hook";
 
 export interface SubmissionListTableProps {
   form: Form;
   initialDateRange?: SubmissionDateRangeFilter | undefined;
+  initialFilters?: FieldFilterCondition[] | undefined;
 }
 
 /**
@@ -25,12 +28,18 @@ export interface SubmissionListTableProps {
  * 비즈니스 상태 및 이벤트 오케스트레이션 로직은 useSubmissionListTable 훅에 전담 위임하고,
  * 순수 뷰 렌더링(상단 툴바, 컬럼 가시성 드롭다운, 가상화 테이블 본문)만 담당하는 Thin View입니다.
  */
-export function SubmissionListTable({ form, initialDateRange }: SubmissionListTableProps) {
+export function SubmissionListTable({
+  form,
+  initialDateRange,
+  initialFilters,
+}: SubmissionListTableProps) {
   const {
     table,
     flatSubmissions,
     totalCount,
     activeFields,
+    columnFilters,
+    relationLookupMap,
     dateRangeFilter,
     dateRangeFieldLabel,
     activeFilterCount,
@@ -41,10 +50,21 @@ export function SubmissionListTable({ form, initialDateRange }: SubmissionListTa
     hasNextPage,
     fetchNextPage,
     tableContainerRef,
+    handleSetFieldFilter,
     handleClearAllFilters,
     handleClearDateRange,
     handleRowClick,
-  } = useSubmissionListTable({ form, initialDateRange });
+  } = useSubmissionListTable({ form, initialDateRange, initialFilters });
+
+  const relationNameMap = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const targetEntry of Object.values(relationLookupMap)) {
+      for (const [subId, label] of Object.entries(targetEntry.labelsById)) {
+        map.set(subId, label);
+      }
+    }
+    return map;
+  }, [relationLookupMap]);
 
   // 1. 초기 로딩 스켈레톤
   if (isLoading && flatSubmissions.length === 0) {
@@ -73,6 +93,8 @@ export function SubmissionListTable({ form, initialDateRange }: SubmissionListTa
     );
   }
 
+  const activeColumnFilters = Object.values(columnFilters);
+
   return (
     <div className="space-y-3">
       {/* 테이블 상단 툴바: 레코드 수, 활성 필터 배지, 컬럼 가시성 설정 */}
@@ -95,6 +117,31 @@ export function SubmissionListTable({ form, initialDateRange }: SubmissionListTa
               </button>
             </Badge>
           ) : null}
+          {activeColumnFilters.map((condition) => {
+            const fieldMeta = activeFields.find((f) => f.id === condition.fieldId);
+            const fieldLabel = resolveFilterFieldLabel(condition.fieldId, activeFields);
+            const summary = formatFilterConditionSummary(condition, fieldMeta, relationNameMap);
+
+            return (
+              <Badge
+                key={condition.fieldId}
+                variant="outline"
+                className="gap-1 px-2 py-0.5 text-[11px]"
+              >
+                <span>
+                  {fieldLabel}: {summary}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleSetFieldFilter(condition.fieldId, undefined)}
+                  className="hover:text-foreground ml-1 text-xs"
+                  title={`${fieldLabel} 필터 해제`}
+                >
+                  <X className="size-3" />
+                </button>
+              </Badge>
+            );
+          })}
           {activeFilterCount > 0 && (
             <Badge variant="secondary" className="gap-1 px-2 py-0.5 text-[11px]">
               필터 {activeFilterCount}개 적용 중

@@ -1,26 +1,30 @@
 import type { AnalysisBlock, AnalysisView } from "@/entities/analysis-view";
-import type { ActiveForm, CoreFormField, Form, SelectOption } from "@/entities/form";
+import type { ActiveForm, CoreFormField, Form } from "@/entities/form";
+import type {
+  ExecuteNavigatorPayload,
+  NavigatorChatMessageDto,
+  NavigatorClientContext,
+  NavigatorMode,
+  VisibleItemSummary,
+} from "../schema/navigator-request.schema";
+import {
+  ANALYSIS_VIEW_OPERATIONS,
+  SCHEMA_OPERATIONS,
+  type AnalysisViewOperation,
+  type SchemaOperation,
+} from "../schema/navigator-tools.schema";
 
-/**
- * 네비게이터 동작 모드 구분
- */
-export type NavigatorMode = "builder" | "consumer" | "analyst";
-
-/**
- * 폼 스키마 변경 오퍼레이션 상수 목록 (단일 진실 원천 - SSOT)
- */
-export const SCHEMA_OPERATIONS = [
-  "ADD_FIELD",
-  "UPDATE_FIELD",
-  "REMOVE_FIELD",
-  "SET_ALL_FIELDS",
-  "SET_PRIMARY_FIELD",
-] as const;
-
-/**
- * 폼 스키마 변경 오퍼레이션 유형 (Builder 전용)
- */
-export type SchemaOperation = (typeof SCHEMA_OPERATIONS)[number];
+export {
+  ANALYSIS_VIEW_OPERATIONS,
+  SCHEMA_OPERATIONS,
+  type AnalysisViewOperation,
+  type ExecuteNavigatorPayload,
+  type NavigatorChatMessageDto,
+  type NavigatorClientContext,
+  type NavigatorMode,
+  type SchemaOperation,
+  type VisibleItemSummary,
+};
 
 // ==========================================
 // 1. 빌더 클라이언트 액션 규격 (Builder Actions)
@@ -99,23 +103,6 @@ export type NavigatorConsumerAction =
 // 3. 분석가 클라이언트 액션 규격 (Analyst Actions)
 // ==========================================
 
-/**
- * 분석 뷰 문서 편집 오퍼레이션 상수 목록 (단일 진실 원천 - SSOT)
- */
-export const ANALYSIS_VIEW_OPERATIONS = [
-  "ADD_BLOCK",
-  "UPDATE_BLOCK",
-  "REMOVE_BLOCK",
-  "REORDER_BLOCKS",
-  "UPDATE_INFO",
-  "SET_ALL_BLOCKS",
-] as const;
-
-/**
- * 분석 뷰 문서 편집 오퍼레이션 유형 (Analyst 전용)
- */
-export type AnalysisViewOperation = (typeof ANALYSIS_VIEW_OPERATIONS)[number];
-
 export interface CreateAnalysisViewAction {
   type: "CREATE_ANALYSIS_VIEW";
   viewId: string;
@@ -161,100 +148,6 @@ export type NavigatorAnalystAction =
 
 export type NavigatorAction =
   NavigatorBuilderAction | NavigatorConsumerAction | NavigatorAnalystAction;
-
-/**
- * 대화 세션 메시지 DTO
- */
-export interface NavigatorChatMessageDto {
-  role: "user" | "assistant" | "system";
-  content: string;
-}
-
-/**
- * 화면 테이블/목록에 렌더링된 항목의 경량 요약 정보 (React Query 캐시 연동)
- */
-export interface VisibleItemSummary {
-  /** 레코드 고유 ID (UUID) */
-  id: string;
-  /** 항목 제목 (폼 제목 또는 응답자 요약) */
-  title: string;
-  /** 생성 일시 (UTC) */
-  createdAt?: string | undefined;
-  /** 보조 요약 문구 (예: '홍길동 (경력 5년)') */
-  summary?: string | undefined;
-}
-
-/**
- * 네비게이터 실행 요청 컨텍스트
- */
-export interface NavigatorClientContext {
-  /** 현재 사용자 브라우저 경로 */
-  currentPath?: string | undefined;
-
-  // Builder Context
-  /** 빌더 화면에서 열려있는 활성 폼 정보 */
-  currentForm?:
-    | {
-        id: string;
-        title: string;
-        description?: string | undefined;
-        isPublished?: boolean | undefined;
-        primaryFieldId?: string | undefined;
-        fields: CoreFormField[];
-      }
-    | undefined;
-  /** 빌더 폼 목록 테이블의 렌더링 캐시 목록 */
-  visibleForms?: VisibleItemSummary[] | undefined;
-
-  // Consumer Context
-  /** 컨슈머 화면에서 열려있는 폼 ID (UUID) */
-  currentFormId?: string | undefined;
-  /** 컨슈머 화면에서 열려있는 폼 제목 */
-  currentFormTitle?: string | undefined;
-  /** 컨슈머 화면에서 사용 가능한 필드 명세 */
-  availableFields?:
-    | Array<{
-        id: string;
-        label: string;
-        type: string;
-        required?: boolean | undefined;
-        description?: string | undefined;
-        options?: SelectOption[] | undefined;
-      }>
-    | undefined;
-  /** 현재 응답자가 작성 중인 임시 필드값 (draftValues) */
-  currentDraftValues?: Record<string, unknown> | undefined;
-  /** 컨슈머 응답 목록 테이블의 렌더링 캐시 목록 */
-  visibleSubmissions?: VisibleItemSummary[] | undefined;
-
-  // Analyst Context
-  /** 분석가 화면에서 열려있는 활성 분석 뷰 문서 정보 */
-  currentAnalysisView?:
-    | {
-        id: string;
-        title: string;
-        description?: string | undefined;
-        isPublished?: boolean | undefined;
-        blocks: AnalysisBlock[];
-      }
-    | undefined;
-  /** 분석가 분석 뷰 목록 화면의 렌더링 캐시 목록 */
-  visibleAnalysisViews?: VisibleItemSummary[] | undefined;
-}
-
-/**
- * 네비게이터 서버 실행 요청 페이로드
- */
-export interface ExecuteNavigatorPayload {
-  /** 실행 모드 (기본값: builder) */
-  mode?: NavigatorMode | undefined;
-  /** 사용자가 입력한 자연어 발화 명령 */
-  prompt: string;
-  /** 이전 대화 히스토리 (선택) */
-  messages?: NavigatorChatMessageDto[] | undefined;
-  /** 클라이언트의 현재 UI 화면 컨텍스트 */
-  currentContext?: NavigatorClientContext | undefined;
-}
 
 /**
  * 네비게이터 서버 실행 응답 규격

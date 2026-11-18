@@ -5,6 +5,7 @@ import {
   formatDateToYmd,
   formatRelativeTime,
   formatUtc,
+  formatYmdInputMask,
   nowUtcIso,
   parseYmdToDate,
   toSafeDate,
@@ -133,6 +134,23 @@ describe("Date Utilities (shared/lib/date)", () => {
       expect(parseYmdToDate("2026/01/05")).toBeUndefined();
       expect(parseYmdToDate(undefined)).toBeUndefined();
       expect(parseYmdToDate(12345)).toBeUndefined();
+    });
+  });
+
+  describe("formatYmdInputMask", () => {
+    it("숫자 외의 문자(영문, 한글, 특수문자)를 차단하고 YYYY-MM-DD 형식으로 마스킹해야 한다", () => {
+      expect(formatYmdInputMask("abc")).toBe("");
+      expect(formatYmdInputMask("가나다2026!@#")).toBe("2026");
+      expect(formatYmdInputMask("2026년 11월 18일")).toBe("2026-11-18");
+      expect(formatYmdInputMask("20261")).toBe("2026-1");
+      expect(formatYmdInputMask("202611")).toBe("2026-11");
+      expect(formatYmdInputMask("20261118")).toBe("2026-11-18");
+      expect(formatYmdInputMask("20261118999")).toBe("2026-11-18");
+    });
+
+    it("백스페이스 삭제 시 후행 하이픈이 남아 입력이 막히지 않아야 한다", () => {
+      expect(formatYmdInputMask("2026-")).toBe("2026");
+      expect(formatYmdInputMask("2026-11-")).toBe("2026-11");
     });
   });
 });

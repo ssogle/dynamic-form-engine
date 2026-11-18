@@ -89,7 +89,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ### 12) 데이터 정의 파일 거버넌스 (Tables vs Schema vs Types)
 
 - **DB 물리 테이블 DDL**: 반드시 `src/shared/tables/*.table.ts`에만 작성합니다. (Drizzle `pgTable`, 외래키 및 CASCADE 제약조건 중앙화)
-- **런타임 검증 Zod 스키마**: 반드시 `src/{entities,features}/*/schema/*.schema.ts`에만 작성합니다. (`z.object`, `createInsertSchema` 및 파생 타입 `z.infer`)
+- **런타임 검증 Zod 스키마**: 반드시 `src/{shared,entities,features}/**/schema/*.schema.ts`에만 작성합니다. (`z.object`, `createInsertSchema` 및 파생 타입 `z.infer` / `z.input` — 스키마가 존재하는 데이터의 수동 인터페이스 중복 선언 금지)
 - **순수 TypeScript 정적 타입**: 반드시 `src/{entities,features}/*/types/*.types.ts`에만 작성하며, **Zod 런타임 스키마 선언(`import { z } from 'zod'`)은 엄격히 금지**됩니다.
 
 ---
@@ -107,6 +107,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | **스펙 주도 개발 (SDD)**     | [.agents/rules/spec-driven-development-rule.md](.agents/rules/spec-driven-development-rule.md) | 5단계 SDD 라이프사이클, TEMPLATE 기반 스펙, 아카이브 가드레일          |
 | **Git 워크플로우 & 커밋/PR** | [.agents/rules/git-commit-automation-rule.md](.agents/rules/git-commit-automation-rule.md)     | GitHub Flow, PR 템플릿 준수, 머지 후 브랜치 삭제, Conventional Commits |
 | **날짜 & 시간 처리 (UTC)**   | [.agents/rules/date-and-time-rule.md](.agents/rules/date-and-time-rule.md)                     | Store in UTC, Display in Local, DB `sql`now()``, 공통 유틸리티 래핑    |
+| **Zod 스키마 거버넌스**      | [.agents/rules/zod-schema-governance-rule.md](.agents/rules/zod-schema-governance-rule.md)     | Schema-First SSOT, 계층별 스키마 배치, 수동 중복 타입 금지             |
 
 ---
 

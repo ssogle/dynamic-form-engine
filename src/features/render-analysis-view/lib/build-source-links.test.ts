@@ -67,4 +67,36 @@ describe("build-source-links (render-analysis-view/lib)", () => {
       `/consumer/forms/${FORM_B_ID}?startDate=2026-02-01&endDate=2026-02-28&dateFieldId=expense_date`
     );
   });
+
+  it("동일 폼/동일 기간이더라도 filters 조건이 다르면 별도 링크로 보존하고 URL에 직렬화해야 한다", () => {
+    const block: AnalysisBlock = {
+      id: "table-filtered",
+      type: "table",
+      title: "카테고리별 내역",
+      columns: [{ key: "k", label: "항목", align: "left" }],
+      rows: [{ k: "A" }],
+      sourceLinks: [
+        {
+          formId: FORM_A_ID,
+          label: "식대 내역",
+          startDate: "2026-02-01",
+          endDate: "2026-02-28",
+          filters: [{ fieldId: "f_cat", op: "in", values: ["MEAL"] }],
+        },
+        {
+          formId: FORM_A_ID,
+          label: "교통비 내역",
+          startDate: "2026-02-01",
+          endDate: "2026-02-28",
+          filters: [{ fieldId: "f_cat", op: "in", values: ["TAXI"] }],
+        },
+      ],
+    };
+
+    const links = buildBlockSourceLinks(block);
+    expect(links).toHaveLength(2);
+    expect(links[0]?.href).toContain("filters=");
+    expect(decodeURIComponent(links[0]!.href)).toContain("MEAL");
+    expect(decodeURIComponent(links[1]!.href)).toContain("TAXI");
+  });
 });

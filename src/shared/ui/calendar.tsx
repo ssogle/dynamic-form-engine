@@ -3,6 +3,7 @@
 import * as React from "react";
 import { cn } from "@/shared/lib/cn";
 import { DayPicker, getDefaultClassNames, type DayButton, type Locale } from "react-day-picker";
+import { ko } from "react-day-picker/locale";
 
 import { Button, buttonVariants } from "@/shared/ui/button";
 import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon } from "lucide-react";
@@ -11,9 +12,11 @@ function Calendar({
   className,
   classNames,
   showOutsideDays = true,
-  captionLayout = "label",
+  // 월/연도를 한 번에 이동할 수 있도록 드롭다운 탐색을 기본값으로 사용
+  captionLayout = "dropdown",
   buttonVariant = "ghost",
-  locale,
+  // 프로젝트 기본 UI 언어에 맞춰 별도 지정이 없으면 한국어 로케일을 사용
+  locale = ko,
   formatters,
   components,
   ...props
@@ -21,10 +24,13 @@ function Calendar({
   buttonVariant?: React.ComponentProps<typeof Button>["variant"];
 }) {
   const defaultClassNames = getDefaultClassNames();
+  // react-day-picker는 endMonth 미지정 시 드롭다운 상한이 올해 말로 제한되므로 +20년까지 확장
+  const defaultEndMonth = React.useMemo(() => new Date(new Date().getFullYear() + 20, 11, 1), []);
 
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
+      endMonth={defaultEndMonth}
       className={cn(
         "group/calendar bg-background p-2 [--cell-radius:var(--radius-md)] [--cell-size:--spacing(7)] in-data-[slot=card-content]:bg-transparent in-data-[slot=popover-content]:bg-transparent",
         String.raw`rtl:**:[.rdp-button\_next>svg]:rotate-180`,
@@ -35,6 +41,8 @@ function Calendar({
       locale={locale}
       formatters={{
         formatMonthDropdown: (date) => date.toLocaleString(locale?.code, { month: "short" }),
+        formatYearDropdown: (date) =>
+          locale?.code?.startsWith("ko") ? `${date.getFullYear()}년` : String(date.getFullYear()),
         ...formatters,
       }}
       classNames={{
@@ -60,16 +68,22 @@ function Calendar({
           defaultClassNames.month_caption
         ),
         dropdowns: cn(
-          "flex h-(--cell-size) w-full items-center justify-center gap-1.5 text-sm font-medium",
+          "flex h-(--cell-size) w-full items-center justify-center gap-1 text-xs font-medium",
           defaultClassNames.dropdowns
         ),
-        dropdown_root: cn("relative rounded-(--cell-radius)", defaultClassNames.dropdown_root),
-        dropdown: cn("absolute inset-0 bg-popover opacity-0", defaultClassNames.dropdown),
+        dropdown_root: cn(
+          "border-input/80 hover:bg-accent/50 relative rounded-(--cell-radius) border shadow-xs transition-colors",
+          defaultClassNames.dropdown_root
+        ),
+        dropdown: cn(
+          "bg-popover absolute inset-0 cursor-pointer opacity-0",
+          defaultClassNames.dropdown
+        ),
         caption_label: cn(
           "font-medium select-none",
           captionLayout === "label"
             ? "text-sm"
-            : "flex items-center gap-1 rounded-(--cell-radius) text-sm [&>svg]:size-3.5 [&>svg]:text-muted-foreground",
+            : "[&>svg]:text-muted-foreground flex h-7 items-center gap-0.5 rounded-(--cell-radius) px-1.5 text-xs [&>svg]:size-3",
           defaultClassNames.caption_label
         ),
         month_grid: cn("w-full border-collapse", defaultClassNames.month_grid),

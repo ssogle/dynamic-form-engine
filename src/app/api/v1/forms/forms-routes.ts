@@ -1,5 +1,10 @@
-import { z } from "zod";
-import { extractActiveFields, insertFormSchema, updateFormSchema } from "@/entities/form";
+import {
+  extractActiveFields,
+  formsListQuerySchema,
+  insertFormSchema,
+  publishFormBodySchema,
+  updateFormSchema,
+} from "@/entities/form";
 import {
   findActiveForms,
   findPublishedForms,
@@ -12,25 +17,6 @@ import { apiResponse, badRequest, notFound } from "@/shared/lib/http";
 import { createSubRouter } from "../_lib/create-api-router";
 import { parseJsonBody, parseQueryParams } from "../_lib/request-helpers";
 import type { FormsRouterVariables } from "./forms-middleware";
-
-/**
- * 폼 목록 조회(`GET /api/v1/forms`) 쿼리 파라미터 검증 스키마
- * - `?published=true` 전달 시 공식 발행된 폼만 필터링하여 컨슈머 포털에 제공합니다.
- */
-const formsListQuerySchema = z.object({
-  published: z.enum(["true", "false"]).optional(),
-});
-
-/**
- * 폼 발행 상태 토글(`POST /api/v1/forms/:id/publish`) 요청 본문 검증 스키마
- * - 본문이 비어 있거나 `isPublished`가 생략된 경우 기본값 `true`(공식 발행)로 처리합니다.
- * - 문자열이나 숫자 등 잘못된 타입이 전달되면 Zod 검증으로 `400 BAD_REQUEST`를 반환합니다.
- */
-const publishFormBodySchema = z.object({
-  isPublished: z
-    .boolean({ message: "발행 여부(isPublished)는 불리언 값이어야 합니다." })
-    .default(true),
-});
 
 /**
  * 폼 메타데이터 및 발행 lifecycle을 담당하는 Hono 서브 라우터

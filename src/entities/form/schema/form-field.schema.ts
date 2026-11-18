@@ -1,31 +1,13 @@
 import { z } from "zod";
+import { coreFieldTypeSchema, type CoreFieldType } from "@/shared/schema";
 import { validatePrimaryFieldSelection } from "../lib/primary-field";
 
 /**
  * 코어 폼 필드 타입 (9종 순수 도메인 데이터 필드)
  *
- * - text: 단문 텍스트 입력
- * - textarea: 장문 설명 입력
- * - number: 숫자 입력
- * - select: 단일 선택 드롭다운
- * - radio: 라디오 버튼 단일 선택 그룹
- * - checkbox: 다중 선택 체크박스 그룹
- * - date: 순수 달력 날짜 선택기 (YYYY-MM-DD)
- * - switch: 참/거짓 모던 토글 스위치 (boolean)
- * - relation: 타겟 데이터 도메인(타 폼 서브미션) 검색/선택 콤보박스
+ * 단일 진실 원천인 @/shared/schema의 coreFieldTypeSchema를 re-export합니다.
  */
-export const coreFieldTypeSchema = z.enum([
-  "text",
-  "textarea",
-  "number",
-  "select",
-  "radio",
-  "checkbox",
-  "date",
-  "switch",
-  "relation",
-]);
-export type CoreFieldType = z.infer<typeof coreFieldTypeSchema>;
+export { coreFieldTypeSchema, type CoreFieldType };
 
 /**
  * 개별 인라인 옵션 Zod 스키마 (소프트 비활성화 지원)
