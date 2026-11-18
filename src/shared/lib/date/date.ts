@@ -188,3 +188,26 @@ export function parseYmdToDate(ymd?: unknown): Date | undefined {
 
   return parsed;
 }
+
+/**
+ * 브라우저의 `<input type="date">` 지원 여부와 무관하게 날짜 입력값을
+ * `YYYY-MM-DD` 숫자 마스크 형식으로 정규화하는 순수 함수입니다.
+ *
+ * - 숫자(`0-9`) 외의 문자(영문, 한글, 기호)는 입력 즉시 제거합니다.
+ * - 최대 8자리 숫자(`YYYYMMDD`)만 허용하며 `4자리-2자리-2자리` 위치에 하이픈(`-`)을 자동 삽입합니다.
+ * - 후행 하이픈을 붙이지 않아 백스페이스 삭제 시 커서가 막히지 않습니다.
+ *
+ * @param rawValue 사용자 입력 원시 문자열
+ * @returns `YYYY-MM-DD` 형식으로 정제된 문자열 (최대 10자)
+ */
+export function formatYmdInputMask(rawValue: string): string {
+  const digits = rawValue.replace(/\D/g, "").slice(0, 8);
+
+  if (digits.length <= 4) {
+    return digits;
+  }
+  if (digits.length <= 6) {
+    return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  }
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
+}

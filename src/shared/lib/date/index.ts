@@ -10,6 +10,7 @@ export {
   formatDateToYmd,
   formatRelativeTime,
   formatUtc,
+  formatYmdInputMask,
   nowUtcIso,
   parseYmdToDate,
   toSafeDate,
