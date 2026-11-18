@@ -17,7 +17,7 @@ import {
 import { Skeleton } from "@/shared/ui/skeleton";
 
 /**
- * 컨슈머 포털(/consumer/views)에 공식 발행된 분석 뷰만 읽기 전용으로 나열하는 목록 컴포넌트
+ * 컨슈머 포털(/consumer)에 공식 발행된 분석 뷰만 읽기 전용으로 나열하는 목록 컴포넌트
  */
 export function PublishedAnalysisViewList() {
   const { data: views, isLoading, isError, error } = usePublishedAnalysisViewsQuery();

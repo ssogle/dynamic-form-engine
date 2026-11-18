@@ -91,7 +91,7 @@ export function ConsumerSubmissionEditor({ formId, submissionId }: ConsumerSubmi
               <Link href={`/consumer/forms/${formId}/submissions`}>제출 목록으로 돌아가기</Link>
             </Button>
             <Button asChild variant="ghost" size="sm">
-              <Link href="/consumer/forms">폼 전체 목록</Link>
+              <Link href="/consumer">전체 목록</Link>
             </Button>
           </CardFooter>
         </Card>

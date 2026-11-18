@@ -49,7 +49,7 @@ const WORKSPACE_APPS: readonly WorkspaceAppItem[] = [
     id: "consumer",
     label: "컨슈머",
     englishLabel: "Consumer",
-    href: "/consumer/forms",
+    href: "/consumer",
     matchPrefix: "/consumer",
     icon: FileText,
   },

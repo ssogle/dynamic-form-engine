@@ -74,7 +74,7 @@ export function ConsumerFormSubmitter({ formId }: ConsumerFormSubmitterProps) {
           </CardHeader>
           <CardFooter>
             <Button asChild variant="outline" size="sm">
-              <Link href="/consumer/forms">폼 목록으로 돌아가기</Link>
+              <Link href="/consumer">목록으로 돌아가기</Link>
             </Button>
           </CardFooter>
         </Card>
@@ -97,7 +97,7 @@ export function ConsumerFormSubmitter({ formId }: ConsumerFormSubmitterProps) {
           </CardHeader>
           <CardContent>
             <Button asChild variant="outline" size="sm">
-              <Link href="/consumer/forms">다른 폼 목록 둘러보기</Link>
+              <Link href="/consumer">다른 폼 목록 둘러보기</Link>
             </Button>
           </CardContent>
         </Card>

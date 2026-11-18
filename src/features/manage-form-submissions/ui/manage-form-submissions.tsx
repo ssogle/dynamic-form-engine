@@ -63,7 +63,7 @@ export function ManageFormSubmissions({
         </CardHeader>
         <CardFooter>
           <Button asChild variant="outline" size="sm">
-            <Link href="/consumer/forms">폼 목록으로 이동</Link>
+            <Link href="/consumer">목록으로 이동</Link>
           </Button>
         </CardFooter>
       </Card>

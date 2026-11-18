@@ -20,9 +20,9 @@ export default async function ConsumerViewDetailPage({ params }: ConsumerViewDet
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6">
       <Button asChild variant="ghost" size="sm" className="text-muted-foreground gap-1.5">
-        <Link href="/consumer/views">
+        <Link href="/consumer">
           <ArrowLeft className="size-4" />
-          공유된 뷰 목록으로 돌아가기
+          목록으로 돌아가기
         </Link>
       </Button>
 
