@@ -9,8 +9,9 @@ import { NavigatorShell } from "@/widgets/navigator-shell";
 /**
  * 분석가(Analyst Knowledge Studio) 대칭 작업 공간 레이아웃
  *
+ * 최상위 WorkspaceLayout의 글로벌 앱 바 하단 영역(h-full)을 채우며,
  * 좌측: 상시 상주하는 Analyst AI Navigator 패널
- * 우측 상단: 분석가 내부 네비게이션 탭 (분석 뷰 목록) 및 타 역할 작업 공간 이동 링크
+ * 우측 상단: 분석가 내부 네비게이션 탭 (분석 뷰 목록)
  * 우측 본문: 분석 뷰 목록 또는 블록 문서 캔버스
  */
 export default function AnalystLayout({ children }: { children: React.ReactNode }) {
@@ -18,7 +19,7 @@ export default function AnalystLayout({ children }: { children: React.ReactNode 
   const isViewsActive = pathname.startsWith("/analyst/views");
 
   return (
-    <div className="bg-background flex h-screen w-full overflow-hidden">
+    <div className="bg-background flex h-full w-full overflow-hidden">
       {/* 좌측 상주형 Analyst AI Navigator 관제탑 패널 */}
       <div className="border-border/80 h-full w-80 shrink-0 border-r lg:w-96">
         <NavigatorShell mode="analyst" />
@@ -40,27 +41,6 @@ export default function AnalystLayout({ children }: { children: React.ReactNode 
               분석 뷰 목록
             </Link>
           </nav>
-
-          <div className="flex items-center gap-4">
-            <Link
-              href="/builder/forms"
-              className="text-muted-foreground hover:text-foreground text-xs font-medium transition-colors"
-            >
-              빌더로 이동
-            </Link>
-            <Link
-              href="/consumer/views"
-              className="text-muted-foreground hover:text-foreground text-xs font-medium transition-colors"
-            >
-              컨슈머로 이동
-            </Link>
-            <Link
-              href="/"
-              className="text-muted-foreground hover:text-foreground text-xs transition-colors"
-            >
-              처음 화면으로
-            </Link>
-          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto">
