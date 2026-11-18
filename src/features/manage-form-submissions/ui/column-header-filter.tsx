@@ -272,7 +272,14 @@ export function ColumnHeaderFilter({
     : "";
 
   const popoverWidthClass =
-    widget === "date" || widget === "relation" ? "w-80 p-3 shadow-md" : "w-72 p-3 shadow-md";
+    widget === "date"
+      ? "w-64 p-3 shadow-md"
+      : widget === "relation"
+        ? "w-80 p-3 shadow-md"
+        : "w-72 p-3 shadow-md";
+  // 날짜 필터 팝오버(w-64) 내부 폭을 꽉 채우면서 컴팩트한 셀 비율(약 31px)을 유지
+  const dateFilterCalendarClassName = "w-full rounded-md border [--cell-size:--spacing(7.5)]";
+  const dateFilterCalendarClassNames = { root: "w-full" };
 
   return (
     <div className="flex items-center justify-between gap-1 pr-2">
@@ -514,7 +521,8 @@ export function ColumnHeaderFilter({
                       maxValue: range?.to ? formatDateToYmd(range.to) : "",
                     }));
                   }}
-                  className="rounded-md border"
+                  className={dateFilterCalendarClassName}
+                  classNames={dateFilterCalendarClassNames}
                 />
               </div>
             )}
@@ -539,7 +547,8 @@ export function ColumnHeaderFilter({
                       scalarValue: date ? formatDateToYmd(date) : "",
                     }));
                   }}
-                  className="rounded-md border"
+                  className={dateFilterCalendarClassName}
+                  classNames={dateFilterCalendarClassNames}
                 />
               </div>
             )}
