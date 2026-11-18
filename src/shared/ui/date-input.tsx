@@ -12,7 +12,7 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "@/shared/ui/input-group";
-import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 
 export interface YmdMaskedInputProps extends Omit<
   React.ComponentProps<typeof Input>,
@@ -93,45 +93,48 @@ export function DatePickerInput({
   };
 
   return (
-    <InputGroup
-      className={cn("h-9 w-full", className)}
-      data-disabled={disabled ? "true" : undefined}
-    >
-      <InputGroupInput
-        id={id}
-        type="text"
-        inputMode="numeric"
-        maxLength={10}
-        disabled={disabled}
-        value={currentValue}
-        onChange={(e) => handleValueChange(formatYmdInputMask(e.target.value))}
-        placeholder={placeholder}
-      />
-      <InputGroupAddon align="inline-end">
-        <Popover open={isOpen} onOpenChange={setIsOpen}>
-          <PopoverTrigger asChild>
-            <InputGroupButton
-              size="icon-xs"
-              disabled={disabled}
-              aria-label="달력에서 날짜 선택"
-              title="달력에서 날짜 선택"
-            >
-              <CalendarIcon className="size-4" />
-            </InputGroupButton>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              {...(selectedDate ? { defaultMonth: selectedDate } : {})}
-              onSelect={(date) => {
-                handleValueChange(date ? formatDateToYmd(date) : "");
-                setIsOpen(false);
-              }}
-            />
-          </PopoverContent>
-        </Popover>
-      </InputGroupAddon>
-    </InputGroup>
+    // Popover를 InputGroupAddon 바깥에 배치해 Portal 클릭 이벤트 버블링으로 인풋 포커스가 빼앗기지 않게 함
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverAnchor asChild>
+        <InputGroup
+          className={cn("h-9 w-full", className)}
+          data-disabled={disabled ? "true" : undefined}
+        >
+          <InputGroupInput
+            id={id}
+            type="text"
+            inputMode="numeric"
+            maxLength={10}
+            disabled={disabled}
+            value={currentValue}
+            onChange={(e) => handleValueChange(formatYmdInputMask(e.target.value))}
+            placeholder={placeholder}
+          />
+          <InputGroupAddon align="inline-end">
+            <PopoverTrigger asChild>
+              <InputGroupButton
+                size="icon-xs"
+                disabled={disabled}
+                aria-label="달력에서 날짜 선택"
+                title="달력에서 날짜 선택"
+              >
+                <CalendarIcon className="size-4" />
+              </InputGroupButton>
+            </PopoverTrigger>
+          </InputGroupAddon>
+        </InputGroup>
+      </PopoverAnchor>
+      <PopoverContent className="w-auto p-0" align="end">
+        <Calendar
+          mode="single"
+          selected={selectedDate}
+          {...(selectedDate ? { defaultMonth: selectedDate } : {})}
+          onSelect={(date) => {
+            handleValueChange(date ? formatDateToYmd(date) : "");
+            setIsOpen(false);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
   );
 }
