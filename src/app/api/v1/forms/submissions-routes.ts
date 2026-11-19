@@ -3,6 +3,7 @@ import {
   extractSubmissionPayload,
   isValidTimezone,
   submissionQuerySchema,
+  updateFormSubmissionSchema,
 } from "@/entities/form-submission";
 import {
   findSubmissionsPaginated,
@@ -10,7 +11,7 @@ import {
   softDeleteSubmissionById,
   updateSubmissionById,
 } from "@/entities/form-submission/server";
-import { apiResponse, badRequest, notFound } from "@/shared/lib/http";
+import { apiResponse, badRequest, conflict, notFound } from "@/shared/lib/http";
 import { parseFieldFiltersStrict, validateFiltersAgainstFields } from "@/shared/schema";
 import { createSubRouter } from "../_lib/create-api-router";
 import { parseQueryParams, readJsonBody } from "../_lib/request-helpers";
@@ -121,6 +122,14 @@ submissionsRoutes.patch("/:id/submissions/:submissionId", async (c) => {
   const submission = c.get("submission");
 
   const rawBody = await readJsonBody(c);
+  const parsedUpdateBody = updateFormSubmissionSchema.safeParse(rawBody);
+  if (!parsedUpdateBody.success) {
+    throw badRequest(
+      "낙관적 락 검증을 위한 expectedVersion을 포함한 올바른 수정 요청 형식이 아닙니다.",
+      parsedUpdateBody.error.issues
+    );
+  }
+
   const submissionPayload = extractSubmissionPayload(rawBody);
 
   // 수정 시에도 폼의 최신 활성 필드 정의를 기준으로 동적 Zod 검증 및 잉여 키 정제를 수행합니다.
@@ -131,15 +140,22 @@ submissionsRoutes.patch("/:id/submissions/:submissionId", async (c) => {
     throw badRequest("수정하려는 폼 응답 데이터가 유효하지 않습니다.", validationResult.errors);
   }
 
-  const updatedSubmission = await updateSubmissionById(submission.id, {
+  const updateResult = await updateSubmissionById(submission.id, {
     data: validationResult.cleanedData ?? {},
+    expectedVersion: parsedUpdateBody.data.expectedVersion,
   });
 
-  if (!updatedSubmission) {
+  if (updateResult.status === "not_found") {
     throw notFound("수정 대상 응답 데이터를 찾을 수 없습니다.");
   }
+  if (updateResult.status === "conflict") {
+    throw conflict(
+      "다른 사용자가 먼저 응답을 수정했습니다. 최신 데이터를 불러온 뒤 다시 시도해 주세요.",
+      { currentVersion: updateResult.currentVersion }
+    );
+  }
 
-  return apiResponse.ok(updatedSubmission);
+  return apiResponse.ok(updateResult.data);
 });
 
 /**

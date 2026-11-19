@@ -32,6 +32,7 @@ import {
   type PublishAnalysisViewInput,
   type UpdateAnalysisViewInput,
 } from "../../schema/navigator-tools.schema";
+import type { OptimisticUpdateResult } from "@/shared/lib/http";
 import type { NavigatorAnalystAction } from "../../types/navigator-action.types";
 
 export {
@@ -50,9 +51,13 @@ export interface AnalystToolsDependencies {
   updateAnalysisViewById: (
     id: string,
     updates: UpdateAnalysisView
-  ) => Promise<AnalysisView | undefined>;
+  ) => Promise<OptimisticUpdateResult<AnalysisView>>;
   publishAnalysisViewById: (id: string, isPublished: boolean) => Promise<AnalysisView | undefined>;
   softDeleteAnalysisViewsByIds: (ids: string[]) => Promise<AnalysisView[]>;
+  /** 클라이언트 화면이 현재 보고 있는 분석 뷰 ID (낙관적 락 컨텍스트 대조용) */
+  expectedViewId?: string | undefined;
+  /** 클라이언트 화면이 현재 보고 있는 분석 뷰 버전 (낙관적 락 컨텍스트 대조용) */
+  expectedViewVersion?: number | undefined;
   aggregateFormSubmissions: (
     query: AnalyticsAggregationQuery
   ) => Promise<AnalyticsResult<AnalyticsAggregationResult>>;
@@ -80,6 +85,7 @@ function hasDuplicateBlockIds(blocks: AnalysisBlock[]): boolean {
  * 본 도구 모음은 서버 집계, 결정론적 시리즈 산술 연산, 분석 뷰 문서 CRUD/발행/네비게이션을 담당합니다.
  */
 export function createAnalystTools(deps: AnalystToolsDependencies) {
+  let trackedClientViewVersion = deps.expectedViewVersion;
   /**
    * 동일 요청 스텝에서 AI가 여러 updateAnalysisView / publishAnalysisView 도구를
    * 동시에 병렬 호출할 때 Read-Modify-Write 경합(Lost Update)을 방지하기 위한 뷰 단위 순차 직렬화 큐
@@ -371,17 +377,42 @@ export function createAnalystTools(deps: AnalystToolsDependencies) {
           }
         }
 
-        const persisted = await deps.updateAnalysisViewById(viewId, {
+        if (
+          deps.expectedViewId === viewId &&
+          trackedClientViewVersion !== undefined &&
+          existing.version !== trackedClientViewVersion
+        ) {
+          return {
+            success: false,
+            error:
+              "다른 사용자가 먼저 분석 뷰를 수정했습니다. 화면을 새로고침해 최신 버전을 확인한 뒤 다시 요청해 주세요.",
+          };
+        }
+
+        const updateResult = await deps.updateAnalysisViewById(viewId, {
           ...(nextTitle !== undefined ? { title: nextTitle } : {}),
           ...(nextDescription !== undefined ? { description: nextDescription } : {}),
           ...(shouldPersistBlocks ? { blocks: updatedBlocks } : {}),
+          expectedVersion: existing.version,
         });
 
-        if (!persisted) {
+        if (updateResult.status === "not_found") {
           return {
             success: false,
-            error: "분석 뷰 업데이트 결과를 저장하지 못했습니다.",
+            error: "수정 대상 분석 뷰를 찾을 수 없습니다.",
           };
+        }
+        if (updateResult.status === "conflict") {
+          return {
+            success: false,
+            error:
+              "다른 사용자가 동시에 분석 뷰를 수정했습니다. 화면을 새로고침해 최신 버전을 확인한 뒤 다시 시도해 주세요.",
+          };
+        }
+
+        const persisted = updateResult.data;
+        if (deps.expectedViewId === viewId) {
+          trackedClientViewVersion = persisted.version;
         }
 
         const persistedBlocks = extractAnalysisBlocks(persisted);

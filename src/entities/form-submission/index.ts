@@ -58,6 +58,7 @@ export {
   useSubmitFormMutation,
   useUpdateSubmissionMutation,
   useDeleteSubmissionMutation,
+  type UpdateFormSubmissionPayload,
 } from "./queries/use-form-submissions.mutation";
 
 export { extractSubmissionPayload } from "./lib/extract-submission-payload";

@@ -49,6 +49,7 @@ export const navigatorClientContextSchema = z.object({
   currentForm: z
     .object({
       id: z.string(),
+      version: z.number().int().positive().optional(),
       title: z.string(),
       description: z.string().optional(),
       isPublished: z.boolean().optional(),
@@ -78,6 +79,7 @@ export const navigatorClientContextSchema = z.object({
   currentAnalysisView: z
     .object({
       id: z.string(),
+      version: z.number().int().positive().optional(),
       title: z.string(),
       description: z.string().optional(),
       isPublished: z.boolean().optional(),

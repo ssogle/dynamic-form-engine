@@ -63,6 +63,7 @@ describe("GET /api/v1/relations (Hono Thin Controller)", () => {
           {
             id: "22222222-2222-4222-a222-222222222222",
             formId: "11111111-1111-4111-a111-111111111111",
+            version: 1,
             data: { f_title: "상담 1건" },
             createdAt: new Date("2026-01-01T00:00:00.000Z"),
             updatedAt: new Date("2026-01-01T00:00:00.000Z"),

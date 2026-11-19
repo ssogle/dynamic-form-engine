@@ -83,26 +83,39 @@ describe("Form Submission Schemas (entities/form-submission)", () => {
   });
 
   describe("updateFormSubmissionSchema", () => {
-    it("수정할 data 객체가 전달되면 성공적으로 파싱되어야 한다", () => {
+    it("수정할 data 객체와 expectedVersion이 전달되면 성공적으로 파싱되어야 한다", () => {
       const validPayload = {
         data: {
           score: 4,
           feedback: "수정된 의견입니다.",
         },
+        expectedVersion: 1,
       };
 
       const result = updateFormSubmissionSchema.safeParse(validPayload);
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.data).toEqual(validPayload.data);
+        expect(result.data.expectedVersion).toBe(1);
       }
     });
 
-    it("수정 시 시스템 전유 필드 및 formId는 스키마에서 제외되어야 한다", () => {
+    it("expectedVersion이 누락되면 유효성 검증에 실패해야 한다", () => {
+      const missingVersionPayload = {
+        data: { score: 4 },
+      };
+
+      const result = updateFormSubmissionSchema.safeParse(missingVersionPayload);
+      expect(result.success).toBe(false);
+    });
+
+    it("수정 시 시스템 전유 필드(id, createdAt, updatedAt, deletedAt, version) 및 formId는 스키마에서 제외되어야 한다", () => {
       const payloadWithDisallowedFields = {
         data: { score: 5 },
+        expectedVersion: 2,
         formId: "123e4567-e89b-12d3-a456-426614174000",
         id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+        version: 99,
         createdAt: new Date(),
         updatedAt: new Date(),
         deletedAt: new Date(),
@@ -111,9 +124,10 @@ describe("Form Submission Schemas (entities/form-submission)", () => {
       const result = updateFormSubmissionSchema.safeParse(payloadWithDisallowedFields);
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data).toEqual({ data: { score: 5 } });
+        expect(result.data).toEqual({ data: { score: 5 }, expectedVersion: 2 });
         expect(result.data).not.toHaveProperty("id");
         expect(result.data).not.toHaveProperty("formId");
+        expect(result.data).not.toHaveProperty("version");
         expect(result.data).not.toHaveProperty("createdAt");
         expect(result.data).not.toHaveProperty("updatedAt");
         expect(result.data).not.toHaveProperty("deletedAt");
@@ -123,6 +137,7 @@ describe("Form Submission Schemas (entities/form-submission)", () => {
     it("data 객체가 누락되거나 잘못된 형식이면 실패해야 한다", () => {
       const invalidPayload = {
         data: null,
+        expectedVersion: 1,
       };
 
       const result = updateFormSubmissionSchema.safeParse(invalidPayload);
@@ -136,6 +151,7 @@ describe("Form Submission Schemas (entities/form-submission)", () => {
         id: "123e4567-e89b-12d3-a456-426614174001",
         formId: "123e4567-e89b-12d3-a456-426614174000",
         data: { field1: "value1" },
+        version: 1,
         createdAt: new Date("2026-01-01T00:00:00Z"),
         updatedAt: new Date("2026-01-01T00:00:00Z"),
         deletedAt: null,

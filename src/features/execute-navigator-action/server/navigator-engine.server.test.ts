@@ -38,6 +38,7 @@ vi.mock("@/entities/form/server", () => ({
 
 vi.mock("@/entities/form-submission/server", () => ({
   hasSubmissionsByFormId: vi.fn().mockResolvedValue(false),
+  findInboundRelatedSubmissions: vi.fn().mockResolvedValue([]),
   softDeleteSubmissionsByIds: vi.fn(),
   aggregateFormSubmissions: vi.fn(),
   queryFormSubmissionsForAnalysis: vi.fn(),

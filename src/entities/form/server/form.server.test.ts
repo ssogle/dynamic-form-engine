@@ -48,6 +48,7 @@ describe("Form Server Repository (entities/form/server)", () => {
     id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
     title: "일일 업무 보고서",
     description: "업무 기록 폼",
+    version: 1,
     schemaDefinition: { fields: [] },
     createdAt: sampleDate,
     updatedAt: sampleDate,
@@ -142,15 +143,28 @@ describe("Form Server Repository (entities/form/server)", () => {
   });
 
   describe("updateFormById", () => {
-    it("폼 메타데이터를 수정하고 수정된 레코드를 반환해야 한다", async () => {
-      const updateData = { title: "수정된 폼 제목" };
-      mockReturning.mockResolvedValueOnce([{ ...sampleForm, title: "수정된 폼 제목" }]);
+    it("expectedVersion이 일치하면 폼 메타데이터를 수정하고 version이 증가된 updated 결과를 반환해야 한다", async () => {
+      const updateData = { title: "수정된 폼 제목", expectedVersion: 1 };
+      const updated = { ...sampleForm, title: "수정된 폼 제목", version: 2 };
+      mockReturning.mockResolvedValueOnce([updated]);
 
       const result = await updateFormById(sampleForm.id, updateData);
 
       expect(mockUpdate).toHaveBeenCalledTimes(1);
       expect(mockSet).toHaveBeenCalledTimes(1);
-      expect(result?.title).toBe("수정된 폼 제목");
+      expect(result).toEqual({ status: "updated", data: updated });
+    });
+
+    it("expectedVersion이 DB 최신 버전과 다르면 conflict와 currentVersion을 반환해야 한다", async () => {
+      mockReturning.mockResolvedValueOnce([]);
+      mockLimit.mockResolvedValueOnce([{ version: 3 }]);
+
+      const result = await updateFormById(sampleForm.id, {
+        title: "충돌 수정",
+        expectedVersion: 1,
+      });
+
+      expect(result).toEqual({ status: "conflict", currentVersion: 3 });
     });
   });
 

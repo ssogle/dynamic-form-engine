@@ -113,13 +113,13 @@ describe("useFormMutation (엔티티 공용 폼 조작 뮤테이션 훅)", () =>
       } as unknown as Response);
       vi.stubGlobal("fetch", mockFetch);
 
-      const result = await updateForm(sampleForm.id, { title: "수정됨" });
+      const result = await updateForm(sampleForm.id, { title: "수정됨", expectedVersion: 1 });
 
       expect(mockFetch).toHaveBeenCalledWith(
         `/api/v1/forms/${sampleForm.id}`,
         expect.objectContaining({
           method: "PATCH",
-          body: JSON.stringify({ title: "수정됨" }),
+          body: JSON.stringify({ title: "수정됨", expectedVersion: 1 }),
         })
       );
       expect(result.title).toBe("수정됨");
@@ -142,7 +142,7 @@ describe("useFormMutation (엔티티 공용 폼 조작 뮤테이션 훅)", () =>
       await act(async () => {
         await result.current.mutateAsync({
           id: sampleForm.id,
-          data: { title: "수정됨" },
+          data: { title: "수정됨", expectedVersion: 1 },
         });
       });
 

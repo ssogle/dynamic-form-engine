@@ -1,15 +1,18 @@
 import { tool } from "ai";
-import type { Form } from "@/entities/form";
+import { extractPrimaryFieldValue, formatFieldDisplayValue, type Form } from "@/entities/form";
+import type { RelatedSubmissionsGroup } from "@/entities/form-submission";
 import { resolveFieldQueryCapability } from "@/shared/schema";
 import {
   getFormDetailsInputSchema,
+  getRelatedSubmissionsInputSchema,
   searchFormsInputSchema,
   type GetFormDetailsInput,
+  type GetRelatedSubmissionsInput,
   type SearchFormsInput,
 } from "../../schema/navigator-tools.schema";
 import { extractFieldsFromForm } from "./builder-tools";
 
-export { getFormDetailsInputSchema, searchFormsInputSchema };
+export { getFormDetailsInputSchema, getRelatedSubmissionsInputSchema, searchFormsInputSchema };
 
 /**
  * 폼 조회 도구 카탈로그에서 사용할 데이터 의존성 인터페이스
@@ -18,6 +21,7 @@ export interface QueryToolsDependencies {
   findActiveForms: () => Promise<Form[]>;
   findPublishedForms: () => Promise<Form[]>;
   findFormById: (id: string) => Promise<Form | undefined>;
+  findInboundRelatedSubmissions?: (targetId: string) => Promise<RelatedSubmissionsGroup[]>;
 }
 
 /**
@@ -91,6 +95,8 @@ export function createQueryTools(deps: QueryToolsDependencies) {
             label: f.label,
             type: f.type,
             required: Boolean(f.required),
+            ...(f.multiple !== undefined ? { multiple: f.multiple } : {}),
+            ...(f.relationConfig ? { relationConfig: f.relationConfig } : {}),
             options: f.options ?? undefined,
             capabilities: capability
               ? {
@@ -106,8 +112,63 @@ export function createQueryTools(deps: QueryToolsDependencies) {
     },
   });
 
+  /**
+   * 3. 특정 레코드를 참조(relation)하는 역참조 연결 이력 조회 도구
+   */
+  const getRelatedSubmissionsTool = tool({
+    description:
+      "relations 엣지 인덱스를 조회하여 특정 응답 레코드(submissionId)를 참조하고 있는 모든 하위 연결 폼의 내역과 요약 값을 반환합니다.",
+    inputSchema: getRelatedSubmissionsInputSchema,
+    execute: async ({ submissionId }: GetRelatedSubmissionsInput) => {
+      if (!deps.findInboundRelatedSubmissions) {
+        return {
+          found: false,
+          groups: [],
+          message: "역참조 관계 조회 기능이 구성되어 있지 않습니다.",
+        };
+      }
+
+      const groups = await deps.findInboundRelatedSubmissions(submissionId);
+      const formattedGroups = groups.map((group) => {
+        const sourceFormLike = {
+          schemaDefinition: group.sourceForm.schemaDefinition,
+        } as unknown as Form;
+        const activeFields = extractFieldsFromForm(sourceFormLike);
+
+        return {
+          sourceFormId: group.sourceForm.id,
+          sourceFormTitle: group.sourceForm.title,
+          count: group.submissions.length,
+          items: group.submissions.map((sub) => {
+            const dataObj = (sub.data ?? {}) as Record<string, unknown>;
+            const values: Record<string, string> = {};
+            for (const field of activeFields) {
+              if (dataObj[field.id] !== undefined) {
+                values[field.label] = formatFieldDisplayValue(dataObj[field.id], field);
+              }
+            }
+            return {
+              id: sub.id,
+              primaryValue: extractPrimaryFieldValue(sourceFormLike, sub),
+              values,
+            };
+          }),
+        };
+      });
+
+      return {
+        found: formattedGroups.length > 0,
+        targetSubmissionId: submissionId,
+        totalGroups: formattedGroups.length,
+        totalRelatedCount: formattedGroups.reduce((sum, g) => sum + g.count, 0),
+        groups: formattedGroups,
+      };
+    },
+  });
+
   return {
     searchForms: searchFormsTool,
     getFormDetails: getFormDetailsTool,
+    getRelatedSubmissions: getRelatedSubmissionsTool,
   };
 }

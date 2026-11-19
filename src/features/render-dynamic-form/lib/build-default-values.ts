@@ -7,8 +7,8 @@ import type { CoreFormField } from "@/entities/form";
  * - number, date: 빈 상태(undefined)로 초기화하여 Zod 타입 변환과 충돌하지 않도록 합니다.
  * - switch: 불리언 기본값 false
  * - checkbox: 옵션이 정의된 다중 선택이면 빈 배열([]), 단일 토글이면 false
- * - relation: 다중 참조(multiple: true)이면 빈 배열([]), 단일 참조이면 undefined
- * - text, textarea, select, radio 등: 빈 문자열("")
+ * - select / relation: 단일/다중 모두 빈 배열([])
+ * - text, textarea, radio 등: 빈 문자열("")
  *
  * @param fields 활성 폼 필드 정의 배열
  * @returns 필드 ID를 키로 하는 기본값 딕셔너리
@@ -25,8 +25,8 @@ export function buildDefaultValues(fields: CoreFormField[]): Record<string, unkn
     } else if (field.type === "checkbox") {
       const hasOptions = Boolean(field.options && field.options.length > 0);
       defaults[field.id] = hasOptions ? [] : false;
-    } else if (field.type === "relation") {
-      defaults[field.id] = field.relationConfig?.multiple ? [] : undefined;
+    } else if (field.type === "select" || field.type === "relation") {
+      defaults[field.id] = [];
     } else {
       defaults[field.id] = "";
     }

@@ -27,6 +27,7 @@ describe("createQueryTools (features/execute-navigator-action/lib/tools)", () =>
         ],
       },
       publishedAt: new Date("2026-11-01T00:00:00Z"),
+      version: 1,
       createdAt: new Date("2026-11-01T00:00:00Z"),
       updatedAt: new Date("2026-11-01T00:00:00Z"),
       deletedAt: null,
@@ -54,6 +55,7 @@ describe("createQueryTools (features/execute-navigator-action/lib/tools)", () =>
         ],
       },
       publishedAt: null, // 미발행
+      version: 1,
       createdAt: new Date("2026-11-02T00:00:00Z"),
       updatedAt: new Date("2026-11-02T00:00:00Z"),
       deletedAt: null,
@@ -173,5 +175,72 @@ describe("createQueryTools (features/execute-navigator-action/lib/tools)", () =>
 
     expect(result.found).toBe(false);
     expect(result.message).toContain("00000000-0000-0000-0000-000000000000");
+  });
+
+  it("getRelatedSubmissions: relations 엣지 역참조 그룹을 포맷팅하여 반환해야 한다", async () => {
+    const tools = createQueryTools({
+      ...dependencies,
+      findInboundRelatedSubmissions: vi.fn().mockResolvedValue([
+        {
+          sourceForm: {
+            id: "form-expense",
+            title: "비용 정산",
+            schemaDefinition: {
+              primaryFieldId: "f_item",
+              fields: [
+                {
+                  id: "f_item",
+                  label: "지출 항목",
+                  type: "text",
+                  required: true,
+                  description: "항목",
+                },
+                {
+                  id: "f_amount",
+                  label: "금액",
+                  type: "number",
+                  required: true,
+                  description: "금액",
+                },
+              ],
+            },
+          },
+          submissions: [
+            {
+              id: "sub-exp-1",
+              formId: "form-expense",
+              version: 1,
+              data: { f_item: "팀 회식", f_amount: 120000 },
+              createdAt: new Date("2026-11-01T00:00:00Z"),
+              updatedAt: new Date("2026-11-01T00:00:00Z"),
+              deletedAt: null,
+            },
+          ],
+        },
+      ]),
+    });
+
+    const result = (await tools.getRelatedSubmissions.execute!(
+      { submissionId: "11111111-1111-4111-a111-111111111111" },
+      mockExecutionOptions
+    )) as {
+      found: boolean;
+      totalGroups: number;
+      totalRelatedCount: number;
+      groups: Array<{
+        sourceFormTitle: string;
+        items: Array<{ primaryValue: string; values: Record<string, string> }>;
+      }>;
+    };
+
+    expect(result.found).toBe(true);
+    expect(result.totalGroups).toBe(1);
+    expect(result.totalRelatedCount).toBe(1);
+    expect(result.groups[0]?.sourceFormTitle).toBe("비용 정산");
+    expect(result.groups[0]?.items[0]?.primaryValue).toBe("팀 회식");
+    expect(result.groups[0]?.items[0]?.values).toEqual({
+      "지출 항목": "팀 회식",
+      금액: "120000",
+    });
   });
 });

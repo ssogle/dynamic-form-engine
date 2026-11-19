@@ -24,6 +24,7 @@ export { forms };
  */
 const systemManagedFields = {
   id: true,
+  version: true,
   createdAt: true,
   updatedAt: true,
   deletedAt: true,
@@ -89,9 +90,15 @@ export type InsertForm = z.infer<typeof insertFormSchema>;
  * 폼 수정 시 클라이언트 요청 본문을 검증하는 Zod 스키마
  *
  * 순수 비즈니스 필드(title, description, schemaDefinition)만 선택적(partial)으로 수정 가능하며,
- * 시스템 전유 필드(id, createdAt, updatedAt, deletedAt, publishedAt)는 철저히 차단됩니다.
+ * 낙관적 락 충돌 감지를 위해 현재 조회 기준 버전(expectedVersion)을 필수로 수신합니다.
+ * 시스템 전유 필드(id, version, createdAt, updatedAt, deletedAt, publishedAt)는 철저히 차단됩니다.
  */
-export const updateFormSchema = insertFormSchema.partial();
+export const updateFormSchema = insertFormSchema.partial().extend({
+  expectedVersion: z
+    .number({ message: "낙관적 락 검증을 위한 expectedVersion(정수)이 필요합니다." })
+    .int("expectedVersion은 정수여야 합니다.")
+    .positive("expectedVersion은 1 이상의 정수여야 합니다."),
+});
 
 /**
  * 폼 정보 수정 입력 데이터 TypeScript 정적 타입

@@ -13,6 +13,7 @@ function createTestForm(fields: CoreFormField[]): Form {
       fields,
     },
     publishedAt: null,
+    version: 1,
     createdAt: new Date("2026-11-01T00:00:00.000Z"),
     updatedAt: new Date("2026-11-01T00:00:00.000Z"),
     deletedAt: null,
@@ -128,17 +129,17 @@ describe("buildPreviewSampleSubmissions (features/manage-form-submissions/lib)",
       f_num: 100,
       f_date: "2026-11-18",
       f_switch: true,
-      // 비활성 옵션("OLD")을 건너뛰고 활성 옵션만 순환해야 함
-      f_select: "ACTIVE",
+      // 비활성 옵션("OLD")을 건너뛰고 활성 옵션만 순환해야 함 (단일 select도 string[] 포맷)
+      f_select: ["ACTIVE"],
       f_radio: "HIGH",
       f_checkbox_multi: ["FE"],
       f_checkbox_bool: true,
-      f_rel_single: "샘플 참조 레코드 1",
+      f_rel_single: ["샘플 참조 레코드 1"],
       f_rel_multi: ["샘플 참조 레코드 1-A", "샘플 참조 레코드 1-B"],
     });
 
     expect(second.data).toMatchObject({
-      f_select: "DONE",
+      f_select: ["DONE"],
       f_radio: "NORMAL",
       f_checkbox_multi: ["FE", "BE"],
       f_checkbox_bool: false,

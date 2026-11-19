@@ -41,6 +41,11 @@ export {
   type FormSchemaParts,
 } from "./lib/extract-active-fields";
 export { mergeOptionsWithPreservation } from "./lib/merge-options-with-preservation";
+export {
+  validateFormSchemaTransition,
+  type FormSchemaTransitionResult,
+  type ValidateFormSchemaTransitionParams,
+} from "./lib/validate-form-schema-transition";
 export { normalizeSelectOption, normalizeSelectOptions } from "./lib/select-options";
 export { formatFieldDisplayValue } from "./lib/format-field-value";
 export {

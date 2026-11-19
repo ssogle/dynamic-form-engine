@@ -294,7 +294,7 @@ function RelationPickerDialogBody({
               variant="ghost"
               size="sm"
               className="text-muted-foreground h-8 text-xs"
-              onClick={() => onSelectValue(multiple ? [] : undefined, false)}
+              onClick={() => onSelectValue([], false)}
             >
               선택 전체 해제
             </Button>

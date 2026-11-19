@@ -1,6 +1,7 @@
 import "server-only";
 import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
-import { db } from "@/shared/db/server";
+import { db, resolveOptimisticUpdateResult } from "@/shared/db/server";
+import type { OptimisticUpdateResult } from "@/shared/lib/http";
 import { forms, type Form, type InsertForm, type UpdateForm } from "../schema/form.schema";
 
 /**
@@ -67,23 +68,37 @@ export const insertForm = async (data: InsertForm): Promise<Form> => {
 };
 
 /**
- * 특정 ID의 폼 메타데이터를 수정하고 updatedAt을 현재 일시로 갱신합니다.
+ * 특정 ID의 폼 메타데이터를 낙관적 락(`expectedVersion`) 검증과 함께 수정합니다.
+ * 성공 시 `version`을 1 증가시키고 `updatedAt`을 중앙 DB 시계로 갱신합니다.
  *
  * @param id 수정할 폼 고유 식별자(UUID)
- * @param data 수정할 폼 메타데이터
- * @returns 수정된 Form 객체 또는 수정 대상이 없을 경우 undefined
+ * @param data 수정할 폼 메타데이터 및 expectedVersion
+ * @returns OptimisticUpdateResult<Form> (`updated` | `conflict` | `not_found`)
  */
-export const updateFormById = async (id: string, data: UpdateForm): Promise<Form | undefined> => {
+export const updateFormById = async (
+  id: string,
+  data: UpdateForm
+): Promise<OptimisticUpdateResult<Form>> => {
+  const { expectedVersion, ...updateFields } = data;
+
   const [updatedForm] = await db
     .update(forms)
     .set({
-      ...data,
+      ...updateFields,
+      version: sql`${forms.version} + 1`,
       updatedAt: sql`now()`,
     })
-    .where(and(eq(forms.id, id), isNull(forms.deletedAt)))
+    .where(and(eq(forms.id, id), eq(forms.version, expectedVersion), isNull(forms.deletedAt)))
     .returning();
 
-  return updatedForm;
+  return await resolveOptimisticUpdateResult(updatedForm, async () => {
+    const [existing] = await db
+      .select({ version: forms.version })
+      .from(forms)
+      .where(and(eq(forms.id, id), isNull(forms.deletedAt)))
+      .limit(1);
+    return existing?.version;
+  });
 };
 
 /**
@@ -143,6 +158,7 @@ export const publishFormById = async (
     .update(forms)
     .set({
       publishedAt: isPublished ? sql`now()` : null,
+      version: sql`${forms.version} + 1`,
       updatedAt: sql`now()`,
     })
     .where(and(eq(forms.id, id), isNull(forms.deletedAt)))

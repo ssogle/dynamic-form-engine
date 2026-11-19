@@ -77,7 +77,7 @@ describe("Dynamic Form Schema & Validator (entities/form/schema)", () => {
     expect(result.cleanedData).toEqual({
       f1: "홍길동",
       f2: 5,
-      f3: "Frontend",
+      f3: ["Frontend"],
       f4: "https://github.com/example",
     });
   });
@@ -94,7 +94,7 @@ describe("Dynamic Form Schema & Validator (entities/form/schema)", () => {
     expect(result.isValid).toBe(false);
     expect(result.errors.f1).toContain("필수 입력");
     expect(result.errors.f2).toContain("필수 입력");
-    expect(result.errors.f3).toContain("필수 입력");
+    expect(result.errors.f3).toContain("필수 선택");
   });
 
   it("선택 항목(required: false)이 비어있으면 에러 없이 통과해야 한다", () => {
@@ -152,7 +152,20 @@ describe("Dynamic Form Schema & Validator (entities/form/schema)", () => {
       const result = validateSubmissionData(mockFields, rawData);
 
       expect(result.isValid).toBe(false);
-      expect(result.errors.f3).toContain("제공된 선택지 중 하나");
+      expect(result.errors.f3).toContain("올바르지 않은 선택지");
+    });
+
+    it("단일 select 필드(multiple 미지정)에 2개 이상의 값을 전달하면 최대 1개 제한 에러를 반환해야 한다", () => {
+      const rawData = {
+        f1: "홍길동",
+        f2: 2,
+        f3: ["Frontend", "Backend"],
+      };
+
+      const result = validateSubmissionData(mockFields, rawData);
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.f3).toContain("최대 1개");
     });
   });
 
@@ -377,11 +390,12 @@ describe("Dynamic Form Schema & Validator (entities/form/schema)", () => {
         },
       ];
 
-      // 1. 빈 객체 제출 시 통과
+      // 1. 빈 객체 제출 시 통과 (select/checkbox 다중 배열은 빈 배열로 정규화)
       const resultEmpty = validateSubmissionData(allOptionalFields, {});
       expect(resultEmpty.isValid).toBe(true);
       expect(resultEmpty.errors).toEqual({});
       expect(resultEmpty.cleanedData).toEqual({
+        status: [],
         is_urgent: false,
         agree: false,
       });
@@ -398,6 +412,55 @@ describe("Dynamic Form Schema & Validator (entities/form/schema)", () => {
       });
       expect(resultBlank.isValid).toBe(true);
       expect(resultBlank.errors).toEqual({});
+    });
+
+    it("select(multiple: true)와 relation(단일/다중) 모두 표준 string[] 배열로 정규화·검증해야 한다", () => {
+      const fields: CoreFormField[] = [
+        {
+          id: "f_tags",
+          label: "태그",
+          type: "select",
+          multiple: true,
+          required: true,
+          description: "복수 선택 가능한 분류 태그",
+          options: [
+            { label: "프론트", value: "FE", description: "프론트엔드", disabled: false },
+            { label: "백엔드", value: "BE", description: "백엔드", disabled: false },
+          ],
+        },
+        {
+          id: "f_owner",
+          label: "담당자",
+          type: "relation",
+          required: false,
+          description: "단일 담당자 연결",
+          relationConfig: {
+            targetFormId: "123e4567-e89b-12d3-a456-426614174000",
+            multiple: false,
+          },
+        },
+      ];
+
+      // 1. select(multiple: true) 다중 선택 통과 & 미선택 실패 & 허용 외 값 실패
+      const ok = validateSubmissionData(fields, {
+        f_tags: ["FE", "BE"],
+        f_owner: "123e4567-e89b-12d3-a456-426614174001",
+      });
+      expect(ok.isValid).toBe(true);
+      expect(ok.cleanedData).toEqual({
+        f_tags: ["FE", "BE"],
+        f_owner: ["123e4567-e89b-12d3-a456-426614174001"],
+      });
+
+      expect(validateSubmissionData(fields, { f_tags: [] }).isValid).toBe(false);
+      expect(validateSubmissionData(fields, { f_tags: ["INVALID"] }).isValid).toBe(false);
+
+      // 2. relation(multiple: false)에 2개 이상 전달 시 max(1) 초과로 실패
+      const overMax = validateSubmissionData(fields, {
+        f_tags: ["FE"],
+        f_owner: ["123e4567-e89b-12d3-a456-426614174001", "123e4567-e89b-12d3-a456-426614174002"],
+      });
+      expect(overMax.isValid).toBe(false);
     });
   });
 });

@@ -90,6 +90,7 @@ describe("primary-field (entities/form/lib)", () => {
       fields: baseFields as unknown as Array<Record<string, unknown>>,
     },
     publishedAt: new Date("2026-11-01T00:00:00Z"),
+    version: 1,
     createdAt: new Date("2026-11-01T00:00:00Z"),
     updatedAt: new Date("2026-11-01T00:00:00Z"),
     deletedAt: null,

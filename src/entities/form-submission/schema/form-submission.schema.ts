@@ -21,6 +21,7 @@ export { formSubmissions };
  */
 const systemManagedSubmissionFields = {
   id: true,
+  version: true,
   createdAt: true,
   updatedAt: true,
   deletedAt: true,
@@ -43,11 +44,18 @@ export const insertFormSubmissionSchema = createInsertSchema(formSubmissions, {
  * 폼 응답 수정용 Zod 스키마
  *
  * 기제출된 응답 데이터(data)만 선택적/부분 갱신 가능하며,
- * 시스템 전유 필드(id, createdAt, updatedAt, deletedAt) 및 부모 폼 식별자(formId)는 철저히 차단됩니다.
+ * 낙관적 락 검증을 위한 expectedVersion을 필수로 수신합니다.
+ * 시스템 전유 필드(id, version, createdAt, updatedAt, deletedAt) 및 부모 폼 식별자(formId)는 철저히 차단됩니다.
  */
 export const updateFormSubmissionSchema = insertFormSubmissionSchema
   .partial()
-  .omit({ formId: true });
+  .omit({ formId: true })
+  .extend({
+    expectedVersion: z
+      .number({ message: "낙관적 락 검증을 위한 expectedVersion(정수)이 필요합니다." })
+      .int("expectedVersion은 정수여야 합니다.")
+      .positive("expectedVersion은 1 이상의 정수여야 합니다."),
+  });
 
 /**
  * 데이터베이스에서 조회된 폼 응답 엔티티 검증용 Zod 스키마

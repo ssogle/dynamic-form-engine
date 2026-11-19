@@ -273,6 +273,7 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
           const fields = extractActiveFields(cachedForm);
           context.currentForm = {
             id: cachedForm.id,
+            version: cachedForm.version,
             title: cachedForm.title,
             description: cachedForm.description ?? undefined,
             isPublished: Boolean(cachedForm.publishedAt),
@@ -383,6 +384,7 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
         if (cachedView) {
           context.currentAnalysisView = {
             id: cachedView.id,
+            version: cachedView.version,
             title: cachedView.title,
             description: cachedView.description ?? undefined,
             isPublished: Boolean(cachedView.publishedAt),

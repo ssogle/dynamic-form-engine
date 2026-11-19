@@ -57,7 +57,14 @@ function buildFieldSampleValue(field: CoreFormField, index: number): unknown {
     case "switch":
       return index % 2 === 0;
 
-    case "select":
+    case "select": {
+      if (field.multiple) {
+        return pickCheckboxSample(field, index);
+      }
+      const singleSample = pickSingleOptionSample(field, index);
+      return singleSample ? [singleSample] : [];
+    }
+
     case "radio":
       return pickSingleOptionSample(field, index);
 
@@ -67,7 +74,7 @@ function buildFieldSampleValue(field: CoreFormField, index: number): unknown {
     case "relation":
       return field.relationConfig?.multiple
         ? [`샘플 참조 레코드 ${index + 1}-A`, `샘플 참조 레코드 ${index + 1}-B`]
-        : `샘플 참조 레코드 ${index + 1}`;
+        : [`샘플 참조 레코드 ${index + 1}`];
 
     default:
       return `${field.label} 예시 ${index + 1}`;
@@ -100,6 +107,7 @@ export function buildPreviewSampleSubmissions(form: Form, count = 3): FormSubmis
     return {
       id: `sample-preview-${index + 1}`,
       formId: form.id,
+      version: 1,
       data,
       createdAt: timestamp,
       updatedAt: timestamp,

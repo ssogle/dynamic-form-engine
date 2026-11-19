@@ -54,6 +54,7 @@ describe("relation-table (features/render-dynamic-form/lib)", () => {
       fields: targetFields,
     },
     publishedAt: new Date("2026-01-01T00:00:00Z"),
+    version: 1,
     createdAt: new Date("2026-01-01T00:00:00Z"),
     updatedAt: new Date("2026-01-01T00:00:00Z"),
     deletedAt: null,
@@ -74,16 +75,16 @@ describe("relation-table (features/render-dynamic-form/lib)", () => {
   });
 
   describe("toggleRelationSelection & removeRelationSelection", () => {
-    it("단일 선택 모드에서는 선택한 ID 문자열을 반환하고 제거 시 undefined를 반환해야 한다", () => {
-      expect(toggleRelationSelection({ currentIds: [], targetId: "sub-1", multiple: false })).toBe(
-        "sub-1"
-      );
+    it("단일 선택 모드에서는 선택한 단일 원소 배열을 반환하고 제거 시 빈 배열을 반환해야 한다", () => {
+      expect(
+        toggleRelationSelection({ currentIds: [], targetId: "sub-1", multiple: false })
+      ).toEqual(["sub-1"]);
       expect(
         toggleRelationSelection({ currentIds: ["sub-1"], targetId: "sub-2", multiple: false })
-      ).toBe("sub-2");
+      ).toEqual(["sub-2"]);
       expect(
         removeRelationSelection({ currentIds: ["sub-1"], targetId: "sub-1", multiple: false })
-      ).toBeUndefined();
+      ).toEqual([]);
     });
 
     it("다중 선택 모드에서는 배열 내 존재 여부를 토글하고 제거 시 남은 배열을 반환해야 한다", () => {

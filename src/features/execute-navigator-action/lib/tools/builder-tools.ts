@@ -6,6 +6,7 @@ import {
   mergeOptionsWithPreservation,
   normalizeSelectOption,
   normalizeSelectOptions,
+  validateFormSchemaTransition,
   validatePrimaryFieldSelection,
   type CoreFormField,
   type Form,
@@ -14,6 +15,7 @@ import {
   type UpdateForm,
 } from "@/entities/form";
 import { nowUtcIso } from "@/shared/lib/date";
+import type { OptimisticUpdateResult } from "@/shared/lib/http";
 import {
   addRelationFieldInputSchema,
   createFormInputSchema,
@@ -80,9 +82,13 @@ export interface BuilderToolsDependencies {
   findFormById: (id: string) => Promise<Form | undefined>;
   hasSubmissionsByFormId?: (formId: string) => Promise<boolean>;
   insertForm: (input: InsertForm) => Promise<Form>;
-  updateFormById: (id: string, updates: UpdateForm) => Promise<Form | undefined>;
+  updateFormById: (id: string, updates: UpdateForm) => Promise<OptimisticUpdateResult<Form>>;
   publishFormById: (id: string, isPublished: boolean) => Promise<Form | undefined>;
   softDeleteFormsByIds: (ids: string[]) => Promise<Form[]>;
+  /** 클라이언트 화면이 현재 보고 있는 폼 ID (낙관적 락 컨텍스트 대조용) */
+  expectedFormId?: string | undefined;
+  /** 클라이언트 화면이 현재 보고 있는 폼 버전 (낙관적 락 컨텍스트 대조용) */
+  expectedFormVersion?: number | undefined;
 }
 
 /**
@@ -110,12 +116,100 @@ async function isFormHistoryProtected(
 }
 
 /**
+ * 공식 발행 중인 폼에 대한 스키마·옵션 직접 수정을 차단하고,
+ * 에이전트가 사용자 동의 없이 임의로 발행을 취소하지 않도록 확인 안내를 반환합니다.
+ *
+ * @param form 검사 대상 폼 엔티티
+ * @param targetLabel 수정 대상 구분 ("스키마" | "옵션")
+ * @returns 발행 중이면 실패 응답 객체, 미발행(초안)이면 null
+ */
+function ensureDraftForSchemaEdit(
+  form: Form,
+  targetLabel: "스키마" | "옵션"
+): { success: false; error: string } | null {
+  if (form.publishedAt !== null && form.publishedAt !== undefined) {
+    return {
+      success: false,
+      error: `현재 공식 발행 중인 폼의 ${targetLabel}는 직접 수정할 수 없습니다. 사용자 확인 없이 임의로 발행을 취소(publishForm)하지 말고, 먼저 사용자에게 '현재 발행 중인 상태이므로 발행을 취소(초안 회수)한 뒤 수정할까요?'라고 질문해 명시적 승인을 받으세요.`,
+    };
+  }
+  return null;
+}
+
+/**
  * AI Builder Navigator Vercel AI SDK 도구 카탈로그 생성 팩토리 함수
  *
  * 폼 조회(searchForms, getFormDetails)는 공통 queryTools가 전담하므로,
  * 본 도구 모음은 화면 이동 및 폼 생성/수정/삭제/발행 액션만 담당합니다.
  */
 export function createBuilderTools(deps: BuilderToolsDependencies) {
+  let trackedClientFormVersion = deps.expectedFormVersion;
+
+  /**
+   * 폼 스키마 수정 전 발행 잠금·데이터 호환성·낙관적 락을 일괄 검증하고 영속화하는 공통 헬퍼
+   */
+  const persistFormUpdateWithGuards = async (params: {
+    existing: Form;
+    title?: string | undefined;
+    schemaDefinition: { primaryFieldId: string; fields: CoreFormField[] };
+    hasSubmissions?: boolean | undefined;
+  }): Promise<{ data: Form; error: null } | { data: null; error: string }> => {
+    const { existing, title, schemaDefinition } = params;
+
+    // 1. 발행 상태 및 기제출 응답 호환성 검증
+    const hasSubmissions =
+      params.hasSubmissions ??
+      (existing.publishedAt === null && deps.hasSubmissionsByFormId
+        ? await deps.hasSubmissionsByFormId(existing.id)
+        : false);
+
+    const transitionCheck = validateFormSchemaTransition({
+      existingForm: existing,
+      nextSchemaDefinition: schemaDefinition,
+      hasSubmissions,
+    });
+    if (transitionCheck.error !== null) {
+      return { data: null, error: transitionCheck.error };
+    }
+
+    // 2. 클라이언트가 보고 있던 버전과 DB 최신 버전 간 낙관적 락 선제 대조
+    if (
+      deps.expectedFormId === existing.id &&
+      trackedClientFormVersion !== undefined &&
+      existing.version !== trackedClientFormVersion
+    ) {
+      return {
+        data: null,
+        error:
+          "다른 사용자가 먼저 폼을 수정했습니다. 화면을 새로고침해 최신 스키마를 확인한 뒤 다시 요청해 주세요.",
+      };
+    }
+
+    // 3. DB 레벨 원자적 낙관적 락 업데이트
+    const updateResult = await deps.updateFormById(existing.id, {
+      ...(title !== undefined ? { title } : {}),
+      schemaDefinition,
+      expectedVersion: existing.version,
+    });
+
+    if (updateResult.status === "not_found") {
+      return { data: null, error: `수정 대상 폼('${existing.id}')을 찾을 수 없습니다.` };
+    }
+    if (updateResult.status === "conflict") {
+      return {
+        data: null,
+        error:
+          "다른 사용자가 동시에 폼을 수정했습니다. 화면을 새로고침해 최신 버전을 확인한 뒤 다시 시도해 주세요.",
+      };
+    }
+
+    if (deps.expectedFormId === existing.id) {
+      trackedClientFormVersion = updateResult.data.version;
+    }
+
+    return { data: updateResult.data, error: null };
+  };
+
   const navigateTool = tool({
     description:
       "애플리케이션 내의 다른 화면으로 이동합니다. 폼 목록(/builder/forms), 라이브 캔버스(/builder/forms/[id]) 등으로 이동할 때 호출합니다.",
@@ -184,6 +278,11 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
           success: false,
           error: `수정 대상 폼('${formId}')을 찾을 수 없습니다.`,
         };
+      }
+
+      const publishLockError = ensureDraftForSchemaEdit(existing, "스키마");
+      if (publishLockError) {
+        return publishLockError;
       }
 
       const currentFields = extractFieldsFromForm(existing);
@@ -286,6 +385,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
           label: fieldData.label,
           type: fieldData.type,
           required: fieldData.required ?? false,
+          ...(fieldData.multiple !== undefined ? { multiple: fieldData.multiple } : {}),
           placeholder: fieldData.placeholder ?? undefined,
           description: fieldData.description.trim(),
           options: fieldData.options ?? undefined,
@@ -370,6 +470,7 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
             label: fieldData.label ?? f.label,
             type: fieldData.type ?? f.type,
             required: fieldData.required ?? f.required,
+            multiple: fieldData.multiple !== undefined ? fieldData.multiple : f.multiple,
             placeholder:
               fieldData.placeholder !== undefined ? fieldData.placeholder : f.placeholder,
             description:
@@ -401,15 +502,24 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
         };
       }
 
-      const updatePayload: UpdateForm = {
+      const persistResult = await persistFormUpdateWithGuards({
+        existing,
         title: formTitle ?? existing.title,
         schemaDefinition: {
           primaryFieldId: nextPrimaryFieldId,
           fields: updatedFields,
         },
-      };
+        hasSubmissions: isProtected,
+      });
 
-      const updated = await deps.updateFormById(existing.id, updatePayload);
+      if (persistResult.error !== null) {
+        return {
+          success: false,
+          error: persistResult.error,
+        };
+      }
+
+      const updated = persistResult.data;
 
       const action: NavigatorBuilderAction = {
         type: "UPDATE_SCHEMA",
@@ -528,6 +638,11 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
         };
       }
 
+      const publishLockError = ensureDraftForSchemaEdit(currentForm, "스키마");
+      if (publishLockError) {
+        return publishLockError;
+      }
+
       const currentPrimaryFieldId = extractPrimaryFieldId(currentForm);
       if (!currentPrimaryFieldId) {
         return {
@@ -571,12 +686,20 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
       };
 
       const updatedFields = [...currentFields, newField];
-      const updated = await deps.updateFormById(currentForm.id, {
+      const persistResult = await persistFormUpdateWithGuards({
+        existing: currentForm,
         schemaDefinition: {
           primaryFieldId: currentPrimaryFieldId,
           fields: updatedFields,
         },
       });
+      if (persistResult.error !== null) {
+        return {
+          success: false,
+          error: persistResult.error,
+        };
+      }
+      const updated = persistResult.data;
 
       const action: NavigatorBuilderAction = {
         type: "UPDATE_SCHEMA",
@@ -615,6 +738,11 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
           success: false,
           error: `대상 폼('${formId}')을 찾을 수 없습니다.`,
         };
+      }
+
+      const publishLockError = ensureDraftForSchemaEdit(existing, "옵션");
+      if (publishLockError) {
+        return publishLockError;
       }
 
       const currentFields = extractFieldsFromForm(existing);
@@ -768,12 +896,21 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
         };
       }
 
-      const updatedForm = await deps.updateFormById(existing.id, {
+      const persistResult = await persistFormUpdateWithGuards({
+        existing,
         schemaDefinition: {
           primaryFieldId: currentPrimaryFieldId,
           fields: updatedFields,
         },
+        hasSubmissions: isProtected,
       });
+      if (persistResult.error !== null) {
+        return {
+          success: false,
+          error: persistResult.error,
+        };
+      }
+      const updatedForm = persistResult.data;
 
       const action: NavigatorBuilderAction = {
         type: "UPDATE_SCHEMA",

@@ -33,6 +33,7 @@ describe("Submission Mutations (entities/form-submission/queries)", () => {
   const mockSubmission: FormSubmission = {
     id: "sub-1",
     formId: "form-1",
+    version: 1,
     data: { name: "홍길동" },
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     updatedAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -42,6 +43,7 @@ describe("Submission Mutations (entities/form-submission/queries)", () => {
   const mockSubmission2: FormSubmission = {
     id: "sub-2",
     formId: "form-1",
+    version: 1,
     data: { name: "이순신" },
     createdAt: new Date("2026-01-02T00:00:00.000Z"),
     updatedAt: new Date("2026-01-02T00:00:00.000Z"),
@@ -128,6 +130,7 @@ describe("Submission Mutations (entities/form-submission/queries)", () => {
         await result.current.mutateAsync({
           submissionId: "sub-1",
           data: { name: "김철수" },
+          expectedVersion: 1,
         });
       });
 

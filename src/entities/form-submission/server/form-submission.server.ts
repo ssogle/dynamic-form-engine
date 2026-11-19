@@ -1,6 +1,7 @@
 import "server-only";
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
-import { db } from "@/shared/db/server";
+import { db, resolveOptimisticUpdateResult } from "@/shared/db/server";
+import type { OptimisticUpdateResult } from "@/shared/lib/http";
 import { forms, relations, type FormSchemaDefinition } from "@/shared/tables";
 import type { RelatedSubmissionsGroup } from "../types/relation.types";
 import { resolveFieldOptionLabelMap } from "../lib/analytics-calculator";
@@ -22,14 +23,20 @@ import { isValidTimezone } from "../schema/date-range.schema";
 import { buildDateRangeConditions, buildValidFieldDateSql } from "./date-filter-sql.server";
 import { buildFieldFilterSqlConditions, buildSafeNumericSql } from "./field-filter-sql.server";
 
+type RelationSyncExecutor = Pick<typeof db, "select" | "insert" | "delete">;
+
 /**
  * 서브미션 데이터에 포함된 관계형 필드(relation) 값을 분석하여 relations 엣지 테이블을 동기화합니다.
  *
  * @param submission 대상 서브미션 객체
+ * @param executor DB 또는 트랜잭션 실행기 (기본값: db)
  */
-export async function syncSubmissionRelations(submission: FormSubmission): Promise<void> {
+export async function syncSubmissionRelations(
+  submission: FormSubmission,
+  executor: RelationSyncExecutor = db
+): Promise<void> {
   // 1. 해당 폼의 스키마 메타데이터 조회
-  const [parentForm] = await db
+  const [parentForm] = await executor
     .select({ schemaDefinition: forms.schemaDefinition })
     .from(forms)
     .where(eq(forms.id, submission.formId))
@@ -49,7 +56,7 @@ export async function syncSubmissionRelations(submission: FormSubmission): Promi
   );
 
   // 3. 기존 서브미션의 관계 엣지 정리 (Re-sync)
-  await db.delete(relations).where(eq(relations.sourceId, submission.id));
+  await executor.delete(relations).where(eq(relations.sourceId, submission.id));
 
   if (relationFields.length === 0) {
     return;
@@ -77,7 +84,7 @@ export async function syncSubmissionRelations(submission: FormSubmission): Promi
 
   // 5. 엣지 레코드 일괄 삽입
   if (newEdges.length > 0) {
-    await db.insert(relations).values(newEdges).onConflictDoNothing();
+    await executor.insert(relations).values(newEdges).onConflictDoNothing();
   }
 }
 
@@ -294,34 +301,49 @@ export const findSubmissionById = async (id: string): Promise<FormSubmission | u
 };
 
 /**
- * 특정 ID의 기제출된 응답 데이터(data)를 수정하고 updatedAt을 중앙 DB 시계(sql`now()`)로 갱신합니다.
+ * 특정 ID의 기제출된 응답 데이터(data)를 낙관적 락(`expectedVersion`) 검증과 함께 수정합니다.
+ * 단일 DB 트랜잭션 내에서 응답 갱신, `version` 1 증가, 그리고 `relations` 엣지 동기화를 원자적으로 수행합니다.
  *
  * @param id 수정할 응답 고유 식별자(UUID)
- * @param data 수정할 응답 데이터
- * @returns 수정된 FormSubmission 객체 또는 대상이 없을 경우 undefined
+ * @param data 수정할 응답 데이터 및 expectedVersion
+ * @returns OptimisticUpdateResult<FormSubmission> (`updated` | `conflict` | `not_found`)
  */
 export const updateSubmissionById = async (
   id: string,
   data: UpdateFormSubmission
-): Promise<FormSubmission | undefined> => {
-  const [updatedSubmission] = await db
-    .update(formSubmissions)
-    .set({
-      ...data,
-      updatedAt: sql`now()`,
-    })
-    .where(and(eq(formSubmissions.id, id), isNull(formSubmissions.deletedAt)))
-    .returning();
+): Promise<OptimisticUpdateResult<FormSubmission>> => {
+  const { expectedVersion, ...updateFields } = data;
 
-  if (updatedSubmission) {
-    try {
-      await syncSubmissionRelations(updatedSubmission);
-    } catch (error) {
-      console.error("서브미션 관계 수정 동기화 실패:", error);
+  return await db.transaction(async (tx) => {
+    const [updatedSubmission] = await tx
+      .update(formSubmissions)
+      .set({
+        ...updateFields,
+        version: sql`${formSubmissions.version} + 1`,
+        updatedAt: sql`now()`,
+      })
+      .where(
+        and(
+          eq(formSubmissions.id, id),
+          eq(formSubmissions.version, expectedVersion),
+          isNull(formSubmissions.deletedAt)
+        )
+      )
+      .returning();
+
+    if (updatedSubmission) {
+      await syncSubmissionRelations(updatedSubmission, tx);
     }
-  }
 
-  return updatedSubmission;
+    return await resolveOptimisticUpdateResult(updatedSubmission, async () => {
+      const [existing] = await tx
+        .select({ version: formSubmissions.version })
+        .from(formSubmissions)
+        .where(and(eq(formSubmissions.id, id), isNull(formSubmissions.deletedAt)))
+        .limit(1);
+      return existing?.version;
+    });
+  });
 };
 
 /**
@@ -416,7 +438,7 @@ export const findInboundRelatedSubmissions = async (
     return [];
   }
 
-  // 3. 소스 폼 메타데이터 일괄 조회
+  // 3. 활성 소스 폼 메타데이터 일괄 조회 (삭제된 폼 제외)
   const formIds = Array.from(new Set(sourceSubmissions.map((s) => s.formId)));
 
   const sourceForms = await db
@@ -426,12 +448,25 @@ export const findInboundRelatedSubmissions = async (
       schemaDefinition: forms.schemaDefinition,
     })
     .from(forms)
-    .where(inArray(forms.id, formIds));
+    .where(and(inArray(forms.id, formIds), isNull(forms.deletedAt)));
 
   const formMap = new Map(sourceForms.map((f) => [f.id, f]));
+  const activeRelationFieldIdsByFormId = new Map<string, Set<string>>();
+  for (const formMeta of sourceForms) {
+    const fields = Array.isArray(formMeta.schemaDefinition?.fields)
+      ? formMeta.schemaDefinition.fields
+      : [];
+    const activeIds = new Set(
+      fields
+        .filter((field) => field && field.type === "relation" && !field.deletedAt && field.id)
+        .map((field) => String(field.id))
+    );
+    activeRelationFieldIdsByFormId.set(formMeta.id, activeIds);
+  }
+
   const submissionMap = new Map(sourceSubmissions.map((s) => [s.id, s]));
 
-  // 4. 소스 폼 단위로 역참조 응답 데이터 그룹화
+  // 4. 소스 폼 단위로 역참조 응답 데이터 그룹화 (삭제/비활성 관계 필드의 잔여 엣지 제외)
   const groupsMap = new Map<string, RelatedSubmissionsGroup>();
 
   for (const edge of edges) {
@@ -440,6 +475,9 @@ export const findInboundRelatedSubmissions = async (
 
     const formMeta = formMap.get(sub.formId);
     if (!formMeta) continue;
+
+    const activeRelationFieldIds = activeRelationFieldIdsByFormId.get(sub.formId);
+    if (!activeRelationFieldIds?.has(edge.fieldId)) continue;
 
     let group = groupsMap.get(sub.formId);
     if (!group) {

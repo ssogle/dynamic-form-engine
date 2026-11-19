@@ -19,6 +19,7 @@ import {
 import type { AnalysisView } from "@/entities/analysis-view";
 import {
   aggregateFormSubmissions,
+  findInboundRelatedSubmissions,
   hasSubmissionsByFormId,
   queryFormSubmissionsForAnalysis,
   softDeleteSubmissionsByIds,
@@ -83,7 +84,10 @@ export interface NavigatorModeConfig {
 /**
  * 모드별 설정 팩토리 함수 타입
  */
-type ModeConfigFactory = (queryTools: ReturnType<typeof createQueryTools>) => NavigatorModeConfig;
+type ModeConfigFactory = (
+  queryTools: ReturnType<typeof createQueryTools>,
+  currentContext?: NavigatorClientContext
+) => NavigatorModeConfig;
 
 /**
  * AI 도구 실행 결과(toolResults)로부터 클라이언트 브라우저 제어용 액션 목록을 추출합니다.
@@ -133,7 +137,7 @@ const NAVIGATOR_MODE_REGISTRY: Record<NavigatorMode, ModeConfigFactory> = {
     },
     formatPrompt: formatConsumerContextPrompt,
   }),
-  builder: (queryTools) => ({
+  builder: (queryTools, currentContext) => ({
     instructions: BUILDER_NAVIGATOR_SYSTEM_PROMPT,
     tools: {
       ...createBuilderTools({
@@ -143,6 +147,8 @@ const NAVIGATOR_MODE_REGISTRY: Record<NavigatorMode, ModeConfigFactory> = {
         updateFormById,
         publishFormById,
         softDeleteFormsByIds,
+        expectedFormId: currentContext?.currentForm?.id,
+        expectedFormVersion: currentContext?.currentForm?.version,
       }),
       ...queryTools,
     },
@@ -151,7 +157,7 @@ const NAVIGATOR_MODE_REGISTRY: Record<NavigatorMode, ModeConfigFactory> = {
       updatedForm: extractUpdatedForm(toolResults) ?? undefined,
     }),
   }),
-  analyst: (queryTools) => ({
+  analyst: (queryTools, currentContext) => ({
     instructions: ANALYST_NAVIGATOR_SYSTEM_PROMPT,
     maxSteps: 10,
     tools: {
@@ -163,6 +169,8 @@ const NAVIGATOR_MODE_REGISTRY: Record<NavigatorMode, ModeConfigFactory> = {
         softDeleteAnalysisViewsByIds,
         aggregateFormSubmissions,
         queryFormSubmissionsForAnalysis,
+        expectedViewId: currentContext?.currentAnalysisView?.id,
+        expectedViewVersion: currentContext?.currentAnalysisView?.version,
       }),
       ...queryTools,
     },
@@ -178,13 +186,14 @@ const NAVIGATOR_MODE_REGISTRY: Record<NavigatorMode, ModeConfigFactory> = {
  */
 function resolveModeConfig(
   mode: NavigatorMode,
-  queryTools: ReturnType<typeof createQueryTools>
+  queryTools: ReturnType<typeof createQueryTools>,
+  currentContext?: NavigatorClientContext
 ): NavigatorModeConfig {
   const factory = NAVIGATOR_MODE_REGISTRY[mode];
   if (!factory) {
     throw new Error(`지원하지 않는 네비게이터 모드입니다: "${mode}"`);
   }
-  return factory(queryTools);
+  return factory(queryTools, currentContext);
 }
 
 export interface RunNavigatorEngineOptions {
@@ -209,6 +218,9 @@ function resolveToolStartProgressMessage(toolName: string): string {
   }
   if (["searchForms", "getFormDetails"].includes(toolName)) {
     return "대상 폼 구조와 필드 정보를 확인하고 있습니다...";
+  }
+  if (toolName === "getRelatedSubmissions") {
+    return "연결된 관계(relations) 이력을 조회하고 있습니다...";
   }
   if (
     [
@@ -244,8 +256,12 @@ function resolveStepEndProgressMessage(toolNames: string[], finishReason: string
   ) {
     return "데이터 집계·조회를 마쳤습니다. 분석 결과를 구성하고 있습니다...";
   }
-  if (toolNames.some((name) => ["searchForms", "getFormDetails"].includes(name))) {
-    return "폼 구조와 필드를 확인했습니다. 다음 작업을 진행하고 있습니다...";
+  if (
+    toolNames.some((name) =>
+      ["searchForms", "getFormDetails", "getRelatedSubmissions"].includes(name)
+    )
+  ) {
+    return "폼 구조 및 연결 정보를 확인했습니다. 다음 작업을 진행하고 있습니다...";
   }
   if (
     toolNames.some((name) =>
@@ -276,15 +292,16 @@ export async function runNavigatorEngine(
 
   const model = getAiModel();
 
-  // 1. 공통 온디맨드 폼 조회 도구 인스턴스화
+  // 1. 공통 온디맨드 폼·관계 조회 도구 인스턴스화
   const queryTools = createQueryTools({
     findActiveForms,
     findPublishedForms,
     findFormById,
+    findInboundRelatedSubmissions,
   });
 
   // 2. 모드 레지스트리로부터 전용 전략 설정 획득 (신규 모드 추가 시 본체 불변)
-  const config = resolveModeConfig(mode, queryTools);
+  const config = resolveModeConfig(mode, queryTools, currentContext);
 
   // 3. 화면 맥락 기반의 린(Lean) 프롬프트 및 대화 메시지 목록 구성
   const formattedPrompt = config.formatPrompt(prompt, currentContext);

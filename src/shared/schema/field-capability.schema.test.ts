@@ -55,6 +55,24 @@ describe("Field Capability Schema (shared/schema/field-capability.schema)", () =
     expect(booleanCapEmptyArray).toEqual(CHECKBOX_BOOLEAN_CAPABILITY);
   });
 
+  it("select 필드는 multiple 여부에 따라 단일 선택과 다중 배열 연산자로 구분 파생되어야 한다", () => {
+    const singleSelectCap = resolveFieldQueryCapability({
+      type: "select",
+      multiple: false,
+      options: [{ label: "A", value: "A" }],
+    });
+    expect(singleSelectCap?.defaultOperator).toBe("in");
+    expect(singleSelectCap?.filterOperators).not.toContain("hasAll");
+
+    const multiSelectCap = resolveFieldQueryCapability({
+      type: "select",
+      multiple: true,
+      options: [{ label: "A", value: "A" }],
+    });
+    expect(multiSelectCap?.defaultOperator).toBe("hasAny");
+    expect(multiSelectCap?.filterOperators).toContain("hasAll");
+  });
+
   it("시스템 컬럼(id, createdAt, updatedAt)의 조회 능력을 정확히 해석해야 한다", () => {
     expect(isSystemFieldId("createdAt")).toBe(true);
     expect(isSystemFieldId("f_name")).toBe(false);

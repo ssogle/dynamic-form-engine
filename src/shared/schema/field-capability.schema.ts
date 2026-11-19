@@ -271,6 +271,7 @@ export const SYSTEM_FIELD_CAPABILITIES: Record<SystemFieldId, FieldQueryCapabili
  */
 export interface FieldCapabilityTarget {
   type?: string | undefined;
+  multiple?: boolean | undefined;
   options?: ReadonlyArray<unknown> | null | undefined;
 }
 
@@ -313,6 +314,10 @@ export function resolveFieldQueryCapability(
   if (parsedType.data === "checkbox") {
     const hasOptions = Array.isArray(field.options) && field.options.length > 0;
     return hasOptions ? CORE_FIELD_CAPABILITIES.checkbox : CHECKBOX_BOOLEAN_CAPABILITY;
+  }
+
+  if (parsedType.data === "select" && field.multiple === true) {
+    return CORE_FIELD_CAPABILITIES.checkbox;
   }
 
   return CORE_FIELD_CAPABILITIES[parsedType.data];

@@ -1,5 +1,6 @@
 import type { InfiniteData } from "@tanstack/react-query";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { HttpErrorData } from "@/shared/lib/http";
 import { httpClient } from "@/shared/lib/http";
 import type { FormSubmission } from "../schema/form-submission.schema";
 import type { PaginatedSubmissionsResponse } from "../schema/submission-query.schema";
@@ -21,20 +22,30 @@ export async function submitFormResponse(
 }
 
 /**
+ * 폼 응답 수정 요청 파라미터
+ */
+export interface UpdateFormSubmissionPayload {
+  /** 수정할 필드별 입력 데이터 맵 */
+  data: Record<string, unknown>;
+  /** 낙관적 락 검증을 위한 현재 조회 기준 버전 */
+  expectedVersion: number;
+}
+
+/**
  * 폼 응답 수정 순수 API 호출 함수
  *
  * @param formId 대상 폼의 고유 UUID 식별자
  * @param submissionId 수정할 응답의 고유 UUID 식별자
- * @param data 수정할 필드별 입력 데이터 맵
+ * @param payload 수정할 응답 데이터 및 expectedVersion
  */
 export async function updateFormSubmission(
   formId: string,
   submissionId: string,
-  data: Record<string, unknown>
+  payload: UpdateFormSubmissionPayload
 ): Promise<FormSubmission> {
   return await httpClient.patch<FormSubmission>(
     `/api/v1/forms/${formId}/submissions/${submissionId}`,
-    { data }
+    payload
   );
 }
 
@@ -84,9 +95,13 @@ export function useSubmitFormMutation(formId: string) {
 export function useUpdateSubmissionMutation(formId: string) {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: ({ submissionId, data }: { submissionId: string; data: Record<string, unknown> }) =>
-      updateFormSubmission(formId, submissionId, data),
+  return useMutation<
+    FormSubmission,
+    HttpErrorData,
+    { submissionId: string; data: Record<string, unknown>; expectedVersion: number }
+  >({
+    mutationFn: ({ submissionId, data, expectedVersion }) =>
+      updateFormSubmission(formId, submissionId, { data, expectedVersion }),
     onSuccess: (updatedSubmission, { submissionId }) => {
       // 1. 단건 상세 캐시 즉시 업데이트
       queryClient.setQueryData(formSubmissionsKeys.detail(submissionId), updatedSubmission);
@@ -125,6 +140,13 @@ export function useUpdateSubmissionMutation(formId: string) {
         queryKey: formSubmissionsKeys.infiniteRoot(formId),
         refetchType: "none",
       });
+    },
+    onError: (error, { submissionId }) => {
+      if (error.status === 409 || error.code === "CONFLICT") {
+        queryClient.invalidateQueries({ queryKey: formSubmissionsKeys.detail(submissionId) });
+        queryClient.invalidateQueries({ queryKey: formSubmissionsKeys.byForm(formId) });
+        queryClient.invalidateQueries({ queryKey: formSubmissionsKeys.infiniteRoot(formId) });
+      }
     },
   });
 }

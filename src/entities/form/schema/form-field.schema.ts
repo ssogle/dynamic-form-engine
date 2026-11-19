@@ -84,6 +84,14 @@ export const coreFormFieldSchema = z.object({
   required: z.boolean().default(false),
 
   /**
+   * 다중 선택 허용 여부 (select 전용, 기본값: false - 단일 선택 드롭다운)
+   */
+  multiple: z
+    .boolean()
+    .optional()
+    .describe("select 필드에서 복수 선택(칩형 멀티 드롭다운)을 허용할지 여부 (기본값 false)"),
+
+  /**
    * 정형 선택지 목록 (select, radio, checkbox 전용)
    */
   options: z

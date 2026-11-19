@@ -1,4 +1,13 @@
-import { index, jsonb, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import {
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  varchar,
+} from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 /**
@@ -44,6 +53,12 @@ export const analysisViews = pgTable(
       .notNull()
       .$type<AnalysisViewBlockRecord[]>()
       .default(sql`'[]'::jsonb`),
+
+    /**
+     * 낙관적 락(Optimistic Lock) 동시 수정 충돌 감지용 버전 번호
+     * 생성 시 1로 초기화되며, 분석 뷰 수정 시마다 원자적으로 1씩 증가합니다.
+     */
+    version: integer("version").default(1).notNull(),
 
     /**
      * 문서 최초 생성 일시 (UTC)

@@ -40,6 +40,7 @@ const createMockAnalysisView = (overrides: Partial<AnalysisView> = {}): Analysis
   description: "1분기 비교 리포트",
   blocks: [SAMPLE_BLOCK_1, SAMPLE_BLOCK_2],
   publishedAt: null,
+  version: 1,
   createdAt: new Date("2026-02-01T00:00:00.000Z"),
   updatedAt: new Date("2026-02-01T00:00:00.000Z"),
   deletedAt: null,
@@ -184,11 +185,13 @@ describe("Analyst Navigator Tools (analyst-tools.ts)", () => {
   describe("updateAnalysisView (6 Operators)", () => {
     it("ADD_BLOCK: insertIndex 지정 시 해당 위치에 블록을 삽입하고 미지정 시 맨 뒤에 추가한다", async () => {
       vi.mocked(deps.findAnalysisViewById).mockResolvedValue(createMockAnalysisView());
-      vi.mocked(deps.updateAnalysisViewById).mockImplementation(async (_id, updates) =>
-        createMockAnalysisView({
+      vi.mocked(deps.updateAnalysisViewById).mockImplementation(async (_id, updates) => ({
+        status: "updated",
+        data: createMockAnalysisView({
           blocks: updates.blocks ?? [SAMPLE_BLOCK_1, SAMPLE_BLOCK_2],
-        })
-      );
+          version: updates.expectedVersion + 1,
+        }),
+      }));
 
       const res = await tools.updateAnalysisView.execute(
         {
@@ -213,11 +216,13 @@ describe("Analyst Navigator Tools (analyst-tools.ts)", () => {
 
     it("UPDATE_BLOCK: targetBlockId를 불변 보존하면서 해당 블록 내용만 교체한다", async () => {
       vi.mocked(deps.findAnalysisViewById).mockResolvedValue(createMockAnalysisView());
-      vi.mocked(deps.updateAnalysisViewById).mockImplementation(async (_id, updates) =>
-        createMockAnalysisView({
+      vi.mocked(deps.updateAnalysisViewById).mockImplementation(async (_id, updates) => ({
+        status: "updated",
+        data: createMockAnalysisView({
           blocks: updates.blocks ?? [SAMPLE_BLOCK_1, SAMPLE_BLOCK_2],
-        })
-      );
+          version: updates.expectedVersion + 1,
+        }),
+      }));
 
       await tools.updateAnalysisView.execute(
         {
@@ -245,11 +250,13 @@ describe("Analyst Navigator Tools (analyst-tools.ts)", () => {
 
     it("REMOVE_BLOCK: 대상 블록 ID를 제거한다", async () => {
       vi.mocked(deps.findAnalysisViewById).mockResolvedValue(createMockAnalysisView());
-      vi.mocked(deps.updateAnalysisViewById).mockImplementation(async (_id, updates) =>
-        createMockAnalysisView({
+      vi.mocked(deps.updateAnalysisViewById).mockImplementation(async (_id, updates) => ({
+        status: "updated",
+        data: createMockAnalysisView({
           blocks: updates.blocks ?? [SAMPLE_BLOCK_1, SAMPLE_BLOCK_2],
-        })
-      );
+          version: updates.expectedVersion + 1,
+        }),
+      }));
 
       await tools.updateAnalysisView.execute(
         {
@@ -266,11 +273,13 @@ describe("Analyst Navigator Tools (analyst-tools.ts)", () => {
 
     it("REORDER_BLOCKS: 기존 ID 집합과 1:1 일치 시 순서를 재배치하고 불일치 시 거부한다", async () => {
       vi.mocked(deps.findAnalysisViewById).mockResolvedValue(createMockAnalysisView());
-      vi.mocked(deps.updateAnalysisViewById).mockImplementation(async (_id, updates) =>
-        createMockAnalysisView({
+      vi.mocked(deps.updateAnalysisViewById).mockImplementation(async (_id, updates) => ({
+        status: "updated",
+        data: createMockAnalysisView({
           blocks: updates.blocks ?? [SAMPLE_BLOCK_1, SAMPLE_BLOCK_2],
-        })
-      );
+          version: updates.expectedVersion + 1,
+        }),
+      }));
 
       const mismatchRes = await tools.updateAnalysisView.execute(
         {
@@ -297,12 +306,14 @@ describe("Analyst Navigator Tools (analyst-tools.ts)", () => {
 
     it("UPDATE_INFO: 블록은 보존하고 제목/설명을 변경한다", async () => {
       vi.mocked(deps.findAnalysisViewById).mockResolvedValue(createMockAnalysisView());
-      vi.mocked(deps.updateAnalysisViewById).mockImplementation(async (_id, updates) =>
-        createMockAnalysisView({
+      vi.mocked(deps.updateAnalysisViewById).mockImplementation(async (_id, updates) => ({
+        status: "updated",
+        data: createMockAnalysisView({
           title: updates.title ?? "매출 vs 비용 분석",
           description: updates.description ?? null,
-        })
-      );
+          version: updates.expectedVersion + 1,
+        }),
+      }));
 
       const res = await tools.updateAnalysisView.execute(
         {
@@ -326,11 +337,13 @@ describe("Analyst Navigator Tools (analyst-tools.ts)", () => {
 
     it("SET_ALL_BLOCKS: 전체 블록을 일괄 교체한다", async () => {
       vi.mocked(deps.findAnalysisViewById).mockResolvedValue(createMockAnalysisView());
-      vi.mocked(deps.updateAnalysisViewById).mockImplementation(async (_id, updates) =>
-        createMockAnalysisView({
+      vi.mocked(deps.updateAnalysisViewById).mockImplementation(async (_id, updates) => ({
+        status: "updated",
+        data: createMockAnalysisView({
           blocks: updates.blocks ?? [SAMPLE_BLOCK_1, SAMPLE_BLOCK_2],
-        })
-      );
+          version: updates.expectedVersion + 1,
+        }),
+      }));
 
       const res = await tools.updateAnalysisView.execute(
         {
@@ -360,11 +373,12 @@ describe("Analyst Navigator Tools (analyst-tools.ts)", () => {
         await new Promise((resolve) => setTimeout(resolve, 10));
         persistedState = {
           ...persistedState,
+          version: persistedState.version + 1,
           ...(updates.title !== undefined ? { title: updates.title } : {}),
           ...(updates.description !== undefined ? { description: updates.description } : {}),
           ...(updates.blocks !== undefined ? { blocks: updates.blocks } : {}),
         };
-        return persistedState;
+        return { status: "updated", data: persistedState };
       });
 
       await Promise.all([

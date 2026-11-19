@@ -4,6 +4,7 @@ import {
   insertFormSchema,
   publishFormBodySchema,
   updateFormSchema,
+  validateFormSchemaTransition,
 } from "@/entities/form";
 import {
   findActiveForms,
@@ -13,7 +14,8 @@ import {
   softDeleteFormById,
   updateFormById,
 } from "@/entities/form/server";
-import { apiResponse, badRequest, notFound } from "@/shared/lib/http";
+import { hasSubmissionsByFormId } from "@/entities/form-submission/server";
+import { apiResponse, badRequest, conflict, notFound } from "@/shared/lib/http";
 import { createSubRouter } from "../_lib/create-api-router";
 import { parseJsonBody, parseQueryParams } from "../_lib/request-helpers";
 import type { FormsRouterVariables } from "./forms-middleware";
@@ -73,12 +75,32 @@ formsRoutes.patch("/:id", async (c) => {
     "유효하지 않은 폼 수정 데이터입니다."
   );
 
-  const updatedForm = await updateFormById(form.id, validatedData);
-  if (!updatedForm) {
-    throw notFound("수정 대상 폼을 찾을 수 없습니다.");
+  // 스키마 변경이 포함된 경우 발행 상태 잠금 및 기제출 응답 호환성 보호 규칙을 검증합니다.
+  if (validatedData.schemaDefinition) {
+    const hasSubmissions =
+      form.publishedAt === null ? await hasSubmissionsByFormId(form.id) : false;
+    const transitionResult = validateFormSchemaTransition({
+      existingForm: form,
+      nextSchemaDefinition: validatedData.schemaDefinition,
+      hasSubmissions,
+    });
+    if (transitionResult.error !== null) {
+      throw badRequest(transitionResult.error);
+    }
   }
 
-  return apiResponse.ok(updatedForm);
+  const updateResult = await updateFormById(form.id, validatedData);
+  if (updateResult.status === "not_found") {
+    throw notFound("수정 대상 폼을 찾을 수 없습니다.");
+  }
+  if (updateResult.status === "conflict") {
+    throw conflict(
+      "다른 사용자가 먼저 폼을 수정했습니다. 최신 데이터를 불러온 뒤 다시 시도해 주세요.",
+      { currentVersion: updateResult.currentVersion }
+    );
+  }
+
+  return apiResponse.ok(updateResult.data);
 });
 
 /**
