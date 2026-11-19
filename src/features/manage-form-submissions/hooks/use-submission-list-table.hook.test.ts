@@ -596,4 +596,45 @@ describe("useSubmissionListTable (features/manage-form-submissions/hooks)", () =
       })
     );
   });
+
+  it("embedded 및 lockedFilters 전달 시 필터 초기화 후에도 고정 필터를 유지하고 URL 동기화를 생략해야 한다", () => {
+    const lockedFilter = {
+      fieldId: "field-name",
+      op: "contains" as const,
+      value: "프로젝트",
+    };
+
+    const { result } = renderHook(
+      () =>
+        useSubmissionListTable({
+          form: dummyForm,
+          embedded: true,
+          lockedFilters: [lockedFilter],
+        }),
+      { wrapper: createWrapper() }
+    );
+
+    expect(mockUseInfiniteQuery).toHaveBeenLastCalledWith(
+      "form-uuid-1",
+      expect.objectContaining({
+        filters: JSON.stringify([lockedFilter]),
+      })
+    );
+
+    act(() => {
+      result.current.handleSetFieldFilter("field-name", "추가검색");
+    });
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    act(() => {
+      result.current.handleClearAllFilters();
+    });
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockUseInfiniteQuery).toHaveBeenLastCalledWith(
+      "form-uuid-1",
+      expect.objectContaining({
+        filters: JSON.stringify([lockedFilter]),
+      })
+    );
+  });
 });

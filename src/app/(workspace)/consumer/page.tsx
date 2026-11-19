@@ -19,17 +19,17 @@ export default function ConsumerPortalPage() {
         </p>
       </div>
 
-      {/* 1. 빌더가 발행한 참여 가능한 폼 섹션 */}
+      {/* 1. 빌더가 발행한 데이터 도메인 폼 섹션 */}
       <section id="forms" aria-labelledby="consumer-forms-heading" className="space-y-4">
         <div className="space-y-1">
           <h2
             id="consumer-forms-heading"
             className="text-foreground text-lg font-semibold tracking-tight"
           >
-            참여 가능한 폼
+            이용 가능한 데이터 폼
           </h2>
           <p className="text-muted-foreground text-xs/relaxed">
-            카드를 선택해 데이터 목록을 확인하거나 신규 응답을 제출할 수 있습니다.
+            카드를 선택해 등록된 데이터를 조회·검색하거나 새로운 레코드를 작성할 수 있습니다.
           </p>
         </div>
         <PublishedFormList />

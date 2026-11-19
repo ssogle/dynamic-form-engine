@@ -23,6 +23,8 @@ import { Checkbox } from "@/shared/ui/checkbox";
 import { DatePickerInput } from "@/shared/ui/date-input";
 import { Switch } from "@/shared/ui/switch";
 import { Label } from "@/shared/ui/label";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
 import { filterSingleSelectOptions, filterMultiSelectOptions } from "../lib/filter-select-options";
 import { FormFieldWrapper } from "./form-field-wrapper";
@@ -76,32 +78,43 @@ function OptionLabelDescription({ htmlFor, opt }: { htmlFor: string; opt: Select
 }
 
 /**
- * 드롭다운(select) 하단에 모든 활성 옵션의 선택 기준(description)을 상시 표시하는 가이드 목록입니다.
- * Radix SelectItem 내부에 긴 설명을 넣으면 선택된 트리거(SelectValue) 레이아웃이 깨지므로,
- * 드롭다운 바깥쪽에 전체 옵션의 상세 설명을 직접 노출합니다.
+ * 드롭다운(select) 하단에 모든 활성 옵션의 선택 기준(description)을 접기/펼치기 및 스크롤 가능한 형태로 표시하는 가이드 목록입니다.
  */
 function SelectOptionsGuideList({ options }: { options: SelectOption[] }) {
+  const [isOpen, setIsOpen] = React.useState(false);
+
   if (options.length === 0) return null;
 
   return (
-    <div className="bg-muted/30 space-y-2 rounded-md border p-2.5 text-xs">
-      {options.map((opt) => (
-        <div key={opt.value} className="space-y-0.5">
-          <p
-            className={cn(
-              "text-foreground font-medium",
-              opt.disabled && "text-muted-foreground line-through"
-            )}
-          >
-            {opt.label}
-            {opt.disabled && " (비활성화됨)"}
-          </p>
-          <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
-            {opt.description}
-          </p>
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="bg-muted/30 rounded-md border">
+      <CollapsibleTrigger
+        type="button"
+        className="text-muted-foreground hover:text-foreground flex w-full cursor-pointer items-center justify-between px-2.5 py-1.5 text-xs font-medium transition-colors"
+      >
+        <span>선택 기준 안내 ({options.length}개 옵션)</span>
+        {isOpen ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="border-border/50 max-h-40 space-y-2 overflow-y-auto border-t p-2.5 text-xs">
+          {options.map((opt) => (
+            <div key={opt.value} className="space-y-0.5">
+              <p
+                className={cn(
+                  "text-foreground font-medium",
+                  opt.disabled && "text-muted-foreground line-through"
+                )}
+              >
+                {opt.label}
+                {opt.disabled && " (비활성화됨)"}
+              </p>
+              <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                {opt.description}
+              </p>
+            </div>
+          ))}
         </div>
-      ))}
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import {
+  extractActiveFields,
   extractPrimaryFieldId,
   formatFieldDisplayValue,
   orderFieldsWithPrimaryFirst,
@@ -11,16 +12,26 @@ import {
   type Form,
 } from "@/entities/form";
 import type { RelatedSubmissionsGroup } from "@/entities/form-submission";
+import type { FieldFilterCondition } from "@/shared/schema";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/shared/ui/table";
 import { Button } from "@/shared/ui/button";
 import { formatDateTime } from "@/shared/lib/date";
 import type { FormSubmissionViewMode } from "../types/submission-view.types";
+import { ManageFormSubmissions } from "./manage-form-submissions";
 
 export interface RelatedSubmissionSubtableProps {
   /**
    * 특정 소스 폼에 의해 그룹화된 역참조 서브미션 데이터
    */
   group: RelatedSubmissionsGroup;
+  /**
+   * 현재 상세 조회 중인 타깃 부모 폼 ID (역참조 relation 필터 구성용)
+   */
+  targetFormId?: string | undefined;
+  /**
+   * 현재 상세 조회 중인 타깃 부모 레코드 ID (역참조 relation 필터 구성용)
+   */
+  targetSubmissionId?: string | undefined;
   /**
    * 동작 모드 (프리뷰 모드에서는 컨슈머 상세 이동 버튼을 숨김)
    */
@@ -30,16 +41,17 @@ export interface RelatedSubmissionSubtableProps {
 /**
  * 역참조된 서브미션 목록을 표시하는 서브 테이블 컴포넌트
  *
- * 소스 폼의 스키마를 기반으로 주요 도메인 컬럼을 추출하여
- * 연결된 각 서브미션 레코드의 요약 정보와 상세 페이지 바로가기 링크를 렌더링합니다.
+ * 컨슈머 모드에서 소스 폼이 현재 부모 폼을 참조하는 단일 relation 필드를 보유한 경우
+ * `ManageFormSubmissions` 임베디드 테이블로 통합해 가상 스크롤·정렬·컬럼 필터·관계 배지·상세/수정/삭제를 동일하게 제공합니다.
  */
 export function RelatedSubmissionSubtable({
   group,
+  targetFormId,
+  targetSubmissionId,
   mode = "consumer",
 }: RelatedSubmissionSubtableProps) {
   const { sourceForm, submissions } = group;
 
-  // 1. 소스 폼의 활성 필드 및 대표 필드 ID 추출 (대표 필드를 가장 왼쪽 컬럼으로 우선 배치)
   const rawSourceForm = React.useMemo(
     () =>
       ({
@@ -47,12 +59,43 @@ export function RelatedSubmissionSubtable({
       }) as unknown as Form,
     [sourceForm.schemaDefinition]
   );
+
+  const lockedRelationFilters = React.useMemo<FieldFilterCondition[] | undefined>(() => {
+    if (mode !== "consumer" || !targetFormId || !targetSubmissionId) {
+      return undefined;
+    }
+    const matchingFields = extractActiveFields(rawSourceForm).filter(
+      (f) => f.type === "relation" && f.relationConfig?.targetFormId === targetFormId
+    );
+    if (matchingFields.length !== 1 || !matchingFields[0]) {
+      return undefined;
+    }
+    return [
+      {
+        fieldId: matchingFields[0].id,
+        op: "hasAny",
+        values: [targetSubmissionId],
+      },
+    ];
+  }, [mode, rawSourceForm, targetFormId, targetSubmissionId]);
+
   const primaryFieldId = extractPrimaryFieldId(rawSourceForm);
 
   const columns = React.useMemo(() => {
-    // 최대 4개의 주요 데이터 컬럼만 노출하여 테이블 가독성 유지 (대표 필드 우선 배치)
+    // 폴백 경량 테이블용 최대 4개 주요 컬럼 (대표 필드 우선 배치)
     return orderFieldsWithPrimaryFirst(rawSourceForm).slice(0, 4);
   }, [rawSourceForm]);
+
+  if (lockedRelationFilters) {
+    return (
+      <ManageFormSubmissions
+        formId={sourceForm.id}
+        embedded
+        lockedFilters={lockedRelationFilters}
+        mode="consumer"
+      />
+    );
+  }
 
   if (!submissions || submissions.length === 0) {
     return (

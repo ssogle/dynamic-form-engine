@@ -83,6 +83,14 @@ export interface UseSubmissionListTableParams {
    */
   mode?: FormSubmissionViewMode | undefined;
   /**
+   * 상세 화면 내 임베디드 렌더링 여부 (true 시 필터·정렬 변경 시 URL 쿼리 sync 생략)
+   */
+  embedded?: boolean | undefined;
+  /**
+   * 초기화(handleClearAllFilters) 시에도 항상 유지·합산되는 고정 필터 조건 목록 (역참조 필터링용)
+   */
+  lockedFilters?: FieldFilterCondition[] | undefined;
+  /**
    * 프리뷰 모드에서 실데이터 0건일 때 폴백으로 표시할 가상 샘플 레코드 목록
    */
   sampleSubmissions?: FormSubmission[] | undefined;
@@ -247,6 +255,8 @@ export function useSubmissionListTable({
   initialFilters,
   initialSort,
   mode = "consumer",
+  embedded = false,
+  lockedFilters,
   sampleSubmissions,
   onSelectSubmission,
 }: UseSubmissionListTableParams): UseSubmissionListTableReturn {
@@ -324,10 +334,11 @@ export function useSubmissionListTable({
     return sorting.map((s) => `${s.id}:${s.desc ? "desc" : "asc"}`).join(",");
   }, [sorting]);
 
-  // 2. 컬럼별 필터 파라미터 직렬화 (표준 FieldFilterCondition[] JSON)
+  // 2. 컬럼별 필터 파라미터 직렬화 (고정 필터 lockedFilters + 사용자 필터 합산)
   const filtersQueryString = React.useMemo(() => {
-    return serializeFieldFiltersParam(Object.values(columnFilters));
-  }, [columnFilters]);
+    const merged = [...(lockedFilters ?? []), ...Object.values(columnFilters)];
+    return serializeFieldFiltersParam(merged);
+  }, [lockedFilters, columnFilters]);
 
   // 3. 서버 무한 스크롤 쿼리 훅 연동 (프리뷰 모드에서는 실데이터 조회를 전면 비활성화)
   const { data, isLoading, isError, error, isFetchingNextPage, hasNextPage, fetchNextPage } =
@@ -388,24 +399,24 @@ export function useSubmissionListTable({
       }
 
       setColumnFilters(next);
-      if (mode !== "preview") {
+      if (mode !== "preview" && !embedded) {
         router.replace(buildConsumerFormUrl(form.id, dateRangeFilter, next, sorting), {
           scroll: false,
         });
       }
     },
-    [activeFields, columnFilters, dateRangeFilter, form.id, mode, router, sorting]
+    [activeFields, columnFilters, dateRangeFilter, embedded, form.id, mode, router, sorting]
   );
 
   // 기간 필터만 해제하고 URL 쿼리스트링도 함께 정리
   const handleClearDateRange = React.useCallback(() => {
     setDateRangeFilter(undefined);
-    if (mode !== "preview") {
+    if (mode !== "preview" && !embedded) {
       router.replace(buildConsumerFormUrl(form.id, undefined, columnFilters, sorting), {
         scroll: false,
       });
     }
-  }, [router, form.id, columnFilters, mode, sorting]);
+  }, [router, form.id, columnFilters, embedded, mode, sorting]);
 
   // 전체 필터 초기화
   const handleClearAllFilters = React.useCallback(() => {
@@ -413,12 +424,12 @@ export function useSubmissionListTable({
     if (hasActiveDateRange) {
       setDateRangeFilter(undefined);
     }
-    if (mode !== "preview") {
+    if (mode !== "preview" && !embedded) {
       router.replace(buildConsumerFormUrl(form.id, undefined, undefined, sorting), {
         scroll: false,
       });
     }
-  }, [hasActiveDateRange, router, form.id, mode, sorting]);
+  }, [hasActiveDateRange, router, embedded, form.id, mode, sorting]);
 
   // 단건 응답 삭제 핸들러 (프리뷰 모드에서는 차단)
   const handleDelete = React.useCallback(

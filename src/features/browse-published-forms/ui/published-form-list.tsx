@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { usePublishedFormsQuery } from "@/entities/form";
-import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Skeleton } from "@/shared/ui/skeleton";
 
 /**
@@ -47,19 +46,14 @@ export function PublishedFormList() {
   if (!publishedForms || publishedForms.length === 0) {
     return (
       <Card className="border-border/80 bg-muted/20 border-dashed py-12 text-center shadow-none">
-        <CardHeader className="pb-3">
+        <CardHeader>
           <CardTitle className="text-foreground text-base font-semibold">
-            현재 참여 가능한 폼이 없습니다
+            현재 이용 가능한 데이터 폼이 없습니다
           </CardTitle>
           <CardDescription className="text-muted-foreground mx-auto max-w-md text-xs/relaxed">
-            빌더에서 새로운 폼을 생성하고 발행하면 이곳에 자동으로 노출됩니다.
+            관리자가 데이터 도메인 폼을 공식 발행하면 이곳에 자동으로 노출됩니다.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/builder/forms">빌더에서 폼 만들기</Link>
-          </Button>
-        </CardContent>
       </Card>
     );
   }

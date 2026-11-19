@@ -37,6 +37,14 @@ export interface ManageFormSubmissionsProps {
    */
   mode?: FormSubmissionViewMode | undefined;
   /**
+   * 상세 화면 내 임베디드 렌더링 여부 (true 시 페이지 <h1> 타이틀 및 URL 쿼리 sync 생략)
+   */
+  embedded?: boolean | undefined;
+  /**
+   * 초기화 시에도 유지되는 고정 필터 조건 목록
+   */
+  lockedFilters?: FieldFilterCondition[] | undefined;
+  /**
    * 프리뷰 모드에서 실데이터 0건 시 폴백으로 표시할 가상 샘플 레코드 목록
    */
   sampleSubmissions?: FormSubmission[] | undefined;
@@ -58,6 +66,8 @@ export function ManageFormSubmissions({
   initialFilters,
   initialSort,
   mode = "consumer",
+  embedded = false,
+  lockedFilters,
   sampleSubmissions,
   onSelectSubmission,
 }: ManageFormSubmissionsProps) {
@@ -95,10 +105,10 @@ export function ManageFormSubmissions({
     );
   }
 
-  // 3. 정상 응답 목록 (프리뷰 모드에서는 페이지 타이틀을 생략하고 테이블만 렌더링)
+  // 3. 정상 응답 목록 (프리뷰·임베디드 모드에서는 페이지 타이틀을 생략하고 테이블만 렌더링)
   return (
     <div className="space-y-6">
-      {mode !== "preview" && (
+      {mode !== "preview" && !embedded && (
         <div className="flex flex-col gap-1">
           <h1 className="text-foreground text-2xl font-bold tracking-tight">
             [{form.title}] 데이터 목록
@@ -116,6 +126,8 @@ export function ManageFormSubmissions({
         initialFilters={initialFilters}
         initialSort={initialSort}
         mode={mode}
+        embedded={embedded}
+        lockedFilters={lockedFilters}
         sampleSubmissions={sampleSubmissions}
         onSelectSubmission={onSelectSubmission}
       />
