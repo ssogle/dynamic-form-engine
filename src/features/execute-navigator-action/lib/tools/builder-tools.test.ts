@@ -1397,5 +1397,43 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
       expect(unpublishRes.clientAction?.type).toBe("PUBLISH_FORM");
       expect(unpublishRes.clientAction?.isPublished).toBe(false);
     });
+
+    it("requireConfirmation: true일 때 publishForm과 deleteForms는 DB를 변이하지 않고 PENDING_CONFIRMATION을 반환해야 한다", async () => {
+      vi.mocked(dependencies.publishFormById).mockClear();
+      vi.mocked(dependencies.softDeleteFormsByIds).mockClear();
+      const tools = createBuilderTools({
+        ...dependencies,
+        requireConfirmation: true,
+      });
+
+      const publishPending = (await tools.publishForm.execute!(
+        { formId: draftFormId, isPublished: true },
+        mockExecutionOptions
+      )) as {
+        status?: string;
+        requiresConfirmation?: boolean;
+        pendingConfirmation?: { toolName: string; targetIds: string[] };
+      };
+
+      expect(publishPending.requiresConfirmation).toBe(true);
+      expect(publishPending.status).toBe("PENDING_CONFIRMATION");
+      expect(publishPending.pendingConfirmation?.toolName).toBe("publishForm");
+      expect(publishPending.pendingConfirmation?.targetIds).toEqual([draftFormId]);
+      expect(dependencies.publishFormById).not.toHaveBeenCalled();
+
+      const deletePending = (await tools.deleteForms.execute!(
+        { formIds: [draftFormId], reason: "불필요한 폼 정리" },
+        mockExecutionOptions
+      )) as {
+        status?: string;
+        requiresConfirmation?: boolean;
+        pendingConfirmation?: { toolName: string; targetIds: string[] };
+      };
+
+      expect(deletePending.requiresConfirmation).toBe(true);
+      expect(deletePending.status).toBe("PENDING_CONFIRMATION");
+      expect(deletePending.pendingConfirmation?.toolName).toBe("deleteForms");
+      expect(dependencies.softDeleteFormsByIds).not.toHaveBeenCalled();
+    });
   });
 });

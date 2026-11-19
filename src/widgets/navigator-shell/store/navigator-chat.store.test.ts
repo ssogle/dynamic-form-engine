@@ -80,4 +80,27 @@ describe("useNavigatorChatStore (widgets/navigator-shell/store)", () => {
     const lastMessage = messages[messages.length - 1];
     expect(lastMessage?.steps).toEqual(["폼 목록 조회 중...", "응답 데이터를 집계하는 중..."]);
   });
+
+  it("updateConfirmationStatus는 특정 메시지의 승인 대기 항목 상태를 갱신해야 한다", () => {
+    const msgId = useNavigatorChatStore.getState().addMessage({
+      role: "assistant",
+      content: "승인이 필요합니다.",
+      pendingConfirmations: [
+        {
+          confirmationId: "conf-1",
+          toolName: "publishForm",
+          title: "폼 발행",
+          description: "공식 발행합니다.",
+          targetIds: ["f1"],
+          payload: { formId: "f1", isPublished: true },
+          status: "pending",
+        },
+      ],
+    });
+
+    useNavigatorChatStore.getState().updateConfirmationStatus(msgId, "conf-1", "approved");
+
+    const updated = useNavigatorChatStore.getState().messages.find((m) => m.id === msgId);
+    expect(updated?.pendingConfirmations?.[0]?.status).toBe("approved");
+  });
 });

@@ -33,6 +33,7 @@ import {
   type UpdateSchemaInput,
 } from "../../schema/navigator-tools.schema";
 import type { NavigatorBuilderAction } from "../../types/navigator-action.types";
+import { buildPendingConfirmationResult } from "./confirmation-gate";
 
 export {
   addRelationFieldInputSchema,
@@ -89,6 +90,8 @@ export interface BuilderToolsDependencies {
   expectedFormId?: string | undefined;
   /** 클라이언트 화면이 현재 보고 있는 폼 버전 (낙관적 락 컨텍스트 대조용) */
   expectedFormVersion?: number | undefined;
+  /** 고위험 도구(publishForm, deleteForms) 실행 전 사용자 확인 게이트 활성화 여부 */
+  requireConfirmation?: boolean | undefined;
 }
 
 /**
@@ -566,6 +569,18 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
         }
       }
 
+      if (deps.requireConfirmation) {
+        return buildPendingConfirmationResult({
+          toolName: "publishForm",
+          title: isPublished ? `'${existing.title}' 폼 발행` : `'${existing.title}' 폼 발행 취소`,
+          description: isPublished
+            ? "공식 발행 시 컨슈머 포털에 노출되며 응답자가 데이터를 제출할 수 있습니다."
+            : "발행을 취소하면 초안 상태로 회수되어 컨슈머 포털 노출이 중단됩니다.",
+          targetIds: [existing.id],
+          payload: { formId: existing.id, isPublished },
+        });
+      }
+
       // 중앙 DB 시계(sql`now()`)를 통해 발행/초안 상태 전이
       const updated = await deps.publishFormById(existing.id, isPublished);
       if (!updated) {
@@ -598,6 +613,16 @@ export function createBuilderTools(deps: BuilderToolsDependencies) {
     description: "지정된 ID의 폼을 소프트 삭제합니다.",
     inputSchema: deleteFormsInputSchema,
     execute: async ({ formIds, reason }: DeleteFormsInput) => {
+      if (deps.requireConfirmation) {
+        return buildPendingConfirmationResult({
+          toolName: "deleteForms",
+          title: `폼 ${formIds.length}건 삭제`,
+          description: reason ?? "선택한 폼을 삭제하면 활성 폼 목록에서 제거됩니다.",
+          targetIds: formIds,
+          payload: { formIds, ...(reason ? { reason } : {}) },
+        });
+      }
+
       const deleted = await deps.softDeleteFormsByIds(formIds);
 
       const action: NavigatorBuilderAction = {

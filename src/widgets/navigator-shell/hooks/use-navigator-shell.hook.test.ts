@@ -488,4 +488,69 @@ describe("useNavigatorShell (widgets/navigator-shell/hooks)", () => {
     expect(mockPush).toHaveBeenCalledWith("/consumer/forms/form-uuid-1");
     window.history.replaceState(null, "", "/");
   });
+
+  it("이미지 첨부 상태와 텍스트 없는 전송을 지원하고, HITL 승인 및 취소 처리가 동작해야 한다", async () => {
+    currentPathname = "/builder/forms/form-uuid-1";
+    const file = new File(["img"], "receipt.png", { type: "image/png" });
+
+    mockMutateAsync.mockResolvedValueOnce({
+      reply: "승인이 필요합니다.",
+      action: null,
+      pendingConfirmations: [
+        {
+          confirmationId: "conf-hitl-1",
+          toolName: "publishForm",
+          title: "폼 발행",
+          description: "공식 발행합니다.",
+          targetIds: ["form-uuid-1"],
+          payload: { formId: "form-uuid-1", isPublished: true },
+        },
+      ],
+    });
+
+    const { result } = renderHook(() => useNavigatorShell({ mode: "builder" }));
+
+    await act(async () => {
+      await result.current.handleAddAttachmentFiles([file]);
+    });
+    expect(result.current.attachments).toHaveLength(1);
+
+    await act(async () => {
+      await result.current.handleExecutePrompt("");
+    });
+
+    expect(mockMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attachments: [expect.objectContaining({ name: "receipt.png", mimeType: "image/png" })],
+      })
+    );
+    expect(result.current.attachments).toHaveLength(0);
+
+    const lastMsg = result.current.messages[result.current.messages.length - 1]!;
+    const pendingItem = lastMsg.pendingConfirmations?.[0];
+    expect(pendingItem?.status).toBe("pending");
+
+    mockMutateAsync.mockResolvedValueOnce({
+      reply: "발행했습니다.",
+      action: { type: "PUBLISH_FORM", formId: "form-uuid-1", isPublished: true },
+    });
+
+    await act(async () => {
+      await result.current.handleApproveConfirmation(lastMsg.id, pendingItem!);
+    });
+
+    expect(mockMutateAsync).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        confirmedAction: {
+          confirmationId: "conf-hitl-1",
+          toolName: "publishForm",
+          payload: { formId: "form-uuid-1", isPublished: true },
+        },
+      })
+    );
+    expect(mockInvalidateQueries).toHaveBeenCalled();
+
+    const updatedMsg = useNavigatorChatStore.getState().messages.find((m) => m.id === lastMsg.id);
+    expect(updatedMsg?.pendingConfirmations?.[0]?.status).toBe("approved");
+  });
 });

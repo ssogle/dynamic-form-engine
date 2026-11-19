@@ -311,4 +311,55 @@ describe("Navigator Request Schema Validation (src/features/execute-navigator-ac
       expect(navigatorRequestSchema.safeParse(payload).success).toBe(false);
     });
   });
+
+  describe("attachments (멀티모달 이미지 첨부 검증) 및 confirmedAction 검증", () => {
+    it("최대 3장의 유효한 PNG/JPEG/WEBP 이미지 첨부는 정상 파싱해야 한다", () => {
+      const payload = {
+        mode: "consumer",
+        prompt: "영수증 내용을 입력해줘",
+        attachments: [
+          { name: "receipt.png", mimeType: "image/png", dataUrl: "data:image/png;base64,AAA" },
+          { name: "slip.webp", mimeType: "image/webp", dataUrl: "data:image/webp;base64,BBB" },
+        ],
+      };
+
+      const parsed = navigatorRequestSchema.safeParse(payload);
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.attachments).toHaveLength(2);
+      }
+    });
+
+    it("이미지를 4장 이상 첨부하거나 비허용 MIME/DataURL이면 파싱에 실패해야 한다", () => {
+      const tooMany = navigatorRequestSchema.safeParse({
+        prompt: "첨부 초과",
+        attachments: Array.from({ length: 4 }, (_, i) => ({
+          name: `img-${i}.png`,
+          mimeType: "image/png",
+          dataUrl: "data:image/png;base64,AAA",
+        })),
+      });
+      const invalidMime = navigatorRequestSchema.safeParse({
+        prompt: "잘못된 형식",
+        attachments: [{ mimeType: "application/pdf", dataUrl: "data:image/png;base64,AAA" }],
+      });
+
+      expect(tooMany.success).toBe(false);
+      expect(invalidMime.success).toBe(false);
+    });
+
+    it("고위험 액션 승인 실행(confirmedAction) 페이로드를 정상 파싱해야 한다", () => {
+      const parsed = navigatorRequestSchema.safeParse({
+        mode: "builder",
+        prompt: "[승인] 폼 발행",
+        confirmedAction: {
+          confirmationId: "conf-1",
+          toolName: "publishForm",
+          payload: { formId: "form-uuid-1", isPublished: true },
+        },
+      });
+
+      expect(parsed.success).toBe(true);
+    });
+  });
 });

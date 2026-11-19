@@ -462,4 +462,37 @@ describe("Analyst Navigator Tools (analyst-tools.ts)", () => {
       },
     });
   });
+
+  it("requireConfirmation: true일 때 publishAnalysisView와 deleteAnalysisViews는 DB를 변이하지 않고 PENDING_CONFIRMATION을 반환해야 한다", async () => {
+    const guardedTools = createAnalystTools({
+      ...deps,
+      requireConfirmation: true,
+    });
+
+    vi.mocked(deps.findAnalysisViewById).mockResolvedValueOnce(createMockAnalysisView());
+    const pubRes = await guardedTools.publishAnalysisView.execute(
+      { viewId: VIEW_ID, isPublished: true },
+      TOOL_CTX
+    );
+    expect(pubRes).toMatchObject({
+      requiresConfirmation: true,
+      status: "PENDING_CONFIRMATION",
+      pendingConfirmation: {
+        toolName: "publishAnalysisView",
+        targetIds: [VIEW_ID],
+      },
+    });
+    expect(deps.publishAnalysisViewById).not.toHaveBeenCalled();
+
+    const delRes = await guardedTools.deleteAnalysisViews.execute({ viewIds: [VIEW_ID] }, TOOL_CTX);
+    expect(delRes).toMatchObject({
+      requiresConfirmation: true,
+      status: "PENDING_CONFIRMATION",
+      pendingConfirmation: {
+        toolName: "deleteAnalysisViews",
+        targetIds: [VIEW_ID],
+      },
+    });
+    expect(deps.softDeleteAnalysisViewsByIds).not.toHaveBeenCalled();
+  });
 });

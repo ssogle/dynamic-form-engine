@@ -1,10 +1,60 @@
 "use client";
 
 import * as React from "react";
-import { CheckCircle2, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  ArrowUpIcon,
+  CheckCircle2,
+  ImagePlusIcon,
+  LoaderCircleIcon,
+  ShieldAlertIcon,
+  XCircleIcon,
+  XIcon,
+} from "lucide-react";
+import {
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentGroup,
+  AttachmentMedia,
+  AttachmentTitle,
+} from "@/shared/ui/attachment";
+import { Badge } from "@/shared/ui/badge";
+import { Bubble, BubbleContent } from "@/shared/ui/bubble";
 import { Button } from "@/shared/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible";
-import { Input } from "@/shared/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupTextarea,
+} from "@/shared/ui/input-group";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemMedia,
+  ItemTitle,
+} from "@/shared/ui/item";
+import { MarkdownContent } from "@/shared/ui/markdown-content";
+import { Message, MessageContent } from "@/shared/ui/message";
+import {
+  MessageScroller,
+  MessageScrollerButton,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerProvider,
+  MessageScrollerViewport,
+} from "@/shared/ui/message-scroller";
+import {
+  Trace,
+  TraceCollapsible,
+  TraceCollapsibleContent,
+  TraceCollapsibleTrigger,
+  TraceIcon,
+  TraceLine,
+  TraceTitle,
+} from "@/shared/ui/trace";
 import { cn } from "@/shared/lib/cn";
 import { useNavigatorShell } from "../hooks/use-navigator-shell.hook";
 import type { NavigatorShellProps } from "../types/navigator-shell.types";
@@ -12,9 +62,9 @@ import type { NavigatorShellProps } from "../types/navigator-shell.types";
 /**
  * AI Navigator 통합 상주 패널 위젯 (Persistent Shell)
  *
- * Builder 및 Consumer 두 모드를 단일 쉘로 수용하며,
- * 비즈니스 로직(AI 통신, 액션 디스패치, 화면 맥락 조립 등)은 useNavigatorShell 훅에 전담 위임하고,
- * 대화 타임라인 및 프롬프트 입력 UI만 렌더링하는 순수 얇은 뷰(Thin View)입니다.
+ * shadcn AI Elements(Message, Bubble, Attachment, Trace, Item, InputGroup)와
+ * 공용 GFM 마크다운 렌더러를 조합해 대화 타임라인, 멀티모달 이미지 첨부,
+ * 고위험 액션 인라인 사전 승인(HITL) UI를 렌더링하는 얇은 뷰(Thin View)입니다.
  */
 export function NavigatorShell({ mode, className }: NavigatorShellProps) {
   const {
@@ -27,10 +77,19 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
     toggleStepsExpanded,
     inputValue,
     setInputValue,
+    attachments,
+    handleAddAttachmentFiles,
+    handleRemoveAttachment,
+    handlePaste,
+    handleApproveConfirmation,
+    handleRejectConfirmation,
     messagesEndRef,
     inputRef,
+    fileInputRef,
     handleSubmit,
   } = useNavigatorShell({ mode });
+
+  const canSubmit = !isBusy && (Boolean(inputValue.trim()) || attachments.length > 0);
 
   return (
     <aside
@@ -45,115 +104,287 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
         </div>
       </header>
 
-      {/* 대화 메시지 목록 영역 */}
-      <div className="flex-1 space-y-3 overflow-y-auto p-4">
-        {messages.map((msg) => {
-          const isStepsExpanded = Boolean(expandedStepMessageIds[msg.id]);
+      {/* 대화 메시지 목록 영역 (MessageScroller + Message + Bubble + Trace + Confirmation Item) */}
+      <MessageScrollerProvider>
+        <MessageScroller className="flex-1">
+          <MessageScrollerViewport className="p-4">
+            <MessageScrollerContent className="gap-4">
+              {messages.map((msg) => {
+                const isUser = msg.role === "user";
+                const isStepsExpanded = Boolean(expandedStepMessageIds[msg.id]);
 
-          return (
-            <div
-              key={msg.id}
-              className={cn(
-                "flex flex-col gap-1 text-xs/relaxed",
-                msg.role === "user" ? "items-end" : "items-start"
-              )}
-            >
-              <div
-                className={cn(
-                  "max-w-[88%] rounded-lg px-3 py-2 text-xs",
-                  msg.role === "user"
-                    ? "bg-primary text-primary-foreground font-medium"
-                    : "bg-muted/70 text-foreground border-border/40 border"
-                )}
-              >
-                {msg.steps && msg.steps.length > 0 && (
-                  <Collapsible
-                    open={isStepsExpanded}
-                    onOpenChange={() => toggleStepsExpanded(msg.id)}
-                    className="border-border/50 mb-2 border-b pb-1.5"
-                  >
-                    <CollapsibleTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground hover:text-foreground h-6 px-1.5 text-[11px] font-normal"
-                      >
-                        {isStepsExpanded ? (
-                          <ChevronDown className="size-3" />
-                        ) : (
-                          <ChevronRight className="size-3" />
+                return (
+                  <MessageScrollerItem key={msg.id}>
+                    <Message align={isUser ? "end" : "start"}>
+                      <MessageContent className="gap-2">
+                        {isUser && msg.attachments && msg.attachments.length > 0 && (
+                          <AttachmentGroup className="justify-end">
+                            {msg.attachments.map((att, attIdx) => (
+                              <Attachment
+                                key={`${msg.id}-att-${attIdx}`}
+                                size="xs"
+                                className="max-w-44"
+                              >
+                                <AttachmentMedia variant="image">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={att.dataUrl} alt={att.name ?? "첨부 이미지"} />
+                                </AttachmentMedia>
+                                <AttachmentContent>
+                                  <AttachmentTitle>{att.name ?? "이미지 첨부"}</AttachmentTitle>
+                                </AttachmentContent>
+                              </Attachment>
+                            ))}
+                          </AttachmentGroup>
                         )}
-                        <span>수행 과정 ({msg.steps.length}단계)</span>
-                      </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="mt-1.5 space-y-1 pl-1">
-                      {msg.steps.map((step, index) => (
-                        <div
-                          key={`${msg.id}-step-${index}`}
-                          className="text-muted-foreground flex items-start gap-1.5 text-[11px] leading-snug"
+
+                        <Bubble
+                          variant={isUser ? "default" : "muted"}
+                          align={isUser ? "end" : "start"}
+                          className="max-w-[92%]"
                         >
-                          <CheckCircle2 className="text-primary/70 mt-0.5 size-3 shrink-0" />
-                          <span>{step}</span>
-                        </div>
-                      ))}
-                    </CollapsibleContent>
-                  </Collapsible>
-                )}
-                {msg.content}
-              </div>
-            </div>
-          );
-        })}
+                          <BubbleContent className="space-y-2 text-xs">
+                            {!isUser && msg.steps && msg.steps.length > 0 && (
+                              <Trace className="border-border/50 border-b pb-2">
+                                <TraceCollapsible
+                                  open={isStepsExpanded}
+                                  onOpenChange={() => toggleStepsExpanded(msg.id)}
+                                >
+                                  <TraceCollapsibleTrigger className="text-[11px]">
+                                    <span>수행 과정 ({msg.steps.length}단계)</span>
+                                  </TraceCollapsibleTrigger>
+                                  <TraceCollapsibleContent className="text-[11px]">
+                                    <div className="space-y-1">
+                                      {msg.steps.map((step, index) => (
+                                        <TraceLine
+                                          key={`${msg.id}-step-${index}`}
+                                          className="text-[11px]"
+                                        >
+                                          <TraceIcon>
+                                            <CheckCircle2 className="text-primary/70 size-3" />
+                                          </TraceIcon>
+                                          <TraceTitle>{step}</TraceTitle>
+                                        </TraceLine>
+                                      ))}
+                                    </div>
+                                  </TraceCollapsibleContent>
+                                </TraceCollapsible>
+                              </Trace>
+                            )}
 
-        {isBusy && (
-          <div className="flex items-start">
-            <div className="bg-muted/50 text-muted-foreground border-border/40 flex max-w-[88%] flex-col gap-1.5 rounded-lg border px-3 py-2 text-xs">
-              {progressSteps.length > 0 && (
-                <div className="border-border/40 space-y-1 border-b pb-1.5">
-                  {progressSteps.map((step, index) => (
-                    <div
-                      key={`active-step-${index}`}
-                      className="flex items-start gap-1.5 text-[11px] leading-snug"
-                    >
-                      <CheckCircle2 className="text-primary/70 mt-0.5 size-3 shrink-0" />
-                      <span>{step}</span>
-                    </div>
-                  ))}
-                </div>
+                            <MarkdownContent content={msg.content} variant="compact" />
+                          </BubbleContent>
+                        </Bubble>
+
+                        {/* 고위험 액션 사전 실행 확인 (HITL Confirmation Item) */}
+                        {!isUser &&
+                          msg.pendingConfirmations &&
+                          msg.pendingConfirmations.length > 0 && (
+                            <div className="w-full max-w-[92%] space-y-2">
+                              {msg.pendingConfirmations.map((conf) => (
+                                <Item
+                                  key={conf.confirmationId}
+                                  variant="outline"
+                                  size="sm"
+                                  className="bg-background/95 shadow-xs"
+                                >
+                                  <ItemMedia variant="icon">
+                                    <ShieldAlertIcon className="text-amber-600 dark:text-amber-400" />
+                                  </ItemMedia>
+                                  <ItemContent>
+                                    <ItemTitle className="text-xs font-semibold">
+                                      {conf.title}
+                                    </ItemTitle>
+                                    <ItemDescription className="text-[11px]">
+                                      {conf.errorMessage || conf.description}
+                                    </ItemDescription>
+                                  </ItemContent>
+                                  <ItemActions className="basis-full justify-end pt-1">
+                                    {conf.status === "pending" && (
+                                      <>
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="xs"
+                                          disabled={isBusy}
+                                          onClick={() =>
+                                            handleRejectConfirmation(msg.id, conf.confirmationId)
+                                          }
+                                        >
+                                          취소
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          size="xs"
+                                          disabled={isBusy}
+                                          onClick={() =>
+                                            void handleApproveConfirmation(msg.id, conf)
+                                          }
+                                        >
+                                          승인
+                                        </Button>
+                                      </>
+                                    )}
+                                    {conf.status === "executing" && (
+                                      <Badge variant="outline" className="gap-1 text-[11px]">
+                                        <LoaderCircleIcon className="size-3 animate-spin" />
+                                        실행 중
+                                      </Badge>
+                                    )}
+                                    {conf.status === "approved" && (
+                                      <Badge variant="default" className="gap-1 text-[11px]">
+                                        <CheckCircle2 className="size-3" />
+                                        승인 완료
+                                      </Badge>
+                                    )}
+                                    {conf.status === "rejected" && (
+                                      <Badge variant="secondary" className="gap-1 text-[11px]">
+                                        <XCircleIcon className="size-3" />
+                                        취소됨
+                                      </Badge>
+                                    )}
+                                    {conf.status === "error" && (
+                                      <Badge variant="destructive" className="text-[11px]">
+                                        실행 오류
+                                      </Badge>
+                                    )}
+                                  </ItemActions>
+                                </Item>
+                              ))}
+                            </div>
+                          )}
+                      </MessageContent>
+                    </Message>
+                  </MessageScrollerItem>
+                );
+              })}
+
+              {isBusy && (
+                <MessageScrollerItem scrollAnchor>
+                  <Message align="start">
+                    <MessageContent>
+                      <Bubble variant="muted" align="start" className="max-w-[92%]">
+                        <BubbleContent className="space-y-2 text-xs">
+                          {progressSteps.length > 0 && (
+                            <Trace className="border-border/40 border-b pb-2">
+                              {progressSteps.map((step, index) => (
+                                <TraceLine key={`active-step-${index}`} className="text-[11px]">
+                                  <TraceIcon>
+                                    <CheckCircle2 className="text-primary/70 size-3" />
+                                  </TraceIcon>
+                                  <TraceTitle>{step}</TraceTitle>
+                                </TraceLine>
+                              ))}
+                            </Trace>
+                          )}
+                          <Trace>
+                            <TraceLine status="running" className="text-[11px]">
+                              <TraceIcon>
+                                <LoaderCircleIcon className="size-3 animate-spin" />
+                              </TraceIcon>
+                              <TraceTitle>{progressMessage || "생각 중..."}</TraceTitle>
+                            </TraceLine>
+                          </Trace>
+                        </BubbleContent>
+                      </Bubble>
+                    </MessageContent>
+                  </Message>
+                </MessageScrollerItem>
               )}
-              <div className="flex items-center gap-1.5">
-                <span className="size-1.5 animate-bounce rounded-full bg-current" />
-                <span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:0.2s]" />
-                <span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:0.4s]" />
-                <span className="ml-1 text-[11px]">{progressMessage || "생각 중..."}</span>
-              </div>
-            </div>
-          </div>
-        )}
 
-        <div ref={messagesEndRef} />
-      </div>
+              <div ref={messagesEndRef} />
+            </MessageScrollerContent>
+          </MessageScrollerViewport>
+          <MessageScrollerButton direction="end" />
+        </MessageScroller>
+      </MessageScrollerProvider>
 
-      {/* 하단 입력 폼 영역 */}
+      {/* 하단 Prompt Input 입력 폼 영역 (멀티라인 + 이미지 첨부 미리보기 + 전송) */}
       <footer className="border-border/60 bg-background/80 shrink-0 border-t p-3 backdrop-blur-sm">
-        <form onSubmit={handleSubmit} className="flex items-center gap-2">
-          <Input
-            ref={inputRef}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder={config.inputPlaceholder}
-            disabled={isBusy}
-            className="focus-visible:ring-primary/30 h-9 flex-1 text-xs"
+        <form onSubmit={handleSubmit}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files) {
+                void handleAddAttachmentFiles(e.target.files);
+              }
+              e.target.value = "";
+            }}
           />
-          <Button
-            type="submit"
-            size="sm"
-            disabled={isBusy || !inputValue.trim()}
-            className="h-9 px-3 text-xs"
-          >
-            전송
-          </Button>
+
+          <InputGroup className="bg-background">
+            {attachments.length > 0 && (
+              <InputGroupAddon align="block-start" className="border-b pb-2">
+                <AttachmentGroup className="w-full gap-2 py-0">
+                  {attachments.map((att, idx) => (
+                    <Attachment key={`pending-att-${idx}`} size="xs" className="max-w-44">
+                      <AttachmentMedia variant="image">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={att.dataUrl} alt={att.name ?? "첨부 이미지"} />
+                      </AttachmentMedia>
+                      <AttachmentContent>
+                        <AttachmentTitle>{att.name ?? `이미지 ${idx + 1}`}</AttachmentTitle>
+                      </AttachmentContent>
+                      <AttachmentActions>
+                        <AttachmentAction
+                          aria-label="첨부 이미지 삭제"
+                          onClick={() => handleRemoveAttachment(idx)}
+                        >
+                          <XIcon className="size-3" />
+                        </AttachmentAction>
+                      </AttachmentActions>
+                    </Attachment>
+                  ))}
+                </AttachmentGroup>
+              </InputGroupAddon>
+            )}
+
+            <InputGroupTextarea
+              ref={inputRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onPaste={handlePaste}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  handleSubmit(e);
+                }
+              }}
+              placeholder={config.inputPlaceholder}
+              disabled={isBusy}
+              rows={2}
+              className="min-h-14 text-xs"
+            />
+
+            <InputGroupAddon align="block-end" className="justify-between border-t pt-1.5">
+              <InputGroupButton
+                type="button"
+                variant="ghost"
+                size="xs"
+                disabled={isBusy || attachments.length >= 3}
+                aria-label="이미지 첨부"
+                title="영수증·명세서 등 이미지 첨부 (최대 3장, Ctrl/Cmd+V 붙여넣기 지원)"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <ImagePlusIcon className="size-3.5" />
+                <span className="text-[11px]">이미지 첨부</span>
+              </InputGroupButton>
+
+              <InputGroupButton
+                type="submit"
+                variant="default"
+                size="xs"
+                disabled={!canSubmit}
+                aria-label="메시지 전송"
+              >
+                <ArrowUpIcon className="size-3.5" />
+                <span className="text-[11px]">전송</span>
+              </InputGroupButton>
+            </InputGroupAddon>
+          </InputGroup>
         </form>
       </footer>
     </aside>

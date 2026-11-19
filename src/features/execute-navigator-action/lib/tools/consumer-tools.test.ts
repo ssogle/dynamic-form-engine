@@ -386,4 +386,31 @@ describe("createConsumerTools (features/execute-navigator-action/lib/tools)", ()
       expect(baseDeps.queryFormSubmissionsForAnalysis).not.toHaveBeenCalled();
     });
   });
+
+  describe("HITL 사전 승인 게이트 (deleteSubmissions)", () => {
+    it("requireConfirmation: true일 때 deleteSubmissions는 DB 삭제 없이 PENDING_CONFIRMATION을 반환해야 한다", async () => {
+      const tools = createConsumerTools({
+        ...baseDeps,
+        requireConfirmation: true,
+      });
+
+      const res = (await tools.deleteSubmissions.execute!(
+        {
+          submissionIds: [targetRecordId],
+          reason: "중복 제출 삭제",
+        },
+        mockExecutionOptions
+      )) as {
+        requiresConfirmation?: boolean;
+        status?: string;
+        pendingConfirmation?: { toolName: string; targetIds: string[] };
+      };
+
+      expect(res.requiresConfirmation).toBe(true);
+      expect(res.status).toBe("PENDING_CONFIRMATION");
+      expect(res.pendingConfirmation?.toolName).toBe("deleteSubmissions");
+      expect(res.pendingConfirmation?.targetIds).toEqual([targetRecordId]);
+      expect(baseDeps.softDeleteSubmissionsByIds).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -1,7 +1,10 @@
 import type { AnalysisBlock, AnalysisView } from "@/entities/analysis-view";
 import type { ActiveForm, CoreFormField, Form } from "@/entities/form";
 import type {
+  ConfirmedNavigatorActionDto,
   ExecuteNavigatorPayload,
+  HighRiskConfirmationToolName,
+  NavigatorAttachmentDto,
   NavigatorChatMessageDto,
   NavigatorClientContext,
   NavigatorMode,
@@ -18,7 +21,10 @@ export {
   ANALYSIS_VIEW_OPERATIONS,
   SCHEMA_OPERATIONS,
   type AnalysisViewOperation,
+  type ConfirmedNavigatorActionDto,
   type ExecuteNavigatorPayload,
+  type HighRiskConfirmationToolName,
+  type NavigatorAttachmentDto,
   type NavigatorChatMessageDto,
   type NavigatorClientContext,
   type NavigatorMode,
@@ -150,6 +156,18 @@ export type NavigatorAction =
   NavigatorBuilderAction | NavigatorConsumerAction | NavigatorAnalystAction;
 
 /**
+ * 고위험 도구 실행 전 클라이언트 채팅 UI에 노출되는 사전 승인 요청 메타데이터
+ */
+export interface PendingNavigatorConfirmation {
+  confirmationId: string;
+  toolName: HighRiskConfirmationToolName;
+  title: string;
+  description: string;
+  targetIds: string[];
+  payload: Record<string, unknown>;
+}
+
+/**
  * 네비게이터 서버 실행 응답 규격
  */
 export interface NavigatorExecutionResponse {
@@ -159,6 +177,8 @@ export interface NavigatorExecutionResponse {
   action: NavigatorAction | null;
   /** [신규] 순차 실행할 클라이언트 복합 액션 배열 (예: [NAVIGATE, FILL_FIELDS]) */
   actions?: NavigatorAction[] | undefined;
+  /** 사용자 사전 승인이 필요한 대기 중 고위험 액션 목록 */
+  pendingConfirmations?: PendingNavigatorConfirmation[] | undefined;
   /** 서버에서 갱신/생성된 폼 데이터 (존재하는 경우) */
   updatedForm?: ActiveForm | Form | null | undefined;
   /** 서버에서 갱신/생성된 분석 뷰 문서 데이터 (존재하는 경우) */
