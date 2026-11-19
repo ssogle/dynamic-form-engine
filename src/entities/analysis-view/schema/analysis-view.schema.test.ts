@@ -147,21 +147,26 @@ describe("AnalysisView Schema Validation Engine", () => {
   });
 
   describe("updateAnalysisViewSchema & selectAnalysisViewSchema", () => {
-    it("부분 수정 시 title만 전달하거나 blocks만 전달해도 검증을 통과해야 한다", () => {
-      expect(updateAnalysisViewSchema.safeParse({ title: "수정된 제목" }).success).toBe(true);
+    it("부분 수정 시 title만 전달하거나 blocks만 전달해도 expectedVersion과 함께 검증을 통과해야 한다", () => {
+      expect(
+        updateAnalysisViewSchema.safeParse({ title: "수정된 제목", expectedVersion: 1 }).success
+      ).toBe(true);
       expect(
         updateAnalysisViewSchema.safeParse({
           blocks: [{ id: "b1", type: "text", content: "요약 내용" }],
+          expectedVersion: 1,
         }).success
       ).toBe(true);
+      expect(updateAnalysisViewSchema.safeParse({ title: "수정된 제목" }).success).toBe(false);
     });
 
-    it("DB 조회 모델 selectAnalysisViewSchema는 타임스탬프와 블록 배열을 검증해야 한다", () => {
+    it("DB 조회 모델 selectAnalysisViewSchema는 타임스탬프, version과 블록 배열을 검증해야 한다", () => {
       const dbRow = {
         id: "22222222-2222-4222-8222-222222222222",
         title: "조회 문서",
         description: null,
         blocks: [{ id: "b1", type: "text", content: "본문" }],
+        version: 1,
         createdAt: new Date("2026-11-16T00:00:00Z"),
         updatedAt: new Date("2026-11-16T00:00:00Z"),
         publishedAt: null,

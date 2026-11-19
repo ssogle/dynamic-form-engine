@@ -1,6 +1,7 @@
 import "server-only";
 import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
-import { db } from "@/shared/db/server";
+import { db, resolveOptimisticUpdateResult } from "@/shared/db/server";
+import type { OptimisticUpdateResult } from "@/shared/lib/http";
 import {
   analysisViews,
   type AnalysisView,
@@ -92,26 +93,43 @@ export const insertAnalysisView = async (data: InsertAnalysisView): Promise<Anal
 };
 
 /**
- * 특정 ID의 분석 뷰 메타데이터 또는 블록 구성을 수정하고 updatedAt을 DB 중앙 시계로 갱신합니다.
+ * 특정 ID의 분석 뷰 메타데이터 또는 블록 구성을 낙관적 락(`expectedVersion`)과 함께 수정합니다.
+ * 성공 시 `version`을 1 증가시키고 `updatedAt`을 DB 중앙 시계로 갱신합니다.
  *
  * @param id 수정할 분석 뷰 고유 식별자(UUID)
- * @param data 수정할 분석 뷰 부분 데이터
- * @returns 수정된 AnalysisView 객체 또는 대상이 없을 경우 undefined
+ * @param data 수정할 분석 뷰 부분 데이터 및 expectedVersion
+ * @returns OptimisticUpdateResult<AnalysisView> (`updated` | `conflict` | `not_found`)
  */
 export const updateAnalysisViewById = async (
   id: string,
   data: UpdateAnalysisView
-): Promise<AnalysisView | undefined> => {
+): Promise<OptimisticUpdateResult<AnalysisView>> => {
+  const { expectedVersion, ...updateFields } = data;
+
   const [updated] = await db
     .update(analysisViews)
     .set({
-      ...data,
+      ...updateFields,
+      version: sql`${analysisViews.version} + 1`,
       updatedAt: sql`now()`,
     })
-    .where(and(eq(analysisViews.id, id), isNull(analysisViews.deletedAt)))
+    .where(
+      and(
+        eq(analysisViews.id, id),
+        eq(analysisViews.version, expectedVersion),
+        isNull(analysisViews.deletedAt)
+      )
+    )
     .returning();
 
-  return updated;
+  return await resolveOptimisticUpdateResult(updated, async () => {
+    const [existing] = await db
+      .select({ version: analysisViews.version })
+      .from(analysisViews)
+      .where(and(eq(analysisViews.id, id), isNull(analysisViews.deletedAt)))
+      .limit(1);
+    return existing?.version;
+  });
 };
 
 /**
@@ -129,6 +147,7 @@ export const publishAnalysisViewById = async (
     .update(analysisViews)
     .set({
       publishedAt: isPublished ? sql`now()` : null,
+      version: sql`${analysisViews.version} + 1`,
       updatedAt: sql`now()`,
     })
     .where(and(eq(analysisViews.id, id), isNull(analysisViews.deletedAt)))

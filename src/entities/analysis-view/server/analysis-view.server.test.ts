@@ -52,6 +52,7 @@ describe("AnalysisView Server Repository (entities/analysis-view/server)", () =>
       },
     ],
     createdAt: sampleDate,
+    version: 1,
     updatedAt: sampleDate,
     publishedAt: null,
     deletedAt: null,
@@ -124,13 +125,24 @@ describe("AnalysisView Server Repository (entities/analysis-view/server)", () =>
     ).rejects.toThrow("분석 뷰 데이터베이스 삽입 결과가 반환되지 않았습니다.");
   });
 
-  it("updateAnalysisViewById는 대상 분석 뷰를 수정하고 반환해야 한다", async () => {
-    const updated = { ...sampleView, title: "수정된 제목" };
+  it("updateAnalysisViewById는 expectedVersion 일치 시 수정하고 불일치 시 conflict를 반환해야 한다", async () => {
+    const updated = { ...sampleView, title: "수정된 제목", version: 2 };
     mockReturning.mockResolvedValueOnce([updated]);
 
-    const result = await updateAnalysisViewById(sampleView.id, { title: "수정된 제목" });
+    const result = await updateAnalysisViewById(sampleView.id, {
+      title: "수정된 제목",
+      expectedVersion: 1,
+    });
     expect(mockUpdate).toHaveBeenCalledTimes(1);
-    expect(result).toEqual(updated);
+    expect(result).toEqual({ status: "updated", data: updated });
+
+    mockReturning.mockResolvedValueOnce([]);
+    mockLimit.mockResolvedValueOnce([{ version: 5 }]);
+    const conflictResult = await updateAnalysisViewById(sampleView.id, {
+      title: "충돌 제목",
+      expectedVersion: 1,
+    });
+    expect(conflictResult).toEqual({ status: "conflict", currentVersion: 5 });
   });
 
   it("publishAnalysisViewById는 발행 여부에 따라 publishedAt을 갱신해야 한다", async () => {

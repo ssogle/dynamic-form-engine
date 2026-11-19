@@ -75,13 +75,78 @@ function createNumberFieldSchema(field: CoreFormField): z.ZodType {
 }
 
 /**
- * 셀렉트(select) 및 라디오(radio) 단일 선택 필드 검증 스키마 생성기
- * 사전에 정의된 허용 선택지(options)에 부합하는지 화이트리스트 검증을 수행합니다.
+ * 선택형 배열(select 단일/다중 및 checkbox with options) 공통 검증 스키마 생성기
+ *
+ * - `select`는 단일(`multiple: false`)과 다중(`multiple: true`) 모두 `string[]` 포맷으로 저장합니다.
+ * - 레거시 단일 문자열 값이 유입되더라도 안전하게 문자열 배열로 정규화하여 하위 호환을 보장합니다.
+ * - `enforceSingle: true`일 때는 1개 초과 선택을 차단합니다.
+ */
+function createMultiOptionArraySchema(
+  field: CoreFormField,
+  options?: { enforceSingle?: boolean | undefined }
+): z.ZodType {
+  const validValues = extractOptionValues(field.options);
+
+  return z
+    .preprocess((rawVal) => {
+      if (rawVal === undefined || rawVal === null || rawVal === "") {
+        return [];
+      }
+      return Array.isArray(rawVal) ? rawVal : [rawVal];
+    }, z.array(z.string()))
+    .superRefine((val, ctx) => {
+      if (val.length === 0) {
+        if (field.required) {
+          ctx.addIssue({
+            code: "custom",
+            message: `${field.label} 항목은 필수 선택입니다.`,
+          });
+        }
+        return;
+      }
+
+      if (options?.enforceSingle && val.length > 1) {
+        ctx.addIssue({
+          code: "custom",
+          message: `${field.label} 항목은 최대 1개까지 선택할 수 있습니다.`,
+        });
+        return;
+      }
+
+      if (validValues.length > 0) {
+        const invalidValues = val.filter((v) => !validValues.includes(v));
+        if (invalidValues.length > 0) {
+          ctx.addIssue({
+            code: "custom",
+            message: `${field.label} 항목에 올바르지 않은 선택지가 포함되어 있습니다.`,
+          });
+        }
+      }
+    });
+}
+
+/**
+ * 셀렉트(select) 필드 검증 스키마 생성기
+ * 단일/다중 선택 모두 표준 string[] 배열 포맷으로 저장·검증하며,
+ * multiple이 false(또는 미지정)인 경우 최대 1개 선택 제약을 적용합니다.
  *
  * @param field 코어 폼 필드 메타데이터
- * @returns Zod 셀렉트/라디오 스키마
+ * @returns Zod 셀렉트 배열 스키마
  */
 function createSelectFieldSchema(field: CoreFormField): z.ZodType {
+  return createMultiOptionArraySchema(field, {
+    enforceSingle: !field.multiple,
+  });
+}
+
+/**
+ * 라디오(radio) 필드 검증 스키마 생성기
+ * 단일 문자열 화이트리스트 검증을 수행합니다.
+ *
+ * @param field 코어 폼 필드 메타데이터
+ * @returns Zod 라디오 문자열 스키마
+ */
+function createRadioFieldSchema(field: CoreFormField): z.ZodType {
   const validValues = extractOptionValues(field.options);
 
   return z
@@ -119,7 +184,6 @@ function createSelectFieldSchema(field: CoreFormField): z.ZodType {
  */
 function createCheckboxFieldSchema(field: CoreFormField): z.ZodType {
   const hasOptions = Boolean(field.options && field.options.length > 0);
-  const validValues = extractOptionValues(field.options);
 
   // 1. 단일 불리언 체크박스 (옵션 목록이 없는 경우)
   if (!hasOptions) {
@@ -135,33 +199,7 @@ function createCheckboxFieldSchema(field: CoreFormField): z.ZodType {
   }
 
   // 2. 다중 선택 체크박스 (옵션 목록이 정의된 경우)
-  return z
-    .array(z.string())
-    .optional()
-    .superRefine((val, ctx) => {
-      const isEmpty = !val || val.length === 0;
-
-      if (isEmpty) {
-        if (field.required) {
-          ctx.addIssue({
-            code: "custom",
-            message: `${field.label} 항목은 필수 선택입니다.`,
-          });
-        }
-        return;
-      }
-
-      if (val && validValues.length > 0) {
-        const invalidValues = val.filter((v) => !validValues.includes(v));
-        if (invalidValues.length > 0) {
-          ctx.addIssue({
-            code: "custom",
-            message: `${field.label} 항목에 올바르지 않은 선택지가 포함되어 있습니다.`,
-          });
-        }
-      }
-    })
-    .default([]);
+  return createMultiOptionArraySchema(field);
 }
 
 /**
@@ -217,54 +255,41 @@ function createSwitchFieldSchema(field: CoreFormField): z.ZodType {
 
 /**
  * 관계형 도메인 필드(relation) 검증 스키마 생성기
- * 단일 선택(UUID) vs 다중 선택(UUID[]) 구조를 모두 지원합니다.
+ * 단일/다중 선택 모두 표준 string[] 배열 포맷으로 저장·검증하며,
+ * 기존 단일 UUID 문자열 레거시 입력도 배열로 정규화하여 호환성을 유지합니다.
  *
  * @param field 코어 폼 필드 메타데이터
- * @returns Zod 관계형 스키마
+ * @returns Zod 관계형 배열 스키마
  */
 function createRelationFieldSchema(field: CoreFormField): z.ZodType {
   const isMultiple = field.relationConfig?.multiple ?? false;
 
-  if (isMultiple) {
-    return z
-      .array(z.uuid("올바른 UUID 형식이어야 합니다."))
-      .optional()
-      .superRefine((val, ctx) => {
-        const isEmpty = !val || val.length === 0;
-        if (isEmpty && field.required) {
-          ctx.addIssue({
-            code: "custom",
-            message: `${field.label} 항목은 필수 선택입니다.`,
-          });
-        }
-      })
-      .default([]);
-  }
-
   return z
-    .string()
-    .optional()
-    .superRefine((val, ctx) => {
-      const isEmpty = val === "" || val === null || val === undefined;
-
-      if (isEmpty) {
-        if (field.required) {
-          ctx.addIssue({
-            code: "custom",
-            message: `${field.label} 항목은 필수 선택입니다.`,
-          });
+    .preprocess(
+      (rawVal) => {
+        if (rawVal === undefined || rawVal === null || rawVal === "") {
+          return [];
         }
+        return Array.isArray(rawVal) ? rawVal : [rawVal];
+      },
+      z.array(z.uuid("올바른 UUID 형식이어야 합니다."))
+    )
+    .superRefine((val, ctx) => {
+      if (val.length === 0 && field.required) {
+        ctx.addIssue({
+          code: "custom",
+          message: `${field.label} 항목은 필수 선택입니다.`,
+        });
         return;
       }
 
-      if (!z.uuid().safeParse(val).success) {
+      if (!isMultiple && val.length > 1) {
         ctx.addIssue({
           code: "custom",
-          message: `${field.label} 항목은 올바른 참조 UUID 형식이어야 합니다.`,
+          message: `${field.label} 항목은 최대 1개까지 선택할 수 있습니다.`,
         });
       }
-    })
-    .transform((val) => (val === "" || val === undefined ? undefined : val));
+    });
 }
 
 /**
@@ -299,8 +324,11 @@ export function buildDynamicFormSchema(
         break;
 
       case "select":
-      case "radio":
         fieldSchema = createSelectFieldSchema(field);
+        break;
+
+      case "radio":
+        fieldSchema = createRadioFieldSchema(field);
         break;
 
       case "checkbox":

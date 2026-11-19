@@ -13,6 +13,7 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
   const targetFormId = "22222222-2222-4222-a222-222222222222";
   const draftFormId = "33333333-3333-4333-a333-333333333333";
   const unpublishedWithSubsFormId = "44444444-4444-4444-a444-444444444444";
+  const publishedFormId = "55555555-5555-4555-a555-555555555555";
 
   const mockForms: Record<string, Form> = {
     [currentFormId]: {
@@ -58,7 +59,8 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
           },
         ],
       },
-      publishedAt: new Date("2026-11-01T00:00:00Z"),
+      publishedAt: null,
+      version: 1,
       createdAt: new Date("2026-11-01T00:00:00Z"),
       updatedAt: new Date("2026-11-01T00:00:00Z"),
       deletedAt: null,
@@ -87,6 +89,7 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
         ],
       },
       publishedAt: new Date("2026-11-01T00:00:00Z"),
+      version: 1,
       createdAt: new Date("2026-11-01T00:00:00Z"),
       updatedAt: new Date("2026-11-01T00:00:00Z"),
       deletedAt: null,
@@ -135,6 +138,7 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
         ],
       },
       publishedAt: null,
+      version: 1,
       createdAt: new Date("2026-11-01T00:00:00Z"),
       updatedAt: new Date("2026-11-01T00:00:00Z"),
       deletedAt: null,
@@ -177,6 +181,37 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
         ],
       },
       publishedAt: null,
+      version: 1,
+      createdAt: new Date("2026-11-01T00:00:00Z"),
+      updatedAt: new Date("2026-11-01T00:00:00Z"),
+      deletedAt: null,
+    },
+    [publishedFormId]: {
+      id: publishedFormId,
+      title: "라이브 발행 중 폼",
+      description: "현재 공개 발행되어 응답 수집 중인 폼",
+      schemaDefinition: {
+        primaryFieldId: "p_title",
+        fields: [
+          {
+            id: "p_title",
+            label: "제목",
+            type: "text",
+            required: true,
+            description: "제목 입력",
+          },
+          {
+            id: "p_status",
+            label: "상태",
+            type: "select",
+            required: true,
+            description: "상태 선택",
+            options: [{ label: "진행", value: "OPEN", description: "진행 중", disabled: false }],
+          },
+        ],
+      },
+      publishedAt: new Date("2026-11-01T00:00:00Z"),
+      version: 1,
       createdAt: new Date("2026-11-01T00:00:00Z"),
       updatedAt: new Date("2026-11-01T00:00:00Z"),
       deletedAt: null,
@@ -187,19 +222,26 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
     findFormById: vi.fn().mockImplementation(async (id: string) => mockForms[id]),
     hasSubmissionsByFormId: vi
       .fn()
-      .mockImplementation(async (formId: string) => formId === unpublishedWithSubsFormId),
+      .mockImplementation(
+        async (formId: string) => formId === currentFormId || formId === unpublishedWithSubsFormId
+      ),
     insertForm: vi.fn().mockImplementation(async (input) => ({
       id: "new-form-id",
       ...input,
+      version: 1,
       publishedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       deletedAt: null,
     })),
     updateFormById: vi.fn().mockImplementation(async (id: string, updates) => ({
-      ...mockForms[id],
-      ...updates,
-      updatedAt: new Date(),
+      status: "updated" as const,
+      data: {
+        ...mockForms[id]!,
+        ...updates,
+        version: (mockForms[id]?.version ?? 1) + 1,
+        updatedAt: new Date(),
+      },
     })),
     publishFormById: vi.fn().mockImplementation(async (id: string, isPublished: boolean) => ({
       ...mockForms[id],
@@ -1221,6 +1263,139 @@ describe("createBuilderTools (features/execute-navigator-action/lib/tools)", () 
       } finally {
         dateSpy.mockRestore();
       }
+    });
+
+    it("발행 상태(publishedFormId)의 폼은 초안 회수 전까지 updateSchema, addRelationField, updateFieldOptions 호출을 차단해야 한다", async () => {
+      const tools = createBuilderTools(dependencies);
+
+      const schemaRes = (await tools.updateSchema.execute!(
+        {
+          formId: publishedFormId,
+          operation: "ADD_FIELD",
+          fieldData: {
+            label: "신규 필드",
+            type: "text",
+            description: "설명",
+          },
+        },
+        mockExecutionOptions
+      )) as { success: boolean; error?: string };
+      expect(schemaRes.success).toBe(false);
+      expect(schemaRes.error).toContain("발행");
+
+      const relRes = (await tools.addRelationField.execute!(
+        {
+          formId: publishedFormId,
+          label: "프로젝트",
+          targetFormId,
+          multiple: false,
+          required: false,
+          description: "연관 프로젝트",
+        },
+        mockExecutionOptions
+      )) as { success: boolean; error?: string };
+      expect(relRes.success).toBe(false);
+      expect(relRes.error).toContain("발행");
+
+      const optRes = (await tools.updateFieldOptions.execute!(
+        {
+          formId: publishedFormId,
+          targetFieldId: "p_status",
+          operation: "ADD_OPTIONS",
+          options: [{ label: "종료", value: "CLOSED", description: "완료됨", disabled: false }],
+        },
+        mockExecutionOptions
+      )) as { success: boolean; error?: string };
+      expect(optRes.success).toBe(false);
+      expect(optRes.error).toContain("발행");
+    });
+
+    it("초안(draftFormId)에서는 select(multiple: true) 필드를 추가할 수 있고, 응답 보유 폼(currentFormId)에서는 필드 type 변경이 차단되어야 한다", async () => {
+      const tools = createBuilderTools(dependencies);
+
+      const multiSelectRes = (await tools.updateSchema.execute!(
+        {
+          formId: draftFormId,
+          operation: "ADD_FIELD",
+          fieldData: {
+            label: "다중 태그",
+            type: "select",
+            multiple: true,
+            description: "다중 선택 가능한 드롭다운",
+            options: [
+              { label: "A", value: "A", description: "A", disabled: false },
+              { label: "B", value: "B", description: "B", disabled: false },
+            ],
+          },
+        },
+        mockExecutionOptions
+      )) as { success: boolean; updatedForm?: Form };
+      expect(multiSelectRes.success).toBe(true);
+      const addedFields = (
+        multiSelectRes.updatedForm?.schemaDefinition as { fields: CoreFormField[] }
+      ).fields;
+      expect(addedFields.find((f) => f.label === "다중 태그")?.multiple).toBe(true);
+
+      const typeChangeBlocked = (await tools.updateSchema.execute!(
+        {
+          formId: currentFormId,
+          operation: "UPDATE_FIELD",
+          targetFieldId: "f_category",
+          fieldData: {
+            type: "radio",
+          },
+        },
+        mockExecutionOptions
+      )) as { success: boolean; error?: string };
+      expect(typeChangeBlocked.success).toBe(false);
+      expect(typeChangeBlocked.error).toContain("타입");
+    });
+
+    it("클라이언트 컨텍스트 버전(expectedFormVersion)과 DB 최신 버전이 다르면 낙관적 락 충돌 에러를 반환해야 한다", async () => {
+      const tools = createBuilderTools({
+        ...dependencies,
+        expectedFormId: draftFormId,
+        expectedFormVersion: 99,
+      });
+
+      const res = (await tools.updateSchema.execute!(
+        {
+          formId: draftFormId,
+          operation: "ADD_FIELD",
+          fieldData: {
+            label: "비고",
+            type: "text",
+            description: "충돌 테스트 필드",
+          },
+        },
+        mockExecutionOptions
+      )) as { success: boolean; error?: string };
+
+      expect(res.success).toBe(false);
+      expect(res.error).toContain("새로고침");
+    });
+
+    it("이미 발행된 폼(publishedFormId)도 publishForm({ isPublished: false })로 정상 초안 회수(발행 취소)할 수 있어야 한다", async () => {
+      const tools = createBuilderTools(dependencies);
+
+      const unpublishRes = (await tools.publishForm.execute!(
+        {
+          formId: publishedFormId,
+          isPublished: false,
+        },
+        mockExecutionOptions
+      )) as {
+        success: boolean;
+        isPublished?: boolean;
+        form?: Form;
+        clientAction?: { type: string; isPublished: boolean };
+      };
+
+      expect(unpublishRes.success).toBe(true);
+      expect(unpublishRes.isPublished).toBe(false);
+      expect(unpublishRes.form?.publishedAt).toBeNull();
+      expect(unpublishRes.clientAction?.type).toBe("PUBLISH_FORM");
+      expect(unpublishRes.clientAction?.isPublished).toBe(false);
     });
   });
 });

@@ -50,6 +50,10 @@ export interface UseConsumerSubmissionEditorReturn {
    */
   isSuccessUpdated: boolean;
   /**
+   * 서버 수정 실패(예: 409 낙관적 락 충돌) 안내 메시지
+   */
+  updateErrorMessage: string | null;
+  /**
    * 원본 제출 데이터와 AI Navigator 임시 필드값이 안전하게 병합된 최종 폼 값
    */
   mergedValues: Record<string, unknown> | undefined;
@@ -78,6 +82,7 @@ export function useConsumerSubmissionEditor({
   submissionId,
 }: UseConsumerSubmissionEditorParams): UseConsumerSubmissionEditorReturn {
   const [isSuccessUpdated, setIsSuccessUpdated] = React.useState(false);
+  const [updateErrorMessage, setUpdateErrorMessage] = React.useState<string | null>(null);
 
   // 1. 폼 스키마 및 기존 단건 제출 데이터 비동기 조회
   const {
@@ -143,15 +148,27 @@ export function useConsumerSubmissionEditor({
    * 폼 유효성 검사를 통과한 정제 데이터를 서버로 전송하여 수정
    */
   const handleUpdate = async (cleanedData: Record<string, unknown>) => {
+    setUpdateErrorMessage(null);
     try {
       await updateSubmission({
         submissionId,
         data: cleanedData,
+        expectedVersion: submission?.version ?? 1,
       });
       resetDraft();
       setIsSuccessUpdated(true);
     } catch (err) {
-      console.error("응답 수정 실패:", err);
+      const httpErr = err as { status?: number; code?: string; message?: string };
+      if (httpErr?.status === 409 || httpErr?.code === "CONFLICT") {
+        setUpdateErrorMessage(
+          "다른 사용자가 먼저 응답을 수정하여 최신 버전으로 다시 불러왔습니다. 변경 사항을 확인한 뒤 다시 저장해 주세요."
+        );
+      } else {
+        setUpdateErrorMessage(
+          httpErr?.message ?? "응답 수정 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+        );
+        console.error("응답 수정 실패:", err);
+      }
     }
   };
 
@@ -160,6 +177,7 @@ export function useConsumerSubmissionEditor({
    */
   const handleResetSuccess = () => {
     setIsSuccessUpdated(false);
+    setUpdateErrorMessage(null);
   };
 
   return {
@@ -170,6 +188,7 @@ export function useConsumerSubmissionEditor({
     errorMessage,
     isUpdating,
     isSuccessUpdated,
+    updateErrorMessage,
     mergedValues,
     activeSubmitTriggerCount,
     handleUpdate,

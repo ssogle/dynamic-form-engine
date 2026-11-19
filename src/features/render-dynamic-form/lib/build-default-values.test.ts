@@ -38,6 +38,18 @@ describe("buildDefaultValues (features/render-dynamic-form/lib)", () => {
         ],
       },
       {
+        id: "f_select_multi",
+        label: "다중 선택",
+        type: "select",
+        multiple: true,
+        required: false,
+        description: "여러 옵션을 선택합니다.",
+        options: [
+          { label: "A", value: "A", description: "A 유형 선택", disabled: false },
+          { label: "B", value: "B", description: "B 유형 선택", disabled: false },
+        ],
+      },
+      {
         id: "f_radio",
         label: "라디오",
         type: "radio",
@@ -109,7 +121,6 @@ describe("buildDefaultValues (features/render-dynamic-form/lib)", () => {
     // 1. 문자열 기반 필드는 빈 문자열("")
     expect(result.f_text).toBe("");
     expect(result.f_textarea).toBe("");
-    expect(result.f_select).toBe("");
     expect(result.f_radio).toBe("");
 
     // 2. 숫자 및 날짜 필드는 undefined
@@ -120,11 +131,13 @@ describe("buildDefaultValues (features/render-dynamic-form/lib)", () => {
     expect(result.f_switch).toBe(false);
     expect(result.f_check_single).toBe(false);
 
-    // 4. 옵션이 있는 다중 체크박스는 빈 배열([])
+    // 4. 옵션이 있는 다중 체크박스와 select(단일/다중)는 빈 배열([])
     expect(result.f_check_multi).toEqual([]);
+    expect(result.f_select).toEqual([]);
+    expect(result.f_select_multi).toEqual([]);
 
-    // 5. 관계형 필드는 multiple 여부에 따라 undefined 또는 []
-    expect(result.f_rel_single).toBeUndefined();
+    // 5. 관계형 필드는 단일/다중 모두 빈 배열([])
+    expect(result.f_rel_single).toEqual([]);
     expect(result.f_rel_multi).toEqual([]);
   });
 

@@ -30,6 +30,7 @@ const createMockAnalysisView = (overrides: Partial<AnalysisView> = {}): Analysis
     },
   ],
   publishedAt: new Date("2026-02-01T00:00:00.000Z"),
+  version: 1,
   createdAt: new Date("2026-02-01T00:00:00.000Z"),
   updatedAt: new Date("2026-02-01T00:00:00.000Z"),
   deletedAt: null,

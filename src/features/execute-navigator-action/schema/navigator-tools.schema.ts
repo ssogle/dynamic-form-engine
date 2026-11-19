@@ -79,6 +79,16 @@ export const getFormDetailsInputSchema = z.object({
 });
 export type GetFormDetailsInput = z.infer<typeof getFormDetailsInputSchema>;
 
+/**
+ * 특정 레코드에 연결된 역참조(인바운드 관계) 응답 목록 조회 도구(getRelatedSubmissions) 입력 스키마
+ */
+export const getRelatedSubmissionsInputSchema = z.object({
+  submissionId: z
+    .uuid("조회할 기준 응답 ID(UUID)는 필수입니다.")
+    .describe("하위 연결 이력(역참조)을 조회할 기준 레코드(submission)의 고유 UUID"),
+});
+export type GetRelatedSubmissionsInput = z.infer<typeof getRelatedSubmissionsInputSchema>;
+
 // ==========================================
 // 2. 빌더 도구 입력 스키마 (Builder Tools)
 // ==========================================

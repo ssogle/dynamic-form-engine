@@ -1,4 +1,4 @@
-import { jsonb, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { integer, jsonb, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 
 /**
  * 폼 엔티티의 JSON 스키마 필드 정의 타입
@@ -44,6 +44,12 @@ export const forms = pgTable("forms", {
    * 물리적 테이블 구조를 변경하지 않고도 무한한 폼 확장을 가능하게 하는 핵심 컬럼입니다.
    */
   schemaDefinition: jsonb("schema_definition").notNull().$type<FormSchemaDefinition>(),
+
+  /**
+   * 낙관적 락(Optimistic Lock) 동시 수정 충돌 감지용 버전 번호
+   * 생성 시 1로 초기화되며, 모든 수정 시 DB 레벨에서 원자적으로 1씩 증가합니다.
+   */
+  version: integer("version").default(1).notNull(),
 
   /**
    * 폼 스키마가 최초 생성된 일시 (UTC 기준 타임스탬프)

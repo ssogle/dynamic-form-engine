@@ -31,6 +31,7 @@ vi.mock("@/entities/form-submission", async (importOriginal) => {
       data: {
         id: submissionId,
         formId,
+        version: 1,
         data: { name: "원래이름", age: 20 },
         createdAt: "2026-01-01T00:00:00Z",
         updatedAt: "2026-01-01T00:00:00Z",
@@ -114,7 +115,29 @@ describe("useConsumerSubmissionEditor (features/render-dynamic-form/hooks)", () 
     expect(mockUpdateMutateAsync).toHaveBeenCalledWith({
       submissionId,
       data: updatePayload,
+      expectedVersion: 1,
     });
     expect(result.current.isSuccessUpdated).toBe(true);
+  });
+
+  it("handleUpdate 호출 시 409 충돌 에러가 발생하면 updateErrorMessage가 설정되어야 한다", async () => {
+    const formId = "form-edit-uuid-4";
+    const submissionId = "sub-edit-uuid-4";
+    mockUpdateMutateAsync.mockRejectedValueOnce({
+      status: 409,
+      code: "CONFLICT",
+      message: "충돌 발생",
+    });
+
+    const { result } = renderHook(() => useConsumerSubmissionEditor({ formId, submissionId }), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.handleUpdate({ name: "충돌수정" });
+    });
+
+    expect(result.current.isSuccessUpdated).toBe(false);
+    expect(result.current.updateErrorMessage).toContain("최신 버전");
   });
 });

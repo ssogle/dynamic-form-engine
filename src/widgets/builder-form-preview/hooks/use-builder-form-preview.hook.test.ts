@@ -44,6 +44,7 @@ describe("useBuilderFormPreview (widgets/builder-form-preview/hooks)", () => {
       ],
     },
     publishedAt: null,
+    version: 1,
     createdAt: new Date("2026-11-01T00:00:00.000Z"),
     updatedAt: new Date("2026-11-01T00:00:00.000Z"),
     deletedAt: null,

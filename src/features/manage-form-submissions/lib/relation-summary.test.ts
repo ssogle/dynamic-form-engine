@@ -38,6 +38,7 @@ describe("relation-summary (features/manage-form-submissions/lib)", () => {
       ],
     },
     publishedAt: new Date("2026-01-01T00:00:00Z"),
+    version: 1,
     createdAt: new Date("2026-01-01T00:00:00Z"),
     updatedAt: new Date("2026-01-01T00:00:00Z"),
     deletedAt: null,
@@ -71,6 +72,7 @@ describe("relation-summary (features/manage-form-submissions/lib)", () => {
     {
       id: "parent-1",
       formId: "parent-form",
+      version: 1,
       data: {
         f_project: subAId,
         f_projects: [subAId, subBId],
@@ -82,6 +84,7 @@ describe("relation-summary (features/manage-form-submissions/lib)", () => {
     {
       id: "parent-2",
       formId: "parent-form",
+      version: 1,
       data: {
         f_project: subBId,
         f_projects: [subAId],
@@ -96,6 +99,7 @@ describe("relation-summary (features/manage-form-submissions/lib)", () => {
     {
       id: subAId,
       formId: targetFormId,
+      version: 1,
       data: { p_code: "PRJ-01", p_name: "차세대 ERP 구축" },
       createdAt: new Date("2026-01-01T00:00:00Z"),
       updatedAt: new Date("2026-01-01T00:00:00Z"),
@@ -104,6 +108,7 @@ describe("relation-summary (features/manage-form-submissions/lib)", () => {
     {
       id: subBId,
       formId: targetFormId,
+      version: 1,
       data: { p_code: "PRJ-02", p_name: "AI 검색 고도화" },
       createdAt: new Date("2026-01-01T00:00:00Z"),
       updatedAt: new Date("2026-01-01T00:00:00Z"),

@@ -43,6 +43,7 @@ export function ConsumerSubmissionEditor({ formId, submissionId }: ConsumerSubmi
     errorMessage,
     isUpdating,
     isSuccessUpdated,
+    updateErrorMessage,
     mergedValues,
     activeSubmitTriggerCount,
     handleUpdate,
@@ -164,6 +165,19 @@ export function ConsumerSubmissionEditor({ formId, submissionId }: ConsumerSubmi
           </p>
         </div>
       </div>
+
+      {updateErrorMessage && (
+        <Card className="border-destructive/40 bg-destructive/5 shadow-none">
+          <CardHeader className="py-3">
+            <CardTitle className="text-destructive text-sm font-semibold">
+              응답을 저장하지 못했습니다
+            </CardTitle>
+            <CardDescription className="text-destructive/90 text-xs">
+              {updateErrorMessage}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
 
       <DynamicFormRenderer
         form={form}

@@ -73,6 +73,7 @@ describe("useSubmissionListTable (features/manage-form-submissions/hooks)", () =
       ],
     },
     publishedAt: new Date("2026-01-01T00:00:00Z"),
+    version: 1,
     createdAt: new Date("2026-01-01T00:00:00Z"),
     updatedAt: new Date("2026-01-01T00:00:00Z"),
     deletedAt: null,
@@ -82,6 +83,7 @@ describe("useSubmissionListTable (features/manage-form-submissions/hooks)", () =
     {
       id: "sub-1",
       formId: "form-uuid-1",
+      version: 1,
       data: { "field-name": "홍길동" },
       createdAt: new Date("2026-01-01T00:00:00Z"),
       updatedAt: new Date("2026-01-01T00:00:00Z"),
@@ -503,6 +505,7 @@ describe("useSubmissionListTable (features/manage-form-submissions/hooks)", () =
       {
         id: "sample-preview-1",
         formId: "form-uuid-1",
+        version: 1,
         data: { "field-name": "이름 예시 1" },
         createdAt: new Date("2026-11-18T09:00:00.000Z"),
         updatedAt: new Date("2026-11-18T09:00:00.000Z"),

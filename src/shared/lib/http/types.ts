@@ -45,3 +45,15 @@ export type ApiResult<T> =
       error: HttpErrorData;
       meta?: undefined;
     };
+
+/**
+ * 낙관적 락(Optimistic Lock) 기반 DB 갱신 결과 판별 유니온
+ *
+ * - updated: expectedVersion 일치로 정상 갱신 완료
+ * - not_found: 대상 레코드가 존재하지 않거나 이미 소프트 삭제됨 (404)
+ * - conflict: 대상 레코드는 활성 상태이나 DB 최신 버전과 expectedVersion 불일치 (409)
+ */
+export type OptimisticUpdateResult<T> =
+  | { status: "updated"; data: T }
+  | { status: "not_found" }
+  | { status: "conflict"; currentVersion: number };

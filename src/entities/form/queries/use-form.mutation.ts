@@ -72,6 +72,11 @@ export const useUpdateFormMutation = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: formKeys.all });
     },
+    onError: (error) => {
+      if (error.status === 409 || error.code === "CONFLICT") {
+        queryClient.invalidateQueries({ queryKey: formKeys.all });
+      }
+    },
   });
 };
 

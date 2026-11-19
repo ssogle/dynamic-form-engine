@@ -1,4 +1,4 @@
-import { index, jsonb, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
+import { index, integer, jsonb, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { forms } from "./forms.table";
 
@@ -29,6 +29,12 @@ export const formSubmissions = pgTable(
      * 필드 키(name)와 입력값 쌍으로 구성됩니다.
      */
     data: jsonb("data").notNull().$type<Record<string, unknown>>(),
+
+    /**
+     * 낙관적 락(Optimistic Lock) 동시 수정 충돌 감지용 버전 번호
+     * 생성 시 1로 초기화되며, 응답 데이터 수정 시마다 원자적으로 1씩 증가합니다.
+     */
+    version: integer("version").default(1).notNull(),
 
     /**
      * 최초 제출 일시 (UTC)

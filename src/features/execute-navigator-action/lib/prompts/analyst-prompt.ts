@@ -42,7 +42,8 @@ export const ANALYST_NAVIGATOR_SYSTEM_PROMPT = `
      * 다중 선택/카테고리: '{ fieldId, op: "in", values: ["식대", "교통비"] }'
      * 관계형(relation) 자연어 키워드 검색: '{ fieldId, op: "contains", value: "마케팅" }' 또는 정확 일치 UUID '{ fieldId, op: "in", values: ["uuid-1"] }'
      * 시스템 컬럼('createdAt', 'updatedAt', 'id')도 'filters'에 사용할 수 있습니다.
-3. 원천 데이터 목록 위임 및 'queryFormSubmissions' 사용 제한:
+3. 원천 데이터 목록 위임 및 'queryFormSubmissions' / 'getRelatedSubmissions' 사용:
+   - 'getRelatedSubmissions({ submissionId })'는 특정 레코드 ID를 참조(relation)하고 있는 모든 하위 폼의 연결 내역을 relations 엣지 인덱스에서 즉시 추적할 때 사용합니다.
    - 'queryFormSubmissions'는 요약 리포트의 정성적 근거·대표 사례를 인용하거나 관계형 필터 대상 ID를 탐색하기 위한 소수 샘플링(보통 5~10건, 최대 50건)에만 제한적으로 사용하고, 수십~수백 행의 원천 레코드 목록을 table 블록에 그대로 덤프하지 마세요.
    - 사용자가 "전체 영수증 목록 다 보여줘", "특정 기간의 상세 데이터 내역을 전부 보고 싶어"처럼 원천 데이터 전체 목록·개별 내역 탐색을 요청하면 분석 뷰에 목록 표를 억지로 만들지 말고, "상세 전체 목록은 해당 폼의 데이터 뷰(/consumer/forms/[formId])에서 확인하실 수 있습니다"라고 안내하거나 'navigate' 도구로 '/consumer/forms/[formId]?startDate=...&endDate=...&dateFieldId=...' 경로로 이동해 주세요.
 

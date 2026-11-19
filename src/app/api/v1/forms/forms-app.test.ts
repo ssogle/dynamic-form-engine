@@ -48,6 +48,7 @@ const createMockForm = (overrides: Partial<Form> = {}): Form => ({
     ],
   },
   publishedAt: new Date("2026-01-01T00:00:00.000Z"),
+  version: 1,
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
   updatedAt: new Date("2026-01-01T00:00:00.000Z"),
   deletedAt: null,
@@ -57,6 +58,7 @@ const createMockForm = (overrides: Partial<Form> = {}): Form => ({
 const createMockSubmission = (overrides: Partial<FormSubmission> = {}): FormSubmission => ({
   id: VALID_SUBMISSION_ID,
   formId: VALID_FORM_ID,
+  version: 1,
   data: { [FIELD_ID]: "홍길동" },
   createdAt: new Date("2026-01-02T00:00:00.000Z"),
   updatedAt: new Date("2026-01-02T00:00:00.000Z"),
@@ -240,14 +242,17 @@ describe("formsApp (Hono Unified API Router)", () => {
 
     it("PATCH partially updates an existing form and returns 200", async () => {
       const existing = createMockForm();
-      const updated = createMockForm({ title: "수정된 제목" });
+      const updated = createMockForm({ title: "수정된 제목", version: 2 });
       vi.mocked(formServer.findFormById).mockResolvedValue(existing);
-      vi.mocked(formServer.updateFormById).mockResolvedValue(updated);
+      vi.mocked(formServer.updateFormById).mockResolvedValue({
+        status: "updated",
+        data: updated,
+      });
 
       const res = await formsApp.request(`/api/v1/forms/${VALID_FORM_ID}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: "수정된 제목" }),
+        body: JSON.stringify({ title: "수정된 제목", expectedVersion: 1 }),
       });
 
       expect(res.status).toBe(200);
@@ -255,7 +260,44 @@ describe("formsApp (Hono Unified API Router)", () => {
       expect(json.data.title).toBe("수정된 제목");
       expect(formServer.updateFormById).toHaveBeenCalledWith(VALID_FORM_ID, {
         title: "수정된 제목",
+        expectedVersion: 1,
       });
+    });
+
+    it("PATCH returns 409 CONFLICT when optimistic lock version mismatches", async () => {
+      const existing = createMockForm({ version: 2 });
+      vi.mocked(formServer.findFormById).mockResolvedValue(existing);
+      vi.mocked(formServer.updateFormById).mockResolvedValue({
+        status: "conflict",
+        currentVersion: 2,
+      });
+
+      const res = await formsApp.request(`/api/v1/forms/${VALID_FORM_ID}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "충돌 수정", expectedVersion: 1 }),
+      });
+
+      expect(res.status).toBe(409);
+      const json = (await res.json()) as { success: boolean; error: { code: string } };
+      expect(json.error.code).toBe("CONFLICT");
+    });
+
+    it("PATCH returns 400 BAD_REQUEST when attempting to mutate schema of a published form", async () => {
+      const publishedForm = createMockForm({ publishedAt: new Date("2026-01-01T00:00:00.000Z") });
+      vi.mocked(formServer.findFormById).mockResolvedValue(publishedForm);
+
+      const res = await formsApp.request(`/api/v1/forms/${VALID_FORM_ID}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expectedVersion: 1,
+          schemaDefinition: publishedForm.schemaDefinition,
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      expect(formServer.updateFormById).not.toHaveBeenCalled();
     });
 
     it("PATCH returns 400 BAD_REQUEST on malformed JSON body", async () => {
@@ -602,23 +644,55 @@ describe("formsApp (Hono Unified API Router)", () => {
     it("PATCH validates and updates submission data", async () => {
       vi.mocked(formServer.findFormById).mockResolvedValue(createMockForm());
       vi.mocked(formSubmissionServer.findSubmissionById).mockResolvedValue(createMockSubmission());
-      vi.mocked(formSubmissionServer.updateSubmissionById).mockResolvedValue(
-        createMockSubmission({ data: { [FIELD_ID]: "김유신" } })
-      );
+      vi.mocked(formSubmissionServer.updateSubmissionById).mockResolvedValue({
+        status: "updated",
+        data: createMockSubmission({ data: { [FIELD_ID]: "김유신" }, version: 2 }),
+      });
 
       const res = await formsApp.request(
         `/api/v1/forms/${VALID_FORM_ID}/submissions/${VALID_SUBMISSION_ID}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ data: { [FIELD_ID]: "  김유신  ", extra: 1 } }),
+          body: JSON.stringify({
+            data: { [FIELD_ID]: "  김유신  ", extra: 1 },
+            expectedVersion: 1,
+          }),
         }
       );
 
       expect(res.status).toBe(200);
       expect(formSubmissionServer.updateSubmissionById).toHaveBeenCalledWith(VALID_SUBMISSION_ID, {
         data: { [FIELD_ID]: "김유신" },
+        expectedVersion: 1,
       });
+    });
+
+    it("PATCH returns 409 CONFLICT when submission version mismatches", async () => {
+      vi.mocked(formServer.findFormById).mockResolvedValue(createMockForm());
+      vi.mocked(formSubmissionServer.findSubmissionById).mockResolvedValue(
+        createMockSubmission({ version: 2 })
+      );
+      vi.mocked(formSubmissionServer.updateSubmissionById).mockResolvedValue({
+        status: "conflict",
+        currentVersion: 2,
+      });
+
+      const res = await formsApp.request(
+        `/api/v1/forms/${VALID_FORM_ID}/submissions/${VALID_SUBMISSION_ID}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            data: { [FIELD_ID]: "김유신" },
+            expectedVersion: 1,
+          }),
+        }
+      );
+
+      expect(res.status).toBe(409);
+      const json = (await res.json()) as { success: boolean; error: { code: string } };
+      expect(json.error.code).toBe("CONFLICT");
     });
 
     it("DELETE soft deletes submission and returns deleted submission data", async () => {

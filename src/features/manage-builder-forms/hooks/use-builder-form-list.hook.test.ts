@@ -32,6 +32,7 @@ describe("useBuilderFormList (features/manage-builder-forms/hooks)", () => {
       description: "설명",
       schemaDefinition: { version: "1.0", fields: [] },
       publishedAt: new Date("2026-01-01T00:00:00Z"),
+      version: 1,
       createdAt: new Date("2026-01-01T00:00:00Z"),
       updatedAt: new Date("2026-01-01T00:00:00Z"),
       deletedAt: null,

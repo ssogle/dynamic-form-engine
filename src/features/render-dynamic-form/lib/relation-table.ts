@@ -26,19 +26,20 @@ export function normalizeSelectedRelationIds(value: unknown, multiple: boolean):
 
 /**
  * 관계형 피커 다이얼로그에서 행을 클릭/체크했을 때의 다음 폼 값을 계산합니다.
+ * 단일 선택과 다중 선택 모두 표준 string[] 배열 포맷으로 반환합니다.
  *
- * - 단일 선택(multiple=false): 선택한 targetId 문자열을 즉시 반환합니다.
+ * - 단일 선택(multiple=false): 선택한 [targetId] 단일 원소 배열을 반환합니다.
  * - 다중 선택(multiple=true): 이미 선택된 ID면 해제하고, 아니면 목록 끝에 추가합니다.
  */
 export function toggleRelationSelection(params: {
   currentIds: string[];
   targetId: string;
   multiple: boolean;
-}): string[] | string {
+}): string[] {
   const { currentIds, targetId, multiple } = params;
 
   if (!multiple) {
-    return targetId;
+    return [targetId];
   }
 
   if (currentIds.includes(targetId)) {
@@ -54,10 +55,10 @@ export function removeRelationSelection(params: {
   currentIds: string[];
   targetId: string;
   multiple: boolean;
-}): string[] | undefined {
+}): string[] {
   const { currentIds, targetId, multiple } = params;
   if (!multiple) {
-    return undefined;
+    return [];
   }
   return currentIds.filter((id) => id !== targetId);
 }

@@ -8,4 +8,9 @@ describe("builder-prompt (features/execute-navigator-action/lib/prompts)", () =>
     expect(BUILDER_NAVIGATOR_SYSTEM_PROMPT).toContain("createdAt");
     expect(BUILDER_NAVIGATOR_SYSTEM_PROMPT).toContain("억지로 추가하지 마세요");
   });
+
+  it("발행 상태 폼 수정 요청 시 임의로 발행을 취소하지 않고 먼저 사용자 승인을 받도록 안내해야 한다", () => {
+    expect(BUILDER_NAVIGATOR_SYSTEM_PROMPT).toContain("사용자 확인 없이 임의로");
+    expect(BUILDER_NAVIGATOR_SYSTEM_PROMPT).toContain("명시적 승인을 받은 다음");
+  });
 });

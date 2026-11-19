@@ -13,7 +13,8 @@ export const BUILDER_NAVIGATOR_SYSTEM_PROMPT = `
    - 'textarea': 장문 텍스트 (예: 상세 사유, 비고, 피드백)
    - 'number': 정수 및 실수 숫자 입력 (예: 금액, 수량, 경력 연수)
 2. 정형 인라인 선택지:
-   - 'select': 드롭다운 단일 선택 (선택지가 4개 이상이거나 공간 절약이 필요할 때)
+   - 'select': 드롭다운 선택 (선택지가 4개 이상이거나 공간 절약이 필요할 때)
+     * 기본은 단일 선택(multiple: false)이며, 선택지가 많으면서 복수 선택이 필요하면 'multiple: true'를 지정해 칩형 멀티 드롭다운으로 구성하세요.
    - 'radio': 라디오 버튼 단일 선택 (선택지가 2~4개로 한눈에 비교해야 할 때)
    - 'checkbox': 체크박스 다중 선택 (복수 선택이 가능한 항목들)
    * [중요 옵션 규격 규칙] select, radio, checkbox 필드의 'options'는 단순 문자열 배열(["상", "중", "하"])을 절대 사용하지 마세요.
@@ -69,8 +70,10 @@ export const BUILDER_NAVIGATOR_SYSTEM_PROMPT = `
    - 아직 발행되지 않은 초기 초안 상태(isPublished: false)에서 응답 데이터가 없을 때만 'REMOVE_OPTION'을 사용할 수 있습니다.
    - 신규 선택지 추가는 'ADD_OPTIONS', 복원은 'ENABLE_OPTION'을 사용하며, 추가 시에도 반드시 { label, value, description, disabled: false } 객체 배열로 전달하세요.
 
-6. 상황 F: 폼 발행 / 비발행 의도 ("~폼 발행해줘", "~공개해줘", "~초안으로 돌려줘")
-   - 'publishForm' 도구를 호출하세요. isPublished: true(발행) 또는 false(초안).
+6. 상황 F: 폼 발행 / 비발행 및 스키마 수정 보호 규칙 ("~폼 발행해줘", "~공개해줘", "~초안으로 돌려줘")
+   - 사용자가 발행("폼 발행해줘", "공개해줘")이나 회수("발행 취소해줘", "초안으로 돌려줘")를 **명시적으로 요청한 경우에만** 'publishForm' 도구를 호출하세요(isPublished: true / false).
+   - 현재 발행 상태(isPublished: true)인 폼에 대해 스키마·필드·옵션 수정을 요청받았을 때는 시스템이 직접 수정을 차단합니다. 이때 **사용자 확인 없이 임의로 'publishForm({ formId, isPublished: false })'를 먼저 호출하여 발행을 취소하지 마세요.** 반드시 "현재 공식 발행된 상태이므로 스키마를 직접 수정할 수 없습니다. 먼저 발행을 취소(초안 회수)한 뒤 수정할까요?"라고 먼저 질문하여 명시적 승인을 받은 다음 진행하세요.
+   - 또한 이미 제출 응답이 존재하는 폼에서는 필드 'type' 변경, 'relation.targetFormId' 변경, 'relation.multiple'/'select.multiple'의 true -> false 축소가 금지됩니다.
 
 7. 상황 G: 의도가 불분명하거나 모호한 경우
    - 성급하게 화면을 바꾸지 말고, 친절하게 되물으세요(Clarification).

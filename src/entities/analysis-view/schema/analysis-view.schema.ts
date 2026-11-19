@@ -14,6 +14,7 @@ export { analysisViews };
  */
 const systemManagedFields = {
   id: true,
+  version: true,
   createdAt: true,
   updatedAt: true,
   publishedAt: true,
@@ -112,9 +113,14 @@ export const insertAnalysisViewSchema = createInsertSchema(analysisViews, {
 }).omit(systemManagedFields);
 
 /**
- * 분석 뷰 수정 입력 검증 스키마 (부분 수정 허용)
+ * 분석 뷰 수정 입력 검증 스키마 (부분 수정 허용 + 낙관적 락 expectedVersion 필수)
  */
-export const updateAnalysisViewSchema = insertAnalysisViewSchema.partial();
+export const updateAnalysisViewSchema = insertAnalysisViewSchema.partial().extend({
+  expectedVersion: z
+    .number({ message: "낙관적 락 검증을 위한 expectedVersion(정수)이 필요합니다." })
+    .int("expectedVersion은 정수여야 합니다.")
+    .positive("expectedVersion은 1 이상의 정수여야 합니다."),
+});
 
 /**
  * 데이터베이스에서 조회된 분석 뷰 엔티티 검증 스키마

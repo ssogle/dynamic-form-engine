@@ -33,13 +33,17 @@ const mockReturning = vi.fn();
 
 vi.mock("@/shared/db/server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/shared/db/server")>();
+  const mockDb = {
+    select: () => mockSelect(),
+    insert: (table: unknown) => mockInsert(table),
+    update: (table: unknown) => mockUpdate(table),
+    delete: (table: unknown) => mockDelete(table),
+  };
   return {
     ...actual,
     db: {
-      select: () => mockSelect(),
-      insert: (table: unknown) => mockInsert(table),
-      update: (table: unknown) => mockUpdate(table),
-      delete: (table: unknown) => mockDelete(table),
+      ...mockDb,
+      transaction: async <T>(cb: (tx: typeof mockDb) => Promise<T>) => cb(mockDb),
     },
   };
 });
@@ -50,6 +54,7 @@ describe("Form Submission Server Repository (entities/form-submission/server)", 
   const sampleSubmission = {
     id: "11111111-1111-4111-a111-111111111111",
     formId: "22222222-2222-4222-a222-222222222222",
+    version: 1,
     data: { name: "홍길동", score: 5 },
     createdAt: sampleDate,
     updatedAt: sampleDate,
@@ -145,9 +150,10 @@ describe("Form Submission Server Repository (entities/form-submission/server)", 
   });
 
   describe("updateSubmissionById", () => {
-    it("기제출된 응답 data를 수정하고 수정된 레코드를 반환해야 한다", async () => {
+    it("expectedVersion이 일치하면 응답 data를 수정하고 updated 결과를 반환해야 한다", async () => {
       const updatedSubmission = {
         ...sampleSubmission,
+        version: 2,
         data: { name: "홍길동", score: 4 },
         updatedAt: new Date("2026-01-02T00:00:00Z"),
       };
@@ -155,6 +161,7 @@ describe("Form Submission Server Repository (entities/form-submission/server)", 
 
       const result = await updateSubmissionById("11111111-1111-4111-a111-111111111111", {
         data: { name: "홍길동", score: 4 },
+        expectedVersion: 1,
       });
 
       expect(mockUpdate).toHaveBeenCalledTimes(1);
@@ -164,7 +171,19 @@ describe("Form Submission Server Repository (entities/form-submission/server)", 
           updatedAt: expect.anything(),
         })
       );
-      expect(result).toEqual(updatedSubmission);
+      expect(result).toEqual({ status: "updated", data: updatedSubmission });
+    });
+
+    it("expectedVersion이 DB 최신 버전과 다르면 conflict를 반환해야 한다", async () => {
+      mockReturning.mockResolvedValueOnce([]);
+      mockLimit.mockResolvedValueOnce([{ version: 2 }]);
+
+      const result = await updateSubmissionById("11111111-1111-4111-a111-111111111111", {
+        data: { name: "홍길동", score: 4 },
+        expectedVersion: 1,
+      });
+
+      expect(result).toEqual({ status: "conflict", currentVersion: 2 });
     });
   });
 
@@ -399,12 +418,21 @@ describe("Form Submission Server Repository (entities/form-submission/server)", 
         {
           id: sampleSubmission.formId,
           title: "프로젝트 목록",
-          schemaDefinition: { primaryFieldId: "name", fields: [] },
+          schemaDefinition: {
+            primaryFieldId: "name",
+            fields: [
+              { id: "f_rel_1", type: "relation", label: "관련 프로젝트 1" },
+              { id: "f_rel_2", type: "relation", label: "관련 프로젝트 2" },
+            ],
+          },
         },
         {
           id: otherFormId,
           title: "이슈 트래커",
-          schemaDefinition: { primaryFieldId: "title", fields: [] },
+          schemaDefinition: {
+            primaryFieldId: "title",
+            fields: [{ id: "f_rel_3", type: "relation", label: "상위 프로젝트" }],
+          },
         },
       ];
 
@@ -425,6 +453,57 @@ describe("Form Submission Server Repository (entities/form-submission/server)", 
           sourceForm: sourceForms[0],
           submissions: [sampleSubmission],
         },
+        {
+          sourceForm: sourceForms[1],
+          submissions: [secondSubmission],
+        },
+      ]);
+    });
+
+    it("삭제(deletedAt)되거나 스키마에서 제거된 관계 필드의 잔여 엣지는 역참조 결과에서 제외해야 한다", async () => {
+      const otherFormId = "33333333-3333-4333-a333-333333333333";
+      const secondSubmission = {
+        ...sampleSubmission,
+        id: "44444444-4444-4444-a444-444444444444",
+        formId: otherFormId,
+      };
+      const sourceForms = [
+        {
+          id: sampleSubmission.formId,
+          title: "프로젝트 목록",
+          schemaDefinition: {
+            primaryFieldId: "name",
+            fields: [
+              {
+                id: "f_rel_deleted",
+                type: "relation",
+                label: "삭제된 관계 필드",
+                deletedAt: "2026-11-19T00:00:00.000Z",
+              },
+            ],
+          },
+        },
+        {
+          id: otherFormId,
+          title: "이슈 트래커",
+          schemaDefinition: {
+            primaryFieldId: "title",
+            fields: [{ id: "f_rel_active", type: "relation", label: "유지된 관계 필드" }],
+          },
+        },
+      ];
+
+      mockWhere
+        .mockResolvedValueOnce([
+          { sourceId: sampleSubmission.id, targetId, fieldId: "f_rel_deleted" },
+          { sourceId: secondSubmission.id, targetId, fieldId: "f_rel_active" },
+        ])
+        .mockResolvedValueOnce([sampleSubmission, secondSubmission])
+        .mockResolvedValueOnce(sourceForms);
+
+      const result = await findInboundRelatedSubmissions(targetId);
+
+      expect(result).toEqual([
         {
           sourceForm: sourceForms[1],
           submissions: [secondSubmission],

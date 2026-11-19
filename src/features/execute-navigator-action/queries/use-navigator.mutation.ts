@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { httpClient } from "@/shared/lib/http";
 import { formKeys } from "@/entities/form";
+import { formSubmissionsKeys } from "@/entities/form-submission";
 import type {
   ExecuteNavigatorPayload,
   NavigatorExecutionResponse,
@@ -94,16 +95,22 @@ export function useNavigatorMutation(options?: UseNavigatorMutationOptions) {
     onSuccess: (data) => {
       if (data.action) {
         switch (data.action.type) {
-          case "CREATE_FORM":
           case "DELETE_FORMS":
+            // 폼 목록 및 역참조 관계 캐시 무효화
+            queryClient.invalidateQueries({ queryKey: formKeys.all });
+            queryClient.invalidateQueries({ queryKey: formSubmissionsKeys.all });
+            break;
+
+          case "CREATE_FORM":
           case "PUBLISH_FORM":
             // 폼 목록 쿼리 캐시 무효화
             queryClient.invalidateQueries({ queryKey: formKeys.all });
             break;
 
           case "UPDATE_SCHEMA":
-            // 폼 목록 및 해당 폼 상세 캐시 무효화
+            // 폼 목록, 해당 폼 상세 및 연관(역참조) 응답 캐시 무효화
             queryClient.invalidateQueries({ queryKey: formKeys.all });
+            queryClient.invalidateQueries({ queryKey: formSubmissionsKeys.all });
             if (data.action.formId) {
               queryClient.invalidateQueries({
                 queryKey: formKeys.detail(data.action.formId),

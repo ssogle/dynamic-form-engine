@@ -6,6 +6,18 @@ import type { CoreFormField, SelectOption } from "@/entities/form";
 import { Input } from "@/shared/ui/input";
 import { Textarea } from "@/shared/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
+import {
+  Combobox,
+  ComboboxChip,
+  ComboboxChips,
+  ComboboxChipsInput,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxValue,
+  useComboboxAnchor,
+} from "@/shared/ui/combobox";
 import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { DatePickerInput } from "@/shared/ui/date-input";
@@ -114,6 +126,85 @@ function renderSelectOptionItems(visibleOptions: SelectOption[]) {
 }
 
 /**
+ * 다중 선택 드롭다운(`select` with `multiple: true`) 칩형 Combobox 컴포넌트입니다.
+ * `@/shared/ui/combobox`의 `ComboboxChips`를 재사용해 선택된 옵션을 칩으로 표시하고,
+ * 비활성 옵션이 이미 저장되어 있는 경우에도 라벨을 온전히 보존해 표시합니다.
+ */
+function MultiSelectCombobox({
+  id,
+  options,
+  value,
+  onChange,
+  placeholder,
+  disabled,
+}: {
+  id: string;
+  options: SelectOption[];
+  value: string[];
+  onChange: (nextValues: string[]) => void;
+  placeholder?: string | undefined;
+  disabled?: boolean | undefined;
+}) {
+  const anchor = useComboboxAnchor();
+  const visibleOptions = filterMultiSelectOptions(options, value);
+  const optionMap = React.useMemo(
+    () => new Map(visibleOptions.map((opt) => [opt.value, opt])),
+    [visibleOptions]
+  );
+
+  return (
+    <div className="space-y-2">
+      <Combobox
+        multiple
+        autoHighlight
+        items={visibleOptions.map((opt) => opt.value)}
+        value={value}
+        onValueChange={(nextValue) => onChange(Array.isArray(nextValue) ? nextValue : [])}
+        itemToStringLabel={(val) => optionMap.get(val)?.label ?? val}
+        disabled={disabled}
+      >
+        <ComboboxChips ref={anchor} className="w-full">
+          <ComboboxValue>
+            {(values: string[]) => (
+              <React.Fragment>
+                {values.map((val) => {
+                  const opt = optionMap.get(val);
+                  return (
+                    <ComboboxChip key={val}>
+                      {opt ? `${opt.label}${opt.disabled ? " (비활성화됨)" : ""}` : val}
+                    </ComboboxChip>
+                  );
+                })}
+                <ComboboxChipsInput
+                  id={id}
+                  placeholder={values.length === 0 ? placeholder || "선택해 주세요" : ""}
+                />
+              </React.Fragment>
+            )}
+          </ComboboxValue>
+        </ComboboxChips>
+        <ComboboxContent anchor={anchor}>
+          <ComboboxEmpty>선택 가능한 옵션이 없습니다.</ComboboxEmpty>
+          <ComboboxList>
+            {(val: string) => {
+              const opt = optionMap.get(val);
+              if (!opt) return null;
+              return (
+                <ComboboxItem key={opt.value} value={opt.value} disabled={opt.disabled}>
+                  {opt.label}
+                  {opt.disabled && " (비활성화됨)"}
+                </ComboboxItem>
+              );
+            }}
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
+      <SelectOptionsGuideList options={visibleOptions} />
+    </div>
+  );
+}
+
+/**
  * 폼 필드 렌더러 컴포넌트 (DynamicField)
  *
  * 필드의 type 속성(코어 8종 입력 + 1종 레이아웃)에 따라
@@ -132,7 +223,9 @@ export function DynamicField({
   error: propError,
   disabled = false,
 }: DynamicFieldProps) {
-  const { id, label, type, placeholder, required, options, relationConfig, description } = field;
+  const { id, label, type, placeholder, required, multiple, options, relationConfig, description } =
+    field;
+  const [previewMultiSelect, setPreviewMultiSelect] = React.useState<string[]>([]);
 
   // React Hook Form 컨텍스트 획득 (컨슈머 제출 모드 또는 FormProvider 래핑 시 유효)
   const formContext = useFormContext();
@@ -179,20 +272,54 @@ export function DynamicField({
           );
 
         case "select": {
+          if (multiple) {
+            return (
+              <Controller
+                name={id}
+                control={formContext.control}
+                render={({ field: controllerField }) => {
+                  const selectedValues: string[] = Array.isArray(controllerField.value)
+                    ? controllerField.value
+                    : typeof controllerField.value === "string" && controllerField.value.length > 0
+                      ? [controllerField.value]
+                      : [];
+                  return (
+                    <MultiSelectCombobox
+                      id={id}
+                      options={options ?? []}
+                      value={selectedValues}
+                      onChange={controllerField.onChange}
+                      placeholder={placeholder}
+                      disabled={disabled}
+                    />
+                  );
+                }}
+              />
+            );
+          }
+
           return (
             <Controller
               name={id}
               control={formContext.control}
               render={({ field: controllerField }) => {
-                const currentValue =
-                  typeof controllerField.value === "string" ? controllerField.value : "";
+                // 단일 select도 string[] 표준 포맷을 사용하되 레거시 string 입력을 안전하게 수용합니다.
+                const currentValue = Array.isArray(controllerField.value)
+                  ? typeof controllerField.value[0] === "string"
+                    ? controllerField.value[0]
+                    : ""
+                  : typeof controllerField.value === "string"
+                    ? controllerField.value
+                    : "";
                 const visibleOptions = filterSingleSelectOptions(options, currentValue);
 
                 return (
                   <div className="space-y-2">
                     <Select
                       value={currentValue}
-                      onValueChange={controllerField.onChange}
+                      onValueChange={(nextValue) =>
+                        controllerField.onChange(nextValue ? [nextValue] : [])
+                      }
                       disabled={disabled}
                     >
                       <SelectTrigger id={id} className="w-full">
@@ -435,6 +562,18 @@ export function DynamicField({
         );
 
       case "select": {
+        if (multiple) {
+          return (
+            <MultiSelectCombobox
+              id={id}
+              options={options ?? []}
+              value={previewMultiSelect}
+              onChange={setPreviewMultiSelect}
+              placeholder={placeholder}
+              disabled={disabled}
+            />
+          );
+        }
         const selectOptions = filterSingleSelectOptions(options, undefined);
         return (
           <div className="space-y-2">

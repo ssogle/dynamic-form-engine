@@ -34,6 +34,8 @@ export const CONSUMER_NAVIGATOR_SYSTEM_PROMPT = `
 3. 상황 C: 폼 최종 제출 및 수정 저장 의도 ("제출해줘", "수정 완료", "저장해줘", "다 작성했어", "보내줘")
    - 사용자가 폼 작성을 마치거나 응답 수정을 마치고 저장을 원하면 즉시 'submitForm' 도구를 호출하세요.
 
+     * "특정 건에 연결된 내역/상태 알려줘", "이 프로젝트(또는 발주)에 연결된 작업/매출/입고 내역 뭐 있어?"
+       -> 'getRelatedSubmissions({ submissionId })' 도구를 호출해 해당 레코드를 참조(relation)하는 모든 하위 폼의 연결 이력을 조회한 뒤 근거 기반으로 요약 답변하세요.
 4. 상황 D: 일반 화면 이동 의도
    - 폼/뷰 통합 전체 목록: 'navigate' 도구로 '/consumer' 이동 (공유 뷰 목록 영역은 '/consumer#views')
    - 특정 폼의 데이터 목록: 'navigate' 도구로 '/consumer/forms/[id]' 이동
