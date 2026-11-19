@@ -24,6 +24,7 @@ import {
   extractActiveFields,
   extractPrimaryFieldId,
   formatFieldDisplayValue,
+  PrimaryFieldBadge,
 } from "@/entities/form";
 import {
   useInfiniteFormSubmissionsQuery,
@@ -33,6 +34,7 @@ import {
 } from "@/entities/form-submission";
 import { formatDateTime } from "@/shared/lib/date";
 import { formatRelationSummaryCell, type RelationLookupMap } from "../lib/relation-summary";
+import type { FormSubmissionViewMode } from "../types/submission-view.types";
 import { useRelationLookup } from "./use-relation-lookup.hook";
 import { ColumnHeaderFilter } from "../ui/column-header-filter";
 import { SubmissionActionCell } from "../ui/submission-action-cell";
@@ -71,6 +73,18 @@ export interface UseSubmissionListTableParams {
    * URL 쿼리 파라미터로부터 전달된 초기 컬럼 필터 목록 (분석 뷰 드릴다운 연동)
    */
   initialFilters?: FieldFilterCondition[] | undefined;
+  /**
+   * 테이블 동작 모드 (기본값: "consumer")
+   */
+  mode?: FormSubmissionViewMode | undefined;
+  /**
+   * 프리뷰 모드에서 실데이터 0건일 때 폴백으로 표시할 가상 샘플 레코드 목록
+   */
+  sampleSubmissions?: FormSubmission[] | undefined;
+  /**
+   * 프리뷰 모드에서 행/상세 클릭 시 호출할 인라인 콜백
+   */
+  onSelectSubmission?: ((submissionId: string) => void) | undefined;
 }
 
 export interface UseSubmissionListTableReturn {
@@ -162,6 +176,10 @@ export interface UseSubmissionListTableReturn {
    * 행 클릭 시 상세 페이지 이동 핸들러
    */
   handleRowClick: (submissionId: string) => void;
+  /**
+   * 실데이터 부재로 인해 샘플 데이터를 미리보기로 렌더링 중인지 여부
+   */
+  isSamplePreview: boolean;
 }
 
 function buildInitialFiltersMap(
@@ -212,6 +230,9 @@ export function useSubmissionListTable({
   form,
   initialDateRange,
   initialFilters,
+  mode = "consumer",
+  sampleSubmissions,
+  onSelectSubmission,
 }: UseSubmissionListTableParams): UseSubmissionListTableReturn {
   const router = useRouter();
   const activeFields = React.useMemo(() => extractActiveFields(form), [form]);
@@ -281,9 +302,9 @@ export function useSubmissionListTable({
     return serializeFieldFiltersParam(Object.values(columnFilters));
   }, [columnFilters]);
 
-  // 3. 서버 무한 스크롤 쿼리 훅 연동
+  // 3. 서버 무한 스크롤 쿼리 훅 연동 (프리뷰 모드에서는 실데이터 조회를 전면 비활성화)
   const { data, isLoading, isError, error, isFetchingNextPage, hasNextPage, fetchNextPage } =
-    useInfiniteFormSubmissionsQuery(form.id, {
+    useInfiniteFormSubmissionsQuery(mode === "preview" ? "" : form.id, {
       sort: sortQueryString,
       filters: filtersQueryString,
       limit: 20,
@@ -294,13 +315,25 @@ export function useSubmissionListTable({
 
   const { mutateAsync: deleteSubmission } = useDeleteSubmissionMutation(form.id);
 
-  // 모든 누적 페이지 아이템 평탄화
-  const flatSubmissions = React.useMemo(() => {
+  // 모든 누적 페이지 아이템 평탄화 (프리뷰 모드에서는 항상 스키마 기반 샘플 데이터만 사용)
+  const serverSubmissions = React.useMemo(() => {
     return data?.pages.flatMap((page) => page.items) ?? [];
   }, [data]);
 
-  const totalCount = data?.pages[0]?.totalCount ?? flatSubmissions.length;
-  const { lookupMap: relationLookupMap } = useRelationLookup(activeFields, flatSubmissions);
+  const serverTotalCount = data?.pages[0]?.totalCount ?? serverSubmissions.length;
+  const isSamplePreview = mode === "preview";
+  const flatSubmissions = React.useMemo(
+    () => (isSamplePreview ? (sampleSubmissions ?? []) : serverSubmissions),
+    [isSamplePreview, sampleSubmissions, serverSubmissions]
+  );
+  const totalCount = isSamplePreview ? flatSubmissions.length : serverTotalCount;
+
+  // 샘플 데이터에는 실제 DB UUID가 없으므로 관계형 배치 조회를 생략해 불필요한 400 요청 방지
+  const lookupTargets = React.useMemo(
+    () => (isSamplePreview ? [] : serverSubmissions),
+    [isSamplePreview, serverSubmissions]
+  );
+  const { lookupMap: relationLookupMap } = useRelationLookup(activeFields, lookupTargets);
 
   // 단일 컬럼 필터 갱신 핸들러 (문자열 전달 시 해당 필드의 기본 연산자로 자동 변환)
   // React 19 Strict Mode/동시성 렌더링에서 setState 업데이터 내부 부수효과(router.replace)를 금지하므로,
@@ -328,16 +361,20 @@ export function useSubmissionListTable({
       }
 
       setColumnFilters(next);
-      router.replace(buildConsumerFormUrl(form.id, dateRangeFilter, next), { scroll: false });
+      if (mode !== "preview") {
+        router.replace(buildConsumerFormUrl(form.id, dateRangeFilter, next), { scroll: false });
+      }
     },
-    [activeFields, columnFilters, dateRangeFilter, form.id, router]
+    [activeFields, columnFilters, dateRangeFilter, form.id, mode, router]
   );
 
   // 기간 필터만 해제하고 URL 쿼리스트링도 함께 정리
   const handleClearDateRange = React.useCallback(() => {
     setDateRangeFilter(undefined);
-    router.replace(buildConsumerFormUrl(form.id, undefined, columnFilters), { scroll: false });
-  }, [router, form.id, columnFilters]);
+    if (mode !== "preview") {
+      router.replace(buildConsumerFormUrl(form.id, undefined, columnFilters), { scroll: false });
+    }
+  }, [router, form.id, columnFilters, mode]);
 
   // 전체 필터 초기화
   const handleClearAllFilters = React.useCallback(() => {
@@ -345,12 +382,17 @@ export function useSubmissionListTable({
     if (hasActiveDateRange) {
       setDateRangeFilter(undefined);
     }
-    router.replace(`/consumer/forms/${form.id}`, { scroll: false });
-  }, [hasActiveDateRange, router, form.id]);
+    if (mode !== "preview") {
+      router.replace(`/consumer/forms/${form.id}`, { scroll: false });
+    }
+  }, [hasActiveDateRange, router, form.id, mode]);
 
-  // 단건 응답 삭제 핸들러
+  // 단건 응답 삭제 핸들러 (프리뷰 모드에서는 차단)
   const handleDelete = React.useCallback(
     async (submissionId: string) => {
+      if (mode === "preview") {
+        return;
+      }
       try {
         setDeletingId(submissionId);
         await deleteSubmission(submissionId);
@@ -360,20 +402,30 @@ export function useSubmissionListTable({
         setDeletingId(null);
       }
     },
-    [deleteSubmission]
+    [deleteSubmission, mode]
   );
 
-  // 행 클릭 시 상세 페이지 이동 핸들러
+  // 행 클릭 시 상세 화면 전환 핸들러 (프리뷰 모드에서는 데이터 행 클릭 동작 비활성화)
   const handleRowClick = React.useCallback(
     (submissionId: string) => {
+      if (mode === "preview") {
+        return;
+      }
       router.push(`/consumer/forms/${form.id}/submissions/${submissionId}`);
     },
-    [router, form.id]
+    [mode, router, form.id]
   );
 
   // 4. 동적 TanStack 컬럼 정의 (순수 createElement 기반)
   const columns = React.useMemo<ColumnDef<FormSubmission>[]>(() => {
     const cols: ColumnDef<FormSubmission>[] = [];
+    const renderStaticHeader = (label: string, isPrimary = false) =>
+      React.createElement(
+        "div",
+        { className: "flex items-center gap-1.5 py-1 text-xs font-semibold whitespace-nowrap" },
+        label,
+        isPrimary ? React.createElement(PrimaryFieldBadge) : null
+      );
 
     // 폼 활성 필드별 동적 컬럼 생성
     activeFields.forEach((field: CoreFormField) => {
@@ -382,21 +434,23 @@ export function useSubmissionListTable({
         id: field.id,
         accessorFn: (row) => row.data?.[field.id],
         header: ({ column }) =>
-          React.createElement(ColumnHeaderFilter, {
-            fieldId: field.id,
-            label: field.label,
-            fieldType: field.type,
-            options: field.options,
-            relationTargetFormId: field.relationConfig?.targetFormId,
-            isPrimary,
-            isSorted: column.getIsSorted(),
-            onToggleSort: (e: React.MouseEvent) => {
-              column.toggleSorting(undefined, e.shiftKey);
-            },
-            filterCondition: columnFilters[field.id],
-            onApplyFilter: (condition?: FieldFilterCondition) =>
-              handleSetFieldFilter(field.id, condition),
-          }),
+          isSamplePreview
+            ? renderStaticHeader(field.label, isPrimary)
+            : React.createElement(ColumnHeaderFilter, {
+                fieldId: field.id,
+                label: field.label,
+                fieldType: field.type,
+                options: field.options,
+                relationTargetFormId: field.relationConfig?.targetFormId,
+                isPrimary,
+                isSorted: column.getIsSorted(),
+                onToggleSort: (e: React.MouseEvent) => {
+                  column.toggleSorting(undefined, e.shiftKey);
+                },
+                filterCondition: columnFilters[field.id],
+                onApplyFilter: (condition?: FieldFilterCondition) =>
+                  handleSetFieldFilter(field.id, condition),
+              }),
         cell: (info) => {
           const rawVal = info.getValue();
           const displayVal =
@@ -426,18 +480,20 @@ export function useSubmissionListTable({
       id: "createdAt",
       accessorKey: "createdAt",
       header: ({ column }) =>
-        React.createElement(ColumnHeaderFilter, {
-          fieldId: "createdAt",
-          label: SYSTEM_COLUMN_LABELS.createdAt,
-          fieldType: "system_date",
-          isSorted: column.getIsSorted(),
-          onToggleSort: (e: React.MouseEvent) => {
-            column.toggleSorting(undefined, e.shiftKey);
-          },
-          filterCondition: columnFilters.createdAt,
-          onApplyFilter: (condition?: FieldFilterCondition) =>
-            handleSetFieldFilter("createdAt", condition),
-        }),
+        isSamplePreview
+          ? renderStaticHeader(SYSTEM_COLUMN_LABELS.createdAt)
+          : React.createElement(ColumnHeaderFilter, {
+              fieldId: "createdAt",
+              label: SYSTEM_COLUMN_LABELS.createdAt,
+              fieldType: "system_date",
+              isSorted: column.getIsSorted(),
+              onToggleSort: (e: React.MouseEvent) => {
+                column.toggleSorting(undefined, e.shiftKey);
+              },
+              filterCondition: columnFilters.createdAt,
+              onApplyFilter: (condition?: FieldFilterCondition) =>
+                handleSetFieldFilter("createdAt", condition),
+            }),
       cell: (info) => {
         const rawDate = info.getValue() as string | Date | undefined;
         const formatted = formatDateTime(rawDate);
@@ -460,18 +516,20 @@ export function useSubmissionListTable({
       id: "updatedAt",
       accessorKey: "updatedAt",
       header: ({ column }) =>
-        React.createElement(ColumnHeaderFilter, {
-          fieldId: "updatedAt",
-          label: SYSTEM_COLUMN_LABELS.updatedAt,
-          fieldType: "system_date",
-          isSorted: column.getIsSorted(),
-          onToggleSort: (e: React.MouseEvent) => {
-            column.toggleSorting(undefined, e.shiftKey);
-          },
-          filterCondition: columnFilters.updatedAt,
-          onApplyFilter: (condition?: FieldFilterCondition) =>
-            handleSetFieldFilter("updatedAt", condition),
-        }),
+        isSamplePreview
+          ? renderStaticHeader(SYSTEM_COLUMN_LABELS.updatedAt)
+          : React.createElement(ColumnHeaderFilter, {
+              fieldId: "updatedAt",
+              label: SYSTEM_COLUMN_LABELS.updatedAt,
+              fieldType: "system_date",
+              isSorted: column.getIsSorted(),
+              onToggleSort: (e: React.MouseEvent) => {
+                column.toggleSorting(undefined, e.shiftKey);
+              },
+              filterCondition: columnFilters.updatedAt,
+              onApplyFilter: (condition?: FieldFilterCondition) =>
+                handleSetFieldFilter("updatedAt", condition),
+            }),
       cell: (info) => {
         const rawDate = info.getValue() as string | Date | undefined;
         const formatted = formatDateTime(rawDate);
@@ -504,9 +562,11 @@ export function useSubmissionListTable({
           formId: form.id,
           deletingId,
           onDelete: handleDelete,
+          mode,
+          onSelectSubmission,
         }),
-      size: 180,
-      minSize: 180,
+      size: mode === "preview" ? 96 : 180,
+      minSize: mode === "preview" ? 80 : 180,
       enableResizing: false,
     });
 
@@ -520,6 +580,9 @@ export function useSubmissionListTable({
     form.id,
     deletingId,
     handleDelete,
+    mode,
+    onSelectSubmission,
+    isSamplePreview,
   ]);
 
   // 5. TanStack Table 인스턴스화
@@ -581,5 +644,6 @@ export function useSubmissionListTable({
     handleClearDateRange,
     handleDelete,
     handleRowClick,
+    isSamplePreview,
   };
 }

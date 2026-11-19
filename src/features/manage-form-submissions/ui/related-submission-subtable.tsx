@@ -14,12 +14,17 @@ import type { RelatedSubmissionsGroup } from "@/entities/form-submission";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/shared/ui/table";
 import { Button } from "@/shared/ui/button";
 import { formatDateTime } from "@/shared/lib/date";
+import type { FormSubmissionViewMode } from "../types/submission-view.types";
 
 export interface RelatedSubmissionSubtableProps {
   /**
    * 특정 소스 폼에 의해 그룹화된 역참조 서브미션 데이터
    */
   group: RelatedSubmissionsGroup;
+  /**
+   * 동작 모드 (프리뷰 모드에서는 컨슈머 상세 이동 버튼을 숨김)
+   */
+  mode?: FormSubmissionViewMode | undefined;
 }
 
 /**
@@ -28,7 +33,10 @@ export interface RelatedSubmissionSubtableProps {
  * 소스 폼의 스키마를 기반으로 주요 도메인 컬럼을 추출하여
  * 연결된 각 서브미션 레코드의 요약 정보와 상세 페이지 바로가기 링크를 렌더링합니다.
  */
-export function RelatedSubmissionSubtable({ group }: RelatedSubmissionSubtableProps) {
+export function RelatedSubmissionSubtable({
+  group,
+  mode = "consumer",
+}: RelatedSubmissionSubtableProps) {
   const { sourceForm, submissions } = group;
 
   // 1. 소스 폼의 활성 필드 및 대표 필드 ID 추출 (대표 필드를 가장 왼쪽 컬럼으로 우선 배치)
@@ -68,9 +76,11 @@ export function RelatedSubmissionSubtable({ group }: RelatedSubmissionSubtablePr
               </TableHead>
             ))}
             <TableHead className="text-xs font-semibold whitespace-nowrap">제출 일시</TableHead>
-            <TableHead className="w-16 text-right text-xs font-semibold whitespace-nowrap">
-              동작
-            </TableHead>
+            {mode !== "preview" && (
+              <TableHead className="w-16 text-right text-xs font-semibold whitespace-nowrap">
+                동작
+              </TableHead>
+            )}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -87,17 +97,19 @@ export function RelatedSubmissionSubtable({ group }: RelatedSubmissionSubtablePr
                 <TableCell className="text-muted-foreground py-2.5 whitespace-nowrap">
                   {formatDateTime(sub.createdAt)}
                 </TableCell>
-                <TableCell className="py-2.5 text-right whitespace-nowrap">
-                  <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-xs">
-                    <Link
-                      href={`/consumer/forms/${sourceForm.id}/submissions/${sub.id}`}
-                      className="inline-flex items-center gap-1"
-                    >
-                      <span>보기</span>
-                      <ArrowUpRight className="size-3" />
-                    </Link>
-                  </Button>
-                </TableCell>
+                {mode !== "preview" && (
+                  <TableCell className="py-2.5 text-right whitespace-nowrap">
+                    <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-xs">
+                      <Link
+                        href={`/consumer/forms/${sourceForm.id}/submissions/${sub.id}`}
+                        className="inline-flex items-center gap-1"
+                      >
+                        <span>보기</span>
+                        <ArrowUpRight className="size-3" />
+                      </Link>
+                    </Button>
+                  </TableCell>
+                )}
               </TableRow>
             );
           })}

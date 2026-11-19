@@ -4,7 +4,7 @@ import * as React from "react";
 import { SlidersHorizontal, X } from "lucide-react";
 import { VirtualTable } from "@/shared/lib/virtual-table";
 import type { Form } from "@/entities/form";
-import type { SubmissionDateRangeFilter } from "@/entities/form-submission";
+import type { FormSubmission, SubmissionDateRangeFilter } from "@/entities/form-submission";
 import type { FieldFilterCondition } from "@/shared/schema";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
@@ -13,12 +13,19 @@ import { Badge } from "@/shared/ui/badge";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 import { formatFilterConditionSummary, resolveFilterFieldLabel } from "../lib/filter-summary";
+import type { FormSubmissionViewMode } from "../types/submission-view.types";
 import { useSubmissionListTable, getColumnLabel } from "../hooks/use-submission-list-table.hook";
 
 export interface SubmissionListTableProps {
   form: Form;
   initialDateRange?: SubmissionDateRangeFilter | undefined;
   initialFilters?: FieldFilterCondition[] | undefined;
+  /** 테이블 동작 모드 (기본값: "consumer") */
+  mode?: FormSubmissionViewMode | undefined;
+  /** 프리뷰 모드에서 실데이터 0건 시 폴백으로 표시할 가상 샘플 레코드 목록 */
+  sampleSubmissions?: FormSubmission[] | undefined;
+  /** 프리뷰 모드에서 행/상세 클릭 시 호출할 인라인 콜백 */
+  onSelectSubmission?: ((submissionId: string) => void) | undefined;
 }
 
 /**
@@ -32,6 +39,9 @@ export function SubmissionListTable({
   form,
   initialDateRange,
   initialFilters,
+  mode = "consumer",
+  sampleSubmissions,
+  onSelectSubmission,
 }: SubmissionListTableProps) {
   const {
     table,
@@ -54,7 +64,15 @@ export function SubmissionListTable({
     handleClearAllFilters,
     handleClearDateRange,
     handleRowClick,
-  } = useSubmissionListTable({ form, initialDateRange, initialFilters });
+    isSamplePreview,
+  } = useSubmissionListTable({
+    form,
+    initialDateRange,
+    initialFilters,
+    mode,
+    sampleSubmissions,
+    onSelectSubmission,
+  });
 
   const relationNameMap = React.useMemo(() => {
     const map = new Map<string, string>();
@@ -103,6 +121,11 @@ export function SubmissionListTable({
           <span className="text-muted-foreground">
             총 <strong className="text-foreground font-semibold">{totalCount}</strong>개 레코드
           </span>
+          {isSamplePreview && (
+            <Badge variant="secondary" className="text-[11px] font-medium">
+              샘플 데이터 미리보기
+            </Badge>
+          )}
           {dateRangeFilter && (dateRangeFilter.startDate || dateRangeFilter.endDate) ? (
             <Badge variant="outline" className="gap-1 px-2 py-0.5 text-[11px]">
               기간({dateRangeFieldLabel}): {dateRangeFilter.startDate ?? "..."} ~{" "}
@@ -214,6 +237,8 @@ export function SubmissionListTable({
                 >
                   필터 모두 지우기
                 </Button>
+              ) : mode === "preview" ? (
+                "활성 필드를 추가하면 데이터 목록 미리보기 레코드가 자동으로 생성됩니다."
               ) : (
                 "상단 '신규 데이터 작성' 버튼을 눌러 첫 번째 응답을 등록해 보세요."
               )}
@@ -230,7 +255,7 @@ export function SubmissionListTable({
           isFetchingNextPage={isFetchingNextPage}
           hasNextPage={hasNextPage}
           fetchNextPage={fetchNextPage}
-          onRowClick={(row) => handleRowClick(row.original.id)}
+          onRowClick={mode === "preview" ? undefined : (row) => handleRowClick(row.original.id)}
         />
       )}
     </div>

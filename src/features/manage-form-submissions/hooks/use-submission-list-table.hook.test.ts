@@ -496,4 +496,67 @@ describe("useSubmissionListTable (features/manage-form-submissions/hooks)", () =
     expect(result.current.activeFilterCount).toBe(0);
     expect(result.current.columnFilters).toEqual({});
   });
+
+  it("preview 모드에서는 실데이터 조회를 비활성화하고 sampleSubmissions만 사용하며 행 클릭·라우팅·삭제를 차단해야 한다", async () => {
+    const onSelectSubmission = vi.fn();
+    const sampleSubmissions = [
+      {
+        id: "sample-preview-1",
+        formId: "form-uuid-1",
+        data: { "field-name": "이름 예시 1" },
+        createdAt: new Date("2026-11-18T09:00:00.000Z"),
+        updatedAt: new Date("2026-11-18T09:00:00.000Z"),
+        deletedAt: null,
+      },
+    ];
+
+    const { result } = renderHook(
+      () =>
+        useSubmissionListTable({
+          form: dummyForm,
+          mode: "preview",
+          sampleSubmissions,
+          onSelectSubmission,
+        }),
+      { wrapper: createWrapper() }
+    );
+
+    expect(mockUseInfiniteQuery).toHaveBeenLastCalledWith("", expect.any(Object));
+    expect(result.current.isSamplePreview).toBe(true);
+    expect(result.current.flatSubmissions).toEqual(sampleSubmissions);
+    expect(result.current.totalCount).toBe(1);
+
+    act(() => {
+      result.current.handleRowClick("sample-preview-1");
+      result.current.handleSetFieldFilter("field-name", "예시");
+      result.current.handleClearAllFilters();
+    });
+
+    expect(onSelectSubmission).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.handleDelete("sample-preview-1");
+    });
+
+    expect(mockDeleteSubmission).not.toHaveBeenCalled();
+  });
+
+  it("preview 모드에서는 sampleSubmissions가 비어 있을 때도 실데이터 대신 빈 목록을 반환해야 한다", () => {
+    const { result } = renderHook(
+      () =>
+        useSubmissionListTable({
+          form: dummyForm,
+          mode: "preview",
+          sampleSubmissions: [],
+        }),
+      { wrapper: createWrapper() }
+    );
+
+    expect(mockUseInfiniteQuery).toHaveBeenLastCalledWith("", expect.any(Object));
+    expect(result.current.isSamplePreview).toBe(true);
+    expect(result.current.flatSubmissions).toEqual([]);
+    expect(result.current.totalCount).toBe(0);
+  });
 });
