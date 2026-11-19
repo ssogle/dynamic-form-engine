@@ -27,8 +27,8 @@ export function WorkspaceSplitShell({ mode, children }: WorkspaceSplitShellProps
       {/* 1024px 미만 좁은 뷰포트(모바일/소형 태블릿) 전용 데스크톱 안내 하드 가드 */}
       <div className="bg-muted/20 flex h-full w-full items-center justify-center p-6 lg:hidden">
         <Card className="border-border/70 w-full max-w-md text-center shadow-sm">
-          <CardHeader className="items-center space-y-3 pb-4">
-            <div className="bg-primary/10 text-primary flex size-11 items-center justify-center rounded-full">
+          <CardHeader className="space-y-3 pb-4 text-center">
+            <div className="bg-primary/10 text-primary mx-auto flex size-11 items-center justify-center rounded-full">
               <Monitor className="size-5" />
             </div>
             <CardTitle className="text-lg font-semibold">
