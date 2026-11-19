@@ -49,6 +49,12 @@ export {
 export { normalizeSelectOption, normalizeSelectOptions } from "./lib/select-options";
 export { formatFieldDisplayValue } from "./lib/format-field-value";
 export {
+  buildFormRelationGraph,
+  type FormRelationGraphData,
+  type FormRelationGraphLink,
+  type FormRelationGraphNode,
+} from "./lib/build-form-relation-graph";
+export {
   PRIMARY_FIELD_DISALLOWED_TYPES,
   validatePrimaryFieldSelection,
   extractPrimaryFieldId,
