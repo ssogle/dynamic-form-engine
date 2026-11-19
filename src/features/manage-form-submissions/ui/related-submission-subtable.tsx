@@ -73,7 +73,8 @@ export function RelatedSubmissionSubtable({
     return [
       {
         fieldId: matchingFields[0].id,
-        op: "hasAny",
+        // `relation` 필드 능력(FIELD_CAPABILITY_BY_TYPE.relation)이 허용하는 `in` 연산자를 사용해 단일·다중 관계 모두 조회
+        op: "in",
         values: [targetSubmissionId],
       },
     ];
