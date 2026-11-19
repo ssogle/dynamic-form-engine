@@ -167,8 +167,8 @@ export function useConsumerSubmissionEditor({
         setUpdateErrorMessage(
           httpErr?.message ?? "응답 수정 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
         );
+        console.error("응답 수정 실패:", err);
       }
-      console.error("응답 수정 실패:", err);
     }
   };
 
