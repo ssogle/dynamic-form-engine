@@ -51,10 +51,12 @@ describe("formatConsumerContextPrompt (features/execute-navigator-action/lib/pro
     expect(prompt).toContain("현재 열려있는 폼 제목: 비용 정산서");
   });
 
-  it("시스템 프롬프트에 날짜 계산, 타깃 폼 오판 방지, submitForm 실패 안내 및 목록 필터·정렬 규칙이 포함되어야 한다", () => {
+  it("시스템 프롬프트에 날짜 계산, 타깃 폼 오판 방지, submitForm 실패 안내 및 목록 필터·정렬, 데이터 검색·릴레이션 연쇄 조회 규칙이 포함되어야 한다", () => {
     expect(CONSUMER_NAVIGATOR_SYSTEM_PROMPT).toContain("현재 서버 기준 날짜");
     expect(CONSUMER_NAVIGATOR_SYSTEM_PROMPT).toContain("현재 열려있는 폼 제목");
     expect(CONSUMER_NAVIGATOR_SYSTEM_PROMPT).toContain("applySubmissionListQuery");
+    expect(CONSUMER_NAVIGATOR_SYSTEM_PROMPT).toContain("searchSubmissions");
+    expect(CONSUMER_NAVIGATOR_SYSTEM_PROMPT).toContain("getRelatedSubmissions");
     expect(CONSUMER_NAVIGATOR_SYSTEM_PROMPT).toContain("success: false");
   });
 });

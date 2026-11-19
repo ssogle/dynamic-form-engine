@@ -5,19 +5,22 @@ import {
   type CoreFormField,
   type Form,
 } from "@/entities/form";
-import type { FormSubmission } from "@/entities/form-submission";
+import type { FormSubmission, QuerySubmissionsForAnalysisInput } from "@/entities/form-submission";
+import type { AnalysisRecordsResult, AnalyticsResult } from "@/entities/form-submission/server";
 import { serializeFieldFiltersParam, validateFiltersAgainstFields } from "@/shared/schema";
 import {
   consumerApplySubmissionListQueryInputSchema,
   consumerDeleteSubmissionsInputSchema,
   consumerFillFieldsInputSchema,
   consumerNavigateInputSchema,
+  consumerSearchSubmissionsInputSchema,
   consumerSubmitFormInputSchema,
   relationRecordIdSchema,
   type ConsumerApplySubmissionListQueryInput,
   type ConsumerDeleteSubmissionsInput,
   type ConsumerFillFieldsInput,
   type ConsumerNavigateInput,
+  type ConsumerSearchSubmissionsInput,
   type ConsumerSubmitFormInput,
 } from "../../schema/navigator-tools.schema";
 import type { NavigatorConsumerAction } from "../../types/navigator-action.types";
@@ -27,6 +30,7 @@ export {
   consumerDeleteSubmissionsInputSchema,
   consumerFillFieldsInputSchema,
   consumerNavigateInputSchema,
+  consumerSearchSubmissionsInputSchema,
   consumerSubmitFormInputSchema,
 };
 
@@ -45,6 +49,9 @@ export function normalizeConsumerPath(rawPath: string): string {
 export interface ConsumerToolsDependencies {
   softDeleteSubmissionsByIds: (ids: string[]) => Promise<FormSubmission[]>;
   findFormById: (id: string) => Promise<Form | undefined>;
+  queryFormSubmissionsForAnalysis: (
+    input: QuerySubmissionsForAnalysisInput
+  ) => Promise<AnalyticsResult<AnalysisRecordsResult>>;
   /** 현재 화면 컨텍스트의 활성 폼 ID */
   currentFormId?: string | undefined;
   /** 현재 화면의 기존/임시 입력값 스냅샷 */
@@ -475,11 +482,74 @@ export function createConsumerTools(deps: ConsumerToolsDependencies) {
     },
   });
 
+  const searchSubmissionsTool = tool({
+    description:
+      "발행된 폼에 등록된 제출 데이터 레코드(id, createdAt, 라벨 매핑된 values)를 화면 이동 없이 읽기 전용으로 검색·조회합니다. 오늘/기간별 등록 여부 확인, 특정 건 조회, relation 필드에 연결할 타깃 폼 레코드 UUID 탐색에 사용하세요(통계 집계에는 사용하지 않음).",
+    inputSchema: consumerSearchSubmissionsInputSchema,
+    execute: async ({
+      formId,
+      dateFieldId,
+      startDate,
+      endDate,
+      filters,
+      sortOrder,
+      limit,
+    }: ConsumerSearchSubmissionsInput) => {
+      const formResult = await resolvePublishedForm(formId);
+      if (formResult.error !== null) {
+        return {
+          success: false,
+          error: formResult.error,
+        };
+      }
+
+      try {
+        // 요청 상한(limit)보다 1건 더 조회하여 추가 데이터 존재 여부(hasMore)를 판별합니다.
+        const result = await deps.queryFormSubmissionsForAnalysis({
+          formId: formResult.form.id,
+          dateFieldId,
+          startDate,
+          endDate,
+          timezone: "Asia/Seoul",
+          filters,
+          sortOrder,
+          limit: limit + 1,
+        });
+        if (result.error !== null) {
+          return {
+            success: false,
+            error: result.error,
+          };
+        }
+
+        const hasMore = result.data.records.length > limit;
+        const records = hasMore ? result.data.records.slice(0, limit) : result.data.records;
+
+        return {
+          success: true,
+          data: {
+            ...result.data,
+            totalReturned: records.length,
+            hasMore,
+            records,
+          },
+        };
+      } catch (err) {
+        console.error("searchSubmissions 실행 오류:", err);
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : "제출 데이터 조회 중 오류가 발생했습니다.",
+        };
+      }
+    },
+  });
+
   return {
     navigate: navigateTool,
     fillFields: fillFieldsTool,
     submitForm: submitFormTool,
     deleteSubmissions: deleteSubmissionsTool,
     applySubmissionListQuery: applySubmissionListQueryTool,
+    searchSubmissions: searchSubmissionsTool,
   };
 }

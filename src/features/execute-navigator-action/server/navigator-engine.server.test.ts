@@ -86,7 +86,7 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
     expect(findActiveForms).not.toHaveBeenCalled();
   });
 
-  it("generateText 호출 시 stopWhen(stepCountIs: 5)와 queryTools가 주입되어야 한다", async () => {
+  it("컨슈머 모드에서 generateText 호출 시 stopWhen(stepCountIs: 10), searchSubmissions 및 queryTools가 주입되어야 한다", async () => {
     mockGenerateText.mockResolvedValueOnce({
       text: "답변입니다.",
       toolResults: [],
@@ -100,9 +100,26 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
     expect(mockGenerateText).toHaveBeenCalledTimes(1);
     const callArgs = mockGenerateText.mock.calls[0]?.[0];
     expect(callArgs).toBeDefined();
-    expect(callArgs?.stopWhen).toEqual({ type: "stepCount", count: 5 });
+    expect(callArgs?.stopWhen).toEqual({ type: "stepCount", count: 10 });
     expect(callArgs?.tools).toHaveProperty("searchForms");
     expect(callArgs?.tools).toHaveProperty("getFormDetails");
+    expect(callArgs?.tools).toHaveProperty("searchSubmissions");
+  });
+
+  it("빌더 모드에서 generateText 호출 시 기본 stopWhen(stepCountIs: 5)가 주입되어야 한다", async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: "빌더 답변입니다.",
+      toolResults: [],
+    });
+
+    await runNavigatorEngine({
+      mode: "builder",
+      prompt: "테스트",
+    });
+
+    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+    const callArgs = mockGenerateText.mock.calls[0]?.[0];
+    expect(callArgs?.stopWhen).toEqual({ type: "stepCount", count: 5 });
   });
 
   it("빌더 모드에서 navigate 도구 호출 시 output.clientAction을 올바르게 반환해야 한다", async () => {

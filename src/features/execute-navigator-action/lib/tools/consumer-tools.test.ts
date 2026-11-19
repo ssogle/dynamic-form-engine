@@ -71,6 +71,7 @@ describe("createConsumerTools (features/execute-navigator-action/lib/tools)", ()
   const baseDeps = {
     findFormById: vi.fn().mockResolvedValue(publishedForm),
     softDeleteSubmissionsByIds: vi.fn().mockResolvedValue([]),
+    queryFormSubmissionsForAnalysis: vi.fn(),
     currentFormId: formId,
   };
 
@@ -276,6 +277,113 @@ describe("createConsumerTools (features/execute-navigator-action/lib/tools)", ()
 
       expect(res.success).toBe(false);
       expect(res.error).toContain("존재하지 않습니다");
+    });
+  });
+
+  describe("searchSubmissions", () => {
+    it("발행된 폼 조회 시 limit+1로 쿼리하고 결과 개수가 limit 이내이면 hasMore: false를 반환해야 한다", async () => {
+      baseDeps.queryFormSubmissionsForAnalysis.mockResolvedValueOnce({
+        data: {
+          formId,
+          formTitle: publishedForm.title,
+          dateAxis: "createdAt",
+          totalReturned: 1,
+          records: [
+            {
+              id: targetRecordId,
+              createdAt: new Date("2026-11-19T01:00:00.000Z"),
+              values: { "지출 항목": "팀 점심", 금액: 25000, 분류: "식대" },
+            },
+          ],
+        },
+        error: null,
+      });
+
+      const tools = createConsumerTools(baseDeps);
+      const res = (await tools.searchSubmissions.execute!(
+        {
+          formId,
+          startDate: "2026-11-19",
+          endDate: "2026-11-19",
+          sortOrder: "desc",
+          limit: 10,
+        },
+        mockExecutionOptions
+      )) as {
+        success: boolean;
+        data?: { totalReturned: number; hasMore: boolean; records: Array<{ id: string }> };
+      };
+
+      expect(baseDeps.queryFormSubmissionsForAnalysis).toHaveBeenCalledWith({
+        formId,
+        dateFieldId: undefined,
+        startDate: "2026-11-19",
+        endDate: "2026-11-19",
+        timezone: "Asia/Seoul",
+        filters: undefined,
+        sortOrder: "desc",
+        limit: 11,
+      });
+      expect(res.success).toBe(true);
+      expect(res.data?.totalReturned).toBe(1);
+      expect(res.data?.hasMore).toBe(false);
+      expect(res.data?.records[0]?.id).toBe(targetRecordId);
+    });
+
+    it("조회된 행이 limit을 초과하면 limit건만 잘라 반환하고 hasMore: true를 설정해야 한다", async () => {
+      baseDeps.queryFormSubmissionsForAnalysis.mockResolvedValueOnce({
+        data: {
+          formId,
+          formTitle: publishedForm.title,
+          dateAxis: "createdAt",
+          totalReturned: 3,
+          records: [
+            { id: "r1", createdAt: new Date(), values: { "지출 항목": "1건" } },
+            { id: "r2", createdAt: new Date(), values: { "지출 항목": "2건" } },
+            { id: "r3", createdAt: new Date(), values: { "지출 항목": "3건" } },
+          ],
+        },
+        error: null,
+      });
+
+      const tools = createConsumerTools(baseDeps);
+      const res = (await tools.searchSubmissions.execute!(
+        {
+          formId,
+          sortOrder: "desc",
+          limit: 2,
+        },
+        mockExecutionOptions
+      )) as {
+        success: boolean;
+        data?: { totalReturned: number; hasMore: boolean; records: Array<{ id: string }> };
+      };
+
+      expect(res.success).toBe(true);
+      expect(res.data?.totalReturned).toBe(2);
+      expect(res.data?.hasMore).toBe(true);
+      expect(res.data?.records.map((r) => r.id)).toEqual(["r1", "r2"]);
+    });
+
+    it("미발행 폼(publishedAt: null) 조회 시 queryFormSubmissionsForAnalysis를 호출하지 않고 거부해야 한다", async () => {
+      baseDeps.findFormById.mockResolvedValueOnce({
+        ...publishedForm,
+        publishedAt: null,
+      });
+
+      const tools = createConsumerTools(baseDeps);
+      const res = (await tools.searchSubmissions.execute!(
+        {
+          formId,
+          sortOrder: "desc",
+          limit: 20,
+        },
+        mockExecutionOptions
+      )) as { success: boolean; error?: string };
+
+      expect(res.success).toBe(false);
+      expect(res.error).toContain("발행된 대상 폼");
+      expect(baseDeps.queryFormSubmissionsForAnalysis).not.toHaveBeenCalled();
     });
   });
 });

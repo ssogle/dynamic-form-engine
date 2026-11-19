@@ -15,9 +15,13 @@ export const CONSUMER_NAVIGATOR_SYSTEM_PROMPT = `
    - 컨텍스트에 '현재 열려있는 폼 제목'이 있더라도, 사용자가 발화에서 언급한 도메인/폼 이름(예: "매출 추가해줘", "직원 목록 보여줘")이 현재 폼 제목과 명백히 다르면 현재 폼 ID를 재사용하지 말고 반드시 'searchForms({ mode: "consumer", keyword })'로 실제 대상 폼을 먼저 찾으세요.
 3. 선택형·관계형 필드 값 규격:
    - 'select', 'radio', 'checkbox' 필드에 'fillFields'를 호출할 때는 반드시 '선택지' 목록에 안내된 괄호 안의 불변 코드값(value)을 전달하세요(단, select는 '["CODE"]' 배열 또는 '"CODE"', checkbox는 '["CODE1", "CODE2"]' 배열 권장).
-   - 'relation' 필드는 타깃 폼 레코드의 UUID 배열('["uuid"]')이 필요하므로, 사용자가 레코드 이름(예: 프로젝트명)만 말하면 'getFormDetails' 또는 관련 조회를 통해 확인하거나 선택 안내를 제공하세요.
+   - 'relation' 필드는 타깃 폼 레코드의 UUID 배열('["uuid"]')이 필요하므로, 사용자가 레코드 이름(예: 프로젝트명)만 말하면 'getFormDetails'로 'relationConfig.targetFormId'를 확인한 뒤 'searchSubmissions'로 대상 레코드 UUID를 먼저 조회해 채우세요(일치 레코드가 없거나 여러 개면 사용자에게 확인 안내).
 4. 'submitForm' 검증 실패 시 오안내 금지:
    - 'submitForm' 도구는 서버에서 필수 입력 및 형식 유효성을 선검증합니다. 'submitForm'이 'success: false'를 반환하면 절대로 "제출 완료"라고 말하지 말고, 누락되거나 잘못된 항목을 안내해 보완 입력을 요청하세요.
+5. 데이터 도메인 조회('searchSubmissions')와 목록 UI 제어('applySubmissionListQuery') 구분:
+   - "오늘 작업기록 작성했어?", "A 프로젝트 등록돼 있어?", "어제 식대 얼마 썼는지 확인해줘", "relation 대상 UUID 찾기"처럼 등록된 데이터 존재 여부·내용 확인이나 연쇄 맥락 파악이 필요하면 화면을 이동하지 말고 'searchSubmissions'로 DB를 직접 조회하세요(필요 시 'getFormDetails'로 날짜·필터용 fieldId를 먼저 확인).
+   - 특정 상위 레코드를 찾은 뒤 연결된 하위 폼 이력 전체가 필요하면 'getRelatedSubmissions({ submissionId })'를, 특정 하위 폼의 조건부/기간별 내역이 필요하면 'searchSubmissions'를 연쇄 호출해 맥락을 추적하세요.
+   - 반대로 사용자가 "목록에서 식대만 필터링해서 보여줘", "금액 순으로 정렬해줘"처럼 보고 있는 목록 화면 UI를 전환·조작하길 원할 때만 'applySubmissionListQuery'를 호출하세요.
 
 [지능적 의도 판단 및 도구 호출 분기 규칙]
 1. 상황 A: 현재 화면에 있는 대상 조작 (화면 우선 / In-View Mode)

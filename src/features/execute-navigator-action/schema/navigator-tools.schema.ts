@@ -5,7 +5,11 @@ import {
   selectOptionSchema,
   validatePrimaryFieldSelection,
 } from "@/entities/form";
-import { calendarDateStringSchema, fieldFilterConditionSchema } from "@/shared/schema";
+import {
+  calendarDateStringSchema,
+  fieldFilterConditionSchema,
+  refineDateRangeOrder,
+} from "@/shared/schema";
 
 /**
  * 폼 스키마 변경 오퍼레이션 상수 목록 (단일 진실 원천 - SSOT)
@@ -352,6 +356,51 @@ export const consumerApplySubmissionListQueryInputSchema = z.object({
 export type ConsumerApplySubmissionListQueryInput = z.infer<
   typeof consumerApplySubmissionListQueryInputSchema
 >;
+
+/**
+ * 컨슈머 읽기 전용 제출 데이터 검색 도구(searchSubmissions) 입력 스키마
+ */
+export const consumerSearchSubmissionsInputSchema = z
+  .object({
+    formId: z
+      .uuid("조회할 대상 폼 ID(UUID)가 유효하지 않습니다.")
+      .optional()
+      .describe(
+        "조회할 발행 폼의 ID (생략 시 현재 열려있는 폼. 다른 도메인이나 relation 타깃 폼 조회 시 해당 formId 명시)"
+      ),
+    dateFieldId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe(
+        "기간 필터 및 정렬의 기준 날짜 필드 ID (생략 시 시스템 제출일 createdAt 기준으로 조회)"
+      ),
+    startDate: calendarDateStringSchema
+      .optional()
+      .describe("조회 시작일 (YYYY-MM-DD, Asia/Seoul 기준)"),
+    endDate: calendarDateStringSchema
+      .optional()
+      .describe("조회 종료일 (YYYY-MM-DD, Asia/Seoul 기준)"),
+    filters: z
+      .array(fieldFilterConditionSchema)
+      .optional()
+      .describe(
+        "필드 조건 필터 배열 ([{ fieldId, op, value?, values?, min?, max? }] — eq/neq/contains/gt/gte/lt/lte/between/in/notIn/hasAny/hasAll/isEmpty/isNotEmpty)"
+      ),
+    sortOrder: z
+      .enum(["asc", "desc"])
+      .default("desc")
+      .describe("정렬 방향 (desc: 최신순, asc: 과거순)"),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(30)
+      .default(20)
+      .describe("최대 조회 건수 (기본 20건, 최대 30건)"),
+  })
+  .superRefine(refineDateRangeOrder);
+export type ConsumerSearchSubmissionsInput = z.infer<typeof consumerSearchSubmissionsInputSchema>;
 
 // ==========================================
 // 4. 분석가 도구 입력 스키마 (Analyst Tools)
