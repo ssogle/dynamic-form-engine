@@ -18,6 +18,7 @@ import {
   type RelatedSubmissionsGroup,
 } from "@/entities/form-submission";
 import { getRelationDetailRows, type RelationFieldDetailRows } from "../lib/relation-summary";
+import type { FormSubmissionViewMode } from "../types/submission-view.types";
 import { useRelationLookup } from "./use-relation-lookup.hook";
 
 export interface UseSubmissionDetailViewParams {
@@ -29,6 +30,14 @@ export interface UseSubmissionDetailViewParams {
    * 단건 응답 레코드의 UUID 식별자
    */
   submissionId: string;
+  /**
+   * 상세 화면 동작 모드 (기본값: "consumer")
+   */
+  mode?: FormSubmissionViewMode | undefined;
+  /**
+   * 프리뷰 모드에서 실데이터 부재 시 직접 바인딩할 가상 샘플 레코드
+   */
+  sampleSubmission?: FormSubmission | undefined;
 }
 
 export interface UseSubmissionDetailViewReturn {
@@ -104,6 +113,10 @@ export interface UseSubmissionDetailViewReturn {
    * 단건 응답 삭제 핸들러 (성공 시 목록 페이지로 라우팅)
    */
   handleDelete: () => Promise<void>;
+  /**
+   * 실데이터 부재로 인해 샘플 데이터를 미리보기로 렌더링 중인지 여부
+   */
+  isSamplePreview: boolean;
 }
 
 /**
@@ -115,13 +128,17 @@ export interface UseSubmissionDetailViewReturn {
 export function useSubmissionDetailView({
   formId,
   submissionId,
+  mode = "consumer",
+  sampleSubmission,
 }: UseSubmissionDetailViewParams): UseSubmissionDetailViewReturn {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = React.useState(false);
   const [selectedGroupIndex, setSelectedGroupIndex] = React.useState(0);
 
-  // 1. 부모 폼 스키마 및 단건 응답 데이터 비동기 쿼리
+  const isSamplePreview = mode === "preview";
+
+  // 1. 부모 폼 스키마 및 단건 응답 데이터 비동기 쿼리 (프리뷰 모드에서는 단건/역참조 쿼리 전면 비활성화)
   const {
     data: form,
     isLoading: isFormLoading,
@@ -130,30 +147,40 @@ export function useSubmissionDetailView({
   } = useFormDetailQuery(formId);
 
   const {
-    data: submission,
+    data: fetchedSubmission,
     isLoading: isSubmissionLoading,
     isError: isSubmissionError,
     error: submissionError,
-  } = useFormSubmissionDetailQuery(formId, submissionId);
+  } = useFormSubmissionDetailQuery(formId, isSamplePreview ? "" : submissionId, {
+    enabled: !isSamplePreview,
+  });
 
   // 2. 현재 레코드를 참조하는 역방향 관계 서브미션 목록 비동기 쿼리
-  const { data: relatedGroups = [], isLoading: isRelatedLoading } =
-    useRelatedSubmissionsQuery(submissionId);
+  const { data: fetchedRelatedGroups = [], isLoading: isFetchedRelatedLoading } =
+    useRelatedSubmissionsQuery(isSamplePreview ? "" : submissionId, {
+      enabled: !isSamplePreview,
+    });
 
   // 3. 응답 삭제 뮤테이션
   const { mutateAsync: deleteSubmission } = useDeleteSubmissionMutation(form?.id ?? formId);
 
-  const isLoading = isFormLoading || isSubmissionLoading;
-  const isError = isFormError || isSubmissionError;
+  const submission = isSamplePreview ? sampleSubmission : fetchedSubmission;
+  const relatedGroups = isSamplePreview ? [] : fetchedRelatedGroups;
+  const isRelatedLoading = isSamplePreview ? false : isFetchedRelatedLoading;
+  const isLoading = isSamplePreview ? isFormLoading : isFormLoading || isSubmissionLoading;
+  const isError = isSamplePreview ? isFormError : isFormError || isSubmissionError;
   const errorMessage =
     formError instanceof Error
       ? formError.message
-      : submissionError instanceof Error
+      : !isSamplePreview && submissionError instanceof Error
         ? submissionError.message
         : "응답 상세 정보를 불러오지 못했습니다.";
 
-  // 4. 응답 삭제 핸들러
+  // 4. 응답 삭제 핸들러 (프리뷰 모드에서는 차단)
   const handleDelete = React.useCallback(async () => {
+    if (mode === "preview") {
+      return;
+    }
     try {
       setIsDeleting(true);
       await deleteSubmission(submissionId);
@@ -162,7 +189,7 @@ export function useSubmissionDetailView({
       console.error("응답 삭제 실패:", err);
       setIsDeleting(false);
     }
-  }, [deleteSubmission, submissionId, formId, router]);
+  }, [deleteSubmission, submissionId, formId, mode, router]);
 
   // 5. 활성 필드, 대표 식별 정보 및 정방향 관계형 상세 행 파생
   const activeFields = React.useMemo(() => extractActiveFields(form), [form]);
@@ -175,8 +202,8 @@ export function useSubmissionDetailView({
   );
 
   const submissionListForLookup = React.useMemo(
-    () => (submission ? [submission] : []),
-    [submission]
+    () => (submission && !isSamplePreview ? [submission] : []),
+    [submission, isSamplePreview]
   );
   const { lookupMap: relationLookupMap } = useRelationLookup(activeFields, submissionListForLookup);
 
@@ -209,5 +236,6 @@ export function useSubmissionDetailView({
     selectedGroupIndex,
     setSelectedGroupIndex,
     handleDelete,
+    isSamplePreview,
   };
 }

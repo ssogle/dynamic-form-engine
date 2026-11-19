@@ -133,12 +133,17 @@ export async function getFormSubmissionDetail(
  *
  * @param formId 조회할 폼의 UUID 식별자
  * @param submissionId 조회할 응답 식별자
+ * @param options TanStack Query 옵션
  */
-export function useFormSubmissionDetailQuery(formId: string, submissionId: string) {
+export function useFormSubmissionDetailQuery(
+  formId: string,
+  submissionId: string,
+  options?: { enabled?: boolean | undefined }
+) {
   return useQuery({
     queryKey: formSubmissionsKeys.detail(submissionId),
     queryFn: () => getFormSubmissionDetail(formId, submissionId),
-    enabled: Boolean(formId && submissionId),
+    enabled: Boolean(formId && submissionId) && (options?.enabled ?? true),
   });
 }
 

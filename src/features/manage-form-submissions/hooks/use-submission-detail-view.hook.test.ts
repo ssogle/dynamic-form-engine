@@ -252,4 +252,39 @@ describe("useSubmissionDetailView (features/manage-form-submissions/hooks)", () 
       p_name: "차세대 ERP 구축",
     });
   });
+
+  it("preview 모드에서 sampleSubmission이 주어지면 단건/역참조 조회와 삭제를 차단하고 샘플 데이터를 표시해야 한다", async () => {
+    const sampleSubmission: FormSubmission = {
+      id: "sample-preview-1",
+      formId: "form-uuid-1",
+      data: { "field-1": "이름 예시 1" },
+      createdAt: new Date("2026-11-18T09:00:00.000Z"),
+      updatedAt: new Date("2026-11-18T09:00:00.000Z"),
+      deletedAt: null,
+    };
+
+    const { result } = renderHook(
+      () =>
+        useSubmissionDetailView({
+          formId: "form-uuid-1",
+          submissionId: "sample-preview-1",
+          mode: "preview",
+          sampleSubmission,
+        }),
+      { wrapper: createWrapper() }
+    );
+
+    expect(result.current.isSamplePreview).toBe(true);
+    expect(result.current.submission).toEqual(sampleSubmission);
+    expect(result.current.primaryDisplayValue).toBe("이름 예시 1");
+    expect(mockUseFormSubmissionDetailQuery).toHaveBeenLastCalledWith("form-uuid-1", "");
+    expect(mockUseRelatedSubmissionsQuery).toHaveBeenLastCalledWith("");
+
+    await act(async () => {
+      await result.current.handleDelete();
+    });
+
+    expect(mockDeleteSubmission).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
 });

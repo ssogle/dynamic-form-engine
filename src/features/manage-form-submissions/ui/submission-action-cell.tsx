@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { FormSubmission } from "@/entities/form-submission";
 import { Button } from "@/shared/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
+import type { FormSubmissionViewMode } from "../types/submission-view.types";
 
 export interface SubmissionActionCellProps {
   /**
@@ -23,6 +24,14 @@ export interface SubmissionActionCellProps {
    * 단건 응답 삭제 핸들러
    */
   onDelete: (id: string) => Promise<void>;
+  /**
+   * 뷰 동작 모드 (기본값: "consumer")
+   */
+  mode?: FormSubmissionViewMode | undefined;
+  /**
+   * 프리뷰 모드에서 상세 보기 버튼 클릭 시 호출할 인라인 콜백
+   */
+  onSelectSubmission?: ((submissionId: string) => void) | undefined;
 }
 
 /**
@@ -33,9 +42,32 @@ export function SubmissionActionCell({
   formId,
   deletingId,
   onDelete,
+  mode = "consumer",
+  onSelectSubmission,
 }: SubmissionActionCellProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const isDeleting = deletingId === submission.id;
+
+  // 빌더 프리뷰 모드에서는 컨슈머 라우트 이동·수정·삭제를 차단하고 레이아웃 참고용 비활성 버튼만 표시
+  if (mode === "preview") {
+    return (
+      <div className="flex items-center justify-start whitespace-nowrap">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 px-2 text-xs"
+          disabled={!onSelectSubmission}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelectSubmission?.(submission.id);
+          }}
+        >
+          상세
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center justify-start gap-1.5 whitespace-nowrap">
