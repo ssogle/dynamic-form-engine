@@ -387,7 +387,97 @@ describe("createConsumerTools (features/execute-navigator-action/lib/tools)", ()
     });
   });
 
-  describe("HITL 사전 승인 게이트 (deleteSubmissions)", () => {
+  describe("HITL 사전 승인 게이트 (submitForm, deleteSubmissions)", () => {
+    it("requireConfirmation: true일 때 submitForm은 검증 실패 시 승인 카드 없이 즉시 거부해야 한다", async () => {
+      const tools = createConsumerTools({
+        ...baseDeps,
+        requireConfirmation: true,
+        currentPath: `/consumer/forms/${formId}/new`,
+      });
+
+      const res = (await tools.submitForm.execute!(
+        {
+          formId,
+          confirmationMessage: "제출을 완료합니다.",
+        },
+        mockExecutionOptions
+      )) as {
+        success: boolean;
+        requiresConfirmation?: boolean;
+        fieldErrors?: Record<string, string>;
+      };
+
+      expect(res.success).toBe(false);
+      expect(res.requiresConfirmation).toBeUndefined();
+      expect(res.fieldErrors).toBeDefined();
+    });
+
+    it("requireConfirmation: true일 때 신규 작성(/new) submitForm은 SUBMIT_FORM 없이 PENDING_CONFIRMATION을 반환해야 한다", async () => {
+      const tools = createConsumerTools({
+        ...baseDeps,
+        requireConfirmation: true,
+        currentPath: `/consumer/forms/${formId}/new`,
+        initialDraftValues: {
+          f_title: "팀 점심 식대",
+          f_amount: 25000,
+          f_category: ["MEAL"],
+        },
+      });
+
+      const res = (await tools.submitForm.execute!(
+        {
+          formId,
+          confirmationMessage: "응답을 제출합니다.",
+        },
+        mockExecutionOptions
+      )) as {
+        requiresConfirmation?: boolean;
+        status?: string;
+        clientAction?: unknown;
+        pendingConfirmation?: { toolName: string; title: string; targetIds: string[] };
+      };
+
+      expect(res.requiresConfirmation).toBe(true);
+      expect(res.status).toBe("PENDING_CONFIRMATION");
+      expect(res.clientAction).toBeUndefined();
+      expect(res.pendingConfirmation?.toolName).toBe("submitForm");
+      expect(res.pendingConfirmation?.title).toContain("응답 제출");
+      expect(res.pendingConfirmation?.targetIds).toEqual([formId]);
+    });
+
+    it("requireConfirmation: true일 때 수정(/edit) submitForm은 수정 저장 안내로 PENDING_CONFIRMATION을 반환해야 한다", async () => {
+      const tools = createConsumerTools({
+        ...baseDeps,
+        requireConfirmation: true,
+        currentPath: `/consumer/forms/${formId}/submissions/${targetRecordId}/edit`,
+        initialDraftValues: {
+          f_title: "팀 회식 식대",
+          f_amount: 42000,
+          f_category: ["MEAL"],
+        },
+      });
+
+      const res = (await tools.submitForm.execute!(
+        {
+          formId,
+          confirmationMessage: "수정 내용을 저장합니다.",
+        },
+        mockExecutionOptions
+      )) as {
+        requiresConfirmation?: boolean;
+        status?: string;
+        clientAction?: unknown;
+        pendingConfirmation?: { toolName: string; title: string; description: string };
+      };
+
+      expect(res.requiresConfirmation).toBe(true);
+      expect(res.status).toBe("PENDING_CONFIRMATION");
+      expect(res.clientAction).toBeUndefined();
+      expect(res.pendingConfirmation?.toolName).toBe("submitForm");
+      expect(res.pendingConfirmation?.title).toContain("수정 응답 저장");
+      expect(res.pendingConfirmation?.description).toContain("수정 내용");
+    });
+
     it("requireConfirmation: true일 때 deleteSubmissions는 DB 삭제 없이 PENDING_CONFIRMATION을 반환해야 한다", async () => {
       const tools = createConsumerTools({
         ...baseDeps,

@@ -107,6 +107,7 @@ export type NavigatorClientContext = z.infer<typeof navigatorClientContextSchema
 export const HIGH_RISK_CONFIRMATION_TOOLS = [
   "publishForm",
   "deleteForms",
+  "submitForm",
   "deleteSubmissions",
   "publishAnalysisView",
   "deleteAnalysisViews",

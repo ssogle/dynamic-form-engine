@@ -156,6 +156,7 @@ const NAVIGATOR_MODE_REGISTRY: Record<NavigatorMode, ModeConfigFactory> = {
         softDeleteSubmissionsByIds,
         findFormById,
         queryFormSubmissionsForAnalysis,
+        currentPath: currentContext?.currentPath,
         currentFormId: currentContext?.currentFormId,
         initialDraftValues: currentContext?.currentDraftValues,
         requireConfirmation,
