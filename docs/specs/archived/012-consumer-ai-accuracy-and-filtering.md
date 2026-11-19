@@ -1,19 +1,16 @@
-<!-- 아카이브(동결) 전환 시 아래 WARNING 주석을 해제하고 상단 NOTE 블록을 대체하세요 -->
-<!--
 > [!WARNING]
 > **ARCHIVED SPECIFICATION (READ-ONLY)**
 > 본 문서는 구현 완료 후 동결된 과거 기록입니다.
 > 현재 시스템의 구현 규격은 `/src` 실제 코드를 참조하세요. AI 에이전트는 이 문서를 최신 코드로 인용하지 마십시오.
--->
 
 # [Spec-012] 컨슈머 AI 정확도 및 목록 필터·정렬 제어 고도화 (Consumer AI Accuracy & Filtering)
 
 > [!NOTE]
 >
-> - **상태 (Status)**: Active (기획/구현 중)
+> - **상태 (Status)**: Archived (구현 완료 및 동결)
 > - **브랜치 (Branch)**: `feat/spec-012-consumer-ai-accuracy-and-filtering`
 > - **작성일 (Created)**: 2026-11-19
-> - **완료일 (Archived)**: -
+> - **완료일 (Archived)**: 2026-11-19
 
 ## 1. 배경 및 문제 정의 (Context & Problem Statement)
 
