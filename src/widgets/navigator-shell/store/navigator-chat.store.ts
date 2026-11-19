@@ -1,24 +1,41 @@
 import { create } from "zustand";
 import { nowUtcIso } from "@/shared/lib/date";
-import type { NavigatorAction, NavigatorMode } from "@/features/execute-navigator-action";
+import type {
+  NavigatorAction,
+  NavigatorAttachmentDto,
+  NavigatorMode,
+  PendingNavigatorConfirmation,
+} from "@/features/execute-navigator-action";
+
+export type NavigatorConfirmationStatus =
+  "pending" | "executing" | "approved" | "rejected" | "error";
+
+export interface NavigatorChatConfirmationItem extends PendingNavigatorConfirmation {
+  status: NavigatorConfirmationStatus;
+  errorMessage?: string | undefined;
+}
 
 export interface NavigatorChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
+  /** 사용자가 메시지와 함께 첨부한 멀티모달 이미지 목록 */
+  attachments?: NavigatorAttachmentDto[] | undefined;
   /** AI 응답 생성 중 스트림으로부터 수신·누적된 수행 단계 목록 */
   steps?: string[] | undefined;
+  /** 사용자 사전 승인이 필요한 고위험 액션 확인 카드 목록 */
+  pendingConfirmations?: NavigatorChatConfirmationItem[] | undefined;
   action?: NavigatorAction | undefined;
   createdAt: string;
 }
 
 export const INITIAL_WELCOME_MESSAGES: Record<NavigatorMode, string> = {
   builder:
-    "안녕하세요! AI Navigator입니다. 마우스 클릭 없이 자연어로 원하시는 폼 생성, 필드 수정, 화면 이동을 명령해 보세요.",
+    "안녕하세요! Builder AI Navigator입니다. 자연어로 데이터 도메인 폼 생성, 필드 설계, 관계 연결 및 화면 이동을 명령해 보세요.",
   consumer:
-    "안녕하세요! Consumer AI Navigator입니다. 참여하고자 하는 설문이나 작성하고 싶은 신청서에 대해 말씀해 주시면, 적합한 폼을 찾아드리고 작성을 도와드립니다.",
+    "안녕하세요! Consumer AI Navigator입니다. 등록된 데이터를 조회·검색하거나 새로운 데이터를 작성(이미지 첨부 포함)해 보세요.",
   analyst:
-    "안녕하세요! Analyst AI Navigator입니다. 등록된 폼의 응답 데이터를 비교·집계하여 표, 차트, 요약 문단이 담긴 분석 뷰 문서를 만들고 발행할 수 있습니다.",
+    "안녕하세요! Analyst AI Navigator입니다. 등록된 데이터를 비교·집계하여 표, 차트, 요약 문단이 담긴 분석 뷰 문서를 만들고 발행할 수 있습니다.",
 };
 
 export interface NavigatorChatState {
@@ -31,7 +48,13 @@ export interface NavigatorChatState {
   selectedFieldId: string | null;
 
   setMode: (mode: NavigatorMode) => void;
-  addMessage: (message: Omit<NavigatorChatMessage, "id" | "createdAt">) => void;
+  addMessage: (message: Omit<NavigatorChatMessage, "id" | "createdAt">) => string;
+  updateConfirmationStatus: (
+    messageId: string,
+    confirmationId: string,
+    status: NavigatorConfirmationStatus,
+    errorMessage?: string
+  ) => void;
   setIsGenerating: (isGenerating: boolean) => void;
   setProgressMessage: (progressMessage: string | null) => void;
   /** 진행 단계 목록에 새 단계를 추가합니다 (빈 문자열 및 직전과 동일한 연속 중복은 무시). */
@@ -87,7 +110,26 @@ export const useNavigatorChatStore = create<NavigatorChatState>()((set, get) => 
     set((state) => ({
       messages: [...state.messages, newMessage],
     }));
+
+    return newMessage.id;
   },
+
+  updateConfirmationStatus: (messageId, confirmationId, status, errorMessage) =>
+    set((state) => ({
+      messages: state.messages.map((msg) => {
+        if (msg.id !== messageId || !msg.pendingConfirmations) {
+          return msg;
+        }
+        return {
+          ...msg,
+          pendingConfirmations: msg.pendingConfirmations.map((item) =>
+            item.confirmationId === confirmationId
+              ? { ...item, status, ...(errorMessage !== undefined ? { errorMessage } : {}) }
+              : item
+          ),
+        };
+      }),
+    })),
 
   setIsGenerating: (isGenerating) =>
     set((state) => ({

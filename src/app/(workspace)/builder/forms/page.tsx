@@ -14,8 +14,8 @@ export default function BuilderFormsPage() {
         <h1 className="text-foreground text-2xl font-bold tracking-tight">등록된 폼 목록</h1>
         <p className="text-muted-foreground text-sm/relaxed">
           데이터베이스에 영속화된 모든 활성 폼 목록입니다. 새로운 폼을 설계하고 싶다면 좌측 AI
-          Navigator에게 원하는 설문지나 신청서의 내용을 말씀해 보세요. 즉시 라이브 캔버스가
-          생성됩니다.
+          Navigator에게 원하는 데이터 모델과 입력 항목, 관계 구조를 말씀해 보세요. 즉시 라이브
+          캔버스가 생성됩니다.
         </p>
       </div>
 

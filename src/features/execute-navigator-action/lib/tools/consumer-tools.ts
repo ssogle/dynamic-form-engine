@@ -24,6 +24,7 @@ import {
   type ConsumerSubmitFormInput,
 } from "../../schema/navigator-tools.schema";
 import type { NavigatorConsumerAction } from "../../types/navigator-action.types";
+import { buildPendingConfirmationResult } from "./confirmation-gate";
 
 export {
   consumerApplySubmissionListQueryInputSchema,
@@ -56,6 +57,8 @@ export interface ConsumerToolsDependencies {
   currentFormId?: string | undefined;
   /** 현재 화면의 기존/임시 입력값 스냅샷 */
   initialDraftValues?: Record<string, unknown> | undefined;
+  /** 고위험 도구(deleteSubmissions) 실행 전 사용자 확인 게이트 활성화 여부 */
+  requireConfirmation?: boolean | undefined;
 }
 
 const SYSTEM_SORT_FIELDS = new Set(["id", "createdAt", "updatedAt"]);
@@ -356,6 +359,16 @@ export function createConsumerTools(deps: ConsumerToolsDependencies) {
       "특정 폼의 제출 응답 내역들을 소프트 삭제합니다. 응답 목록 화면에서 단일 또는 복수의 응답을 삭제할 때 호출합니다.",
     inputSchema: consumerDeleteSubmissionsInputSchema,
     execute: async ({ submissionIds, reason }: ConsumerDeleteSubmissionsInput) => {
+      if (deps.requireConfirmation) {
+        return buildPendingConfirmationResult({
+          toolName: "deleteSubmissions",
+          title: `제출 응답 ${submissionIds.length}건 삭제`,
+          description: reason ?? "선택한 제출 응답 내역을 삭제 처리합니다.",
+          targetIds: submissionIds,
+          payload: { submissionIds, ...(reason ? { reason } : {}) },
+        });
+      }
+
       const deleted = await deps.softDeleteSubmissionsByIds(submissionIds);
       const action: NavigatorConsumerAction = {
         type: "DELETE_SUBMISSIONS",

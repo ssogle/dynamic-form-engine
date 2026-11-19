@@ -43,11 +43,14 @@ import {
   formatConsumerContextPrompt,
 } from "../lib/prompts/consumer-prompt";
 import type {
+  ConfirmedNavigatorActionDto,
   ExecuteNavigatorPayload,
   NavigatorAction,
+  NavigatorAttachmentDto,
   NavigatorClientContext,
   NavigatorExecutionResponse,
   NavigatorMode,
+  PendingNavigatorConfirmation,
 } from "../types/navigator-action.types";
 
 /**
@@ -86,7 +89,8 @@ export interface NavigatorModeConfig {
  */
 type ModeConfigFactory = (
   queryTools: ReturnType<typeof createQueryTools>,
-  currentContext?: NavigatorClientContext
+  currentContext?: NavigatorClientContext,
+  requireConfirmation?: boolean
 ) => NavigatorModeConfig;
 
 /**
@@ -96,6 +100,21 @@ function extractClientActions(toolResults: Array<{ output: unknown }>): Navigato
   return toolResults
     .map((tr) => (tr.output as { clientAction?: NavigatorAction } | undefined)?.clientAction)
     .filter((act): act is NavigatorAction => Boolean(act));
+}
+
+/**
+ * 고위험 도구 실행 결과(toolResults)로부터 사전 승인 대기 메타데이터 목록을 추출합니다.
+ */
+function extractPendingConfirmations(
+  toolResults: Array<{ output: unknown }>
+): PendingNavigatorConfirmation[] {
+  return toolResults
+    .map(
+      (tr) =>
+        (tr.output as { pendingConfirmation?: PendingNavigatorConfirmation } | undefined)
+          ?.pendingConfirmation
+    )
+    .filter((item): item is PendingNavigatorConfirmation => Boolean(item));
 }
 
 /**
@@ -129,7 +148,7 @@ function extractUpdatedAnalysisView(toolResults: Array<{ output: unknown }>): An
  * 본 맵에 선언적으로 도구와 프롬프트 팩토리를 등록하여 손쉽게 확장할 수 있습니다.
  */
 const NAVIGATOR_MODE_REGISTRY: Record<NavigatorMode, ModeConfigFactory> = {
-  consumer: (queryTools, currentContext) => ({
+  consumer: (queryTools, currentContext, requireConfirmation = true) => ({
     instructions: CONSUMER_NAVIGATOR_SYSTEM_PROMPT,
     maxSteps: 10,
     tools: {
@@ -139,12 +158,13 @@ const NAVIGATOR_MODE_REGISTRY: Record<NavigatorMode, ModeConfigFactory> = {
         queryFormSubmissionsForAnalysis,
         currentFormId: currentContext?.currentFormId,
         initialDraftValues: currentContext?.currentDraftValues,
+        requireConfirmation,
       }),
       ...queryTools,
     },
     formatPrompt: formatConsumerContextPrompt,
   }),
-  builder: (queryTools, currentContext) => ({
+  builder: (queryTools, currentContext, requireConfirmation = true) => ({
     instructions: BUILDER_NAVIGATOR_SYSTEM_PROMPT,
     tools: {
       ...createBuilderTools({
@@ -156,6 +176,7 @@ const NAVIGATOR_MODE_REGISTRY: Record<NavigatorMode, ModeConfigFactory> = {
         softDeleteFormsByIds,
         expectedFormId: currentContext?.currentForm?.id,
         expectedFormVersion: currentContext?.currentForm?.version,
+        requireConfirmation,
       }),
       ...queryTools,
     },
@@ -164,7 +185,7 @@ const NAVIGATOR_MODE_REGISTRY: Record<NavigatorMode, ModeConfigFactory> = {
       updatedForm: extractUpdatedForm(toolResults) ?? undefined,
     }),
   }),
-  analyst: (queryTools, currentContext) => ({
+  analyst: (queryTools, currentContext, requireConfirmation = true) => ({
     instructions: ANALYST_NAVIGATOR_SYSTEM_PROMPT,
     maxSteps: 10,
     tools: {
@@ -178,6 +199,7 @@ const NAVIGATOR_MODE_REGISTRY: Record<NavigatorMode, ModeConfigFactory> = {
         queryFormSubmissionsForAnalysis,
         expectedViewId: currentContext?.currentAnalysisView?.id,
         expectedViewVersion: currentContext?.currentAnalysisView?.version,
+        requireConfirmation,
       }),
       ...queryTools,
     },
@@ -194,13 +216,103 @@ const NAVIGATOR_MODE_REGISTRY: Record<NavigatorMode, ModeConfigFactory> = {
 function resolveModeConfig(
   mode: NavigatorMode,
   queryTools: ReturnType<typeof createQueryTools>,
-  currentContext?: NavigatorClientContext
+  currentContext?: NavigatorClientContext,
+  requireConfirmation = true
 ): NavigatorModeConfig {
   const factory = NAVIGATOR_MODE_REGISTRY[mode];
   if (!factory) {
     throw new Error(`지원하지 않는 네비게이터 모드입니다: "${mode}"`);
   }
-  return factory(queryTools, currentContext);
+  return factory(queryTools, currentContext, requireConfirmation);
+}
+
+/**
+ * 첨부 이미지를 포함한 마지막 사용자 메시지 콘텐츠(단일 텍스트 또는 멀티모달 파트 배열)를 조립합니다.
+ */
+function buildFinalUserMessageContent(
+  formattedPrompt: string,
+  attachments?: NavigatorAttachmentDto[]
+) {
+  if (!attachments || attachments.length === 0) {
+    return formattedPrompt;
+  }
+
+  const parts: Array<
+    | { type: "text"; text: string }
+    | { type: "file"; data: string; mediaType: string; filename?: string }
+  > = [{ type: "text", text: formattedPrompt }];
+
+  for (const attachment of attachments) {
+    const base64Data = attachment.dataUrl.includes(",")
+      ? (attachment.dataUrl.split(",")[1] ?? attachment.dataUrl)
+      : attachment.dataUrl;
+    parts.push({
+      type: "file",
+      data: base64Data,
+      mediaType: attachment.mimeType,
+      ...(attachment.name ? { filename: attachment.name } : {}),
+    });
+  }
+
+  return parts;
+}
+
+/**
+ * 사용자가 인라인 확인 카드에서 승인한 고위험 액션을 LLM 재추론 없이 결정론적으로 직접 실행합니다.
+ */
+async function executeConfirmedActionDirectly(
+  config: NavigatorModeConfig,
+  confirmedAction: ConfirmedNavigatorActionDto
+): Promise<NavigatorExecutionResponse> {
+  const toolMap = config.tools as unknown as Record<
+    string,
+    {
+      inputSchema?: {
+        safeParse?: (v: unknown) => { success: boolean; data?: unknown; error?: unknown };
+      };
+      execute?: (input: unknown, options: unknown) => Promise<unknown>;
+    }
+  >;
+  const targetTool = toolMap[confirmedAction.toolName];
+
+  if (!targetTool || typeof targetTool.execute !== "function") {
+    const errorReply = `현재 모드에서 승인 요청된 도구('${confirmedAction.toolName}')를 실행할 수 없습니다.`;
+    return { reply: errorReply, action: null, message: errorReply };
+  }
+
+  let validatedInput: unknown = confirmedAction.payload;
+  if (targetTool.inputSchema && typeof targetTool.inputSchema.safeParse === "function") {
+    const parsed = targetTool.inputSchema.safeParse(confirmedAction.payload);
+    if (!parsed.success) {
+      const errorReply = "승인된 작업 파라미터 형식이 올바르지 않아 실행할 수 없습니다.";
+      return { reply: errorReply, action: null, message: errorReply };
+    }
+    validatedInput = parsed.data;
+  }
+
+  const rawOutput = (await targetTool.execute(validatedInput, {
+    toolCallId: confirmedAction.confirmationId,
+    messages: [],
+  })) as { success?: boolean; error?: string; message?: string } | undefined;
+
+  if (rawOutput && rawOutput.success === false) {
+    const errorReply = rawOutput.error ?? "승인된 작업을 실행하는 중 오류가 발생했습니다.";
+    return { reply: errorReply, action: null, message: errorReply };
+  }
+
+  const toolResults = [{ output: rawOutput }];
+  const clientActions = extractClientActions(toolResults);
+  const singleAction: NavigatorAction | null = clientActions[0] ?? null;
+  const extras = config.extractExtras ? config.extractExtras(toolResults) : {};
+  const reply = singleAction?.message ?? rawOutput?.message ?? "승인하신 작업을 완료했습니다.";
+
+  return {
+    reply,
+    action: singleAction,
+    actions: clientActions.length > 0 ? clientActions : undefined,
+    message: reply,
+    ...extras,
+  };
 }
 
 export interface RunNavigatorEngineOptions {
@@ -304,9 +416,7 @@ export async function runNavigatorEngine(
   options?: RunNavigatorEngineOptions
 ): Promise<NavigatorExecutionResponse> {
   const mode = payload.mode ?? "builder";
-  const { prompt, messages, currentContext } = payload;
-
-  const model = getAiModel();
+  const { prompt, messages, attachments, confirmedAction, currentContext } = payload;
 
   // 1. 공통 온디맨드 폼·관계 조회 도구 인스턴스화
   const queryTools = createQueryTools({
@@ -316,11 +426,21 @@ export async function runNavigatorEngine(
     findInboundRelatedSubmissions,
   });
 
-  // 2. 모드 레지스트리로부터 전용 전략 설정 획득 (신규 모드 추가 시 본체 불변)
-  const config = resolveModeConfig(mode, queryTools, currentContext);
+  // 2. 사용자가 인라인 확인 카드에서 승인한 고위험 액션 직접 실행 경로 (LLM 재호출 없음)
+  if (confirmedAction) {
+    options?.onProgress?.("승인하신 작업을 안전하게 실행하고 있습니다...");
+    const directConfig = resolveModeConfig(mode, queryTools, currentContext, false);
+    return executeConfirmedActionDirectly(directConfig, confirmedAction);
+  }
 
-  // 3. 화면 맥락 기반의 린(Lean) 프롬프트 및 대화 메시지 목록 구성
+  const model = getAiModel();
+
+  // 3. 모드 레지스트리로부터 전용 전략 설정 획득 (사전 승인 게이트 활성화)
+  const config = resolveModeConfig(mode, queryTools, currentContext, true);
+
+  // 4. 화면 맥락 기반의 린(Lean) 프롬프트 및 대화 메시지(첨부 이미지 포함) 구성
   const formattedPrompt = config.formatPrompt(prompt, currentContext);
+  const finalUserContent = buildFinalUserMessageContent(formattedPrompt, attachments);
   const conversationMessages = [
     ...(messages ?? []).map((m) => ({
       role: m.role as "user" | "assistant" | "system",
@@ -328,7 +448,7 @@ export async function runNavigatorEngine(
     })),
     {
       role: "user" as const,
-      content: formattedPrompt,
+      content: finalUserContent,
     },
   ];
 
@@ -387,15 +507,18 @@ export async function runNavigatorEngine(
 
   const toolResults = (result.toolResults ?? []) as Array<{ output: unknown }>;
 
-  // 5. 공통 액션 추출 및 모드별 특화 부가 데이터 수집
+  // 5. 공통 액션 추출, 사전 승인 요청 목록 및 모드별 특화 부가 데이터 수집
   const clientActions = extractClientActions(toolResults);
+  const pendingConfirmations = extractPendingConfirmations(toolResults);
   const singleAction: NavigatorAction | null = clientActions[0] ?? null;
   const extras = config.extractExtras ? config.extractExtras(toolResults) : {};
   const resolvedFinishReason = result.finishReason ?? lastStepFinishReason;
   const fallbackReply =
-    resolvedFinishReason && resolvedFinishReason !== "stop" && clientActions.length === 0
-      ? "처리 단계가 많아 작업을 끝까지 완료하지 못했습니다. 조건을 좁히거나 나누어 다시 요청해 주세요."
-      : "요청을 처리했습니다.";
+    pendingConfirmations.length > 0
+      ? "작업 실행 전 확인이 필요합니다. 아래 승인 카드에서 [승인] 또는 [취소]를 선택해 주세요."
+      : resolvedFinishReason && resolvedFinishReason !== "stop" && clientActions.length === 0
+        ? "처리 단계가 많아 작업을 끝까지 완료하지 못했습니다. 조건을 좁히거나 나누어 다시 요청해 주세요."
+        : "요청을 처리했습니다.";
   const reply = result.text || singleAction?.message || fallbackReply;
 
   // 6. 통합 단일 반환
@@ -403,6 +526,7 @@ export async function runNavigatorEngine(
     reply,
     action: singleAction,
     actions: clientActions.length > 0 ? clientActions : undefined,
+    pendingConfirmations: pendingConfirmations.length > 0 ? pendingConfirmations : undefined,
     message: reply,
     ...extras,
   };

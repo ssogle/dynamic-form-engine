@@ -3,9 +3,11 @@
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   useNavigatorMutation,
   type NavigatorAction,
+  type NavigatorAttachmentDto,
   type NavigatorClientContext,
   type NavigatorMode,
   type NavigatorProgressMeta,
@@ -29,7 +31,12 @@ import {
   type FormSubmission,
 } from "@/entities/form-submission";
 import { toUtcIso } from "@/shared/lib/date";
-import { useNavigatorChatStore, type NavigatorChatMessage } from "../store/navigator-chat.store";
+import {
+  useNavigatorChatStore,
+  type NavigatorChatConfirmationItem,
+  type NavigatorChatMessage,
+} from "../store/navigator-chat.store";
+import { MAX_IMAGE_ATTACHMENTS, resizeImageFileToAttachment } from "../lib/image-attachment";
 import { NAVIGATOR_SHELL_CONFIGS, type NavigatorShellConfig } from "../lib/navigator-shell-config";
 
 export interface UseNavigatorShellParams {
@@ -77,13 +84,44 @@ export interface UseNavigatorShellReturn {
    */
   setInputValue: React.Dispatch<React.SetStateAction<string>>;
   /**
+   * 전송 대기 중인 멀티모달 이미지 첨부 목록
+   */
+  attachments: NavigatorAttachmentDto[];
+  /**
+   * 이미지 파일 선택/붙여넣기 첨부 핸들러
+   */
+  handleAddAttachmentFiles: (files: FileList | File[]) => Promise<void>;
+  /**
+   * 대기 중인 첨부 이미지 제거 핸들러
+   */
+  handleRemoveAttachment: (index: number) => void;
+  /**
+   * 입력창 클립보드 이미지 붙여넣기 핸들러
+   */
+  handlePaste: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
+  /**
+   * 고위험 액션 인라인 승인 핸들러
+   */
+  handleApproveConfirmation: (
+    messageId: string,
+    confirmation: NavigatorChatConfirmationItem
+  ) => Promise<void>;
+  /**
+   * 고위험 액션 인라인 취소 핸들러
+   */
+  handleRejectConfirmation: (messageId: string, confirmationId: string) => void;
+  /**
    * 최하단 자동 스크롤 앵커 ref
    */
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
   /**
    * 입력창 포커스 제어 ref
    */
-  inputRef: React.RefObject<HTMLInputElement | null>;
+  inputRef: React.RefObject<HTMLTextAreaElement | null>;
+  /**
+   * 숨김 이미지 파일 입력 ref
+   */
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
   /**
    * 프롬프트 텍스트 직접 실행 핸들러
    */
@@ -115,6 +153,7 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
   const progressMessage = useNavigatorChatStore((state) => state.progressMessage);
   const progressSteps = useNavigatorChatStore((state) => state.progressSteps);
   const addMessage = useNavigatorChatStore((state) => state.addMessage);
+  const updateConfirmationStatus = useNavigatorChatStore((state) => state.updateConfirmationStatus);
   const setIsGenerating = useNavigatorChatStore((state) => state.setIsGenerating);
   const setProgressMessage = useNavigatorChatStore((state) => state.setProgressMessage);
   const appendProgressStep = useNavigatorChatStore((state) => state.appendProgressStep);
@@ -133,6 +172,7 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
 
   // 3. UI 로컬 상태
   const [inputValue, setInputValue] = React.useState("");
+  const [attachments, setAttachments] = React.useState<NavigatorAttachmentDto[]>([]);
   const [expandedStepMessageIds, setExpandedStepMessageIds] = React.useState<
     Record<string, boolean>
   >({});
@@ -145,7 +185,8 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
   }, []);
 
   const messagesEndRef = React.useRef<HTMLDivElement | null>(null);
-  const inputRef = React.useRef<HTMLInputElement | null>(null);
+  const inputRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   /**
    * 스트림 진행 이벤트 핸들러
@@ -200,15 +241,28 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
           if (action.formId) {
             router.push(`/builder/forms/${action.formId}`);
           }
+          toast.success(action.message ?? "새로운 폼을 생성했습니다.");
+          break;
+
+        case "UPDATE_SCHEMA":
+          if (action.formId) {
+            queryClient.invalidateQueries({ queryKey: formKeys.detail(action.formId) });
+          }
+          toast.success(action.message ?? "폼 구조를 업데이트했습니다.");
           break;
 
         case "DELETE_FORMS":
           queryClient.invalidateQueries({ queryKey: formKeys.all });
           router.push("/builder/forms");
+          toast.success(action.message ?? "선택한 폼을 삭제했습니다.");
           break;
 
         case "PUBLISH_FORM":
           queryClient.invalidateQueries({ queryKey: formKeys.all });
+          toast.success(
+            action.message ??
+              (action.isPublished ? "폼을 공식 발행했습니다." : "폼 발행을 취소했습니다.")
+          );
           break;
 
         case "FILL_FIELDS": {
@@ -216,6 +270,7 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
           const targetFormId = action.formId || formIdMatch?.[1] || currentDraftFormId || "";
           if (targetFormId && action.fields) {
             applyDraftFields(targetFormId, action.fields);
+            toast.success(action.message ?? "입력 필드에 값을 채웠습니다.");
           }
           break;
         }
@@ -231,6 +286,7 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
 
         case "DELETE_SUBMISSIONS":
           queryClient.invalidateQueries({ queryKey: formSubmissionsKeys.all });
+          toast.success(action.message ?? "선택한 제출 응답을 삭제했습니다.");
           break;
 
         case "CREATE_ANALYSIS_VIEW":
@@ -238,16 +294,26 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
           if (action.viewId) {
             router.push(`/analyst/views/${action.viewId}`);
           }
+          toast.success(action.message ?? "새로운 분석 뷰를 생성했습니다.");
           break;
 
         case "UPDATE_ANALYSIS_VIEW":
+          queryClient.invalidateQueries({ queryKey: analysisViewKeys.all });
+          toast.success(action.message ?? "분석 뷰를 업데이트했습니다.");
+          break;
+
         case "PUBLISH_ANALYSIS_VIEW":
           queryClient.invalidateQueries({ queryKey: analysisViewKeys.all });
+          toast.success(
+            action.message ??
+              (action.isPublished ? "분석 뷰를 공식 발행했습니다." : "분석 뷰 발행을 취소했습니다.")
+          );
           break;
 
         case "DELETE_ANALYSIS_VIEWS":
           queryClient.invalidateQueries({ queryKey: analysisViewKeys.all });
           router.push("/analyst/views");
+          toast.success(action.message ?? "선택한 분석 뷰를 삭제했습니다.");
           break;
 
         default:
@@ -428,18 +494,81 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
   }, [mode, pathname, queryClient, currentDraftFormId, currentDraftValues]);
 
   /**
+   * 이미지 파일 선택/드롭/붙여넣기 첨부 처리 핸들러
+   */
+  const handleAddAttachmentFiles = React.useCallback(
+    async (files: FileList | File[]) => {
+      const fileArray = Array.from(files);
+      if (fileArray.length === 0) return;
+
+      const remainingSlots = MAX_IMAGE_ATTACHMENTS - attachments.length;
+      if (remainingSlots <= 0) {
+        toast.error(`이미지는 최대 ${MAX_IMAGE_ATTACHMENTS}장까지 첨부할 수 있습니다.`);
+        return;
+      }
+
+      const targets = fileArray.slice(0, remainingSlots);
+      if (fileArray.length > remainingSlots) {
+        toast.warning(`한 번에 최대 ${MAX_IMAGE_ATTACHMENTS}장까지 첨부되어 초과분은 제외됩니다.`);
+      }
+
+      const converted: NavigatorAttachmentDto[] = [];
+      for (const file of targets) {
+        try {
+          const dto = await resizeImageFileToAttachment(file);
+          converted.push(dto);
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "이미지를 첨부할 수 없습니다.");
+        }
+      }
+
+      if (converted.length > 0) {
+        setAttachments((prev) => [...prev, ...converted].slice(0, MAX_IMAGE_ATTACHMENTS));
+      }
+    },
+    [attachments.length]
+  );
+
+  const handleRemoveAttachment = React.useCallback((index: number) => {
+    setAttachments((prev) => prev.filter((_, idx) => idx !== index));
+  }, []);
+
+  const handlePaste = React.useCallback(
+    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      const imageFiles: File[] = [];
+      for (const item of Array.from(e.clipboardData?.items ?? [])) {
+        if (item.kind === "file" && item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) imageFiles.push(file);
+        }
+      }
+      if (imageFiles.length > 0) {
+        e.preventDefault();
+        void handleAddAttachmentFiles(imageFiles);
+      }
+    },
+    [handleAddAttachmentFiles]
+  );
+
+  /**
    * 사용자 명령 실행 핸들러
    */
   const handleExecutePrompt = React.useCallback(
     async (promptText: string) => {
       const trimmed = promptText.trim();
-      if (!trimmed || isBusy) return;
+      const pendingAttachments = [...attachments];
+      if ((!trimmed && pendingAttachments.length === 0) || isBusy) return;
+
+      const resolvedPrompt =
+        trimmed || "첨부한 이미지를 분석하여 현재 폼 또는 대상 폼에 적절히 입력해 주세요.";
 
       addMessage({
         role: "user",
-        content: trimmed,
+        content: resolvedPrompt,
+        ...(pendingAttachments.length > 0 ? { attachments: pendingAttachments } : {}),
       });
       setInputValue("");
+      setAttachments([]);
       setProgressMessage("요청을 준비하고 있습니다...");
       setIsGenerating(true);
 
@@ -454,8 +583,9 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
 
         const response = await executeAction({
           mode,
-          prompt: trimmed,
+          prompt: resolvedPrompt,
           messages: historyMessages,
+          ...(pendingAttachments.length > 0 ? { attachments: pendingAttachments } : {}),
           currentContext,
         });
 
@@ -463,10 +593,19 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
         const recordedSteps = useNavigatorChatStore.getState().progressSteps;
         const replyText =
           response.reply || response.message || response.action?.message || "요청을 처리했습니다.";
+        const confirmationItems: NavigatorChatConfirmationItem[] | undefined =
+          response.pendingConfirmations && response.pendingConfirmations.length > 0
+            ? response.pendingConfirmations.map((c) => ({
+                ...c,
+                status: "pending",
+              }))
+            : undefined;
+
         addMessage({
           role: "assistant",
           content: replyText,
           steps: recordedSteps.length > 0 ? [...recordedSteps] : undefined,
+          ...(confirmationItems ? { pendingConfirmations: confirmationItems } : {}),
           action: response.action ?? undefined,
         });
 
@@ -498,18 +637,21 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
       } catch (err) {
         console.error("AI Navigator 통신 오류:", err);
         const recordedSteps = useNavigatorChatStore.getState().progressSteps;
+        const errMsg =
+          "죄송합니다. 요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
         addMessage({
           role: "assistant",
-          content:
-            "죄송합니다. 요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+          content: errMsg,
           steps: recordedSteps.length > 0 ? [...recordedSteps] : undefined,
         });
+        toast.error("AI 요청 처리 중 오류가 발생했습니다.");
       } finally {
         setIsGenerating(false);
         setProgressMessage(null);
       }
     },
     [
+      attachments,
       isBusy,
       addMessage,
       setIsGenerating,
@@ -521,6 +663,90 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
       queryClient,
       dispatchAction,
     ]
+  );
+
+  /**
+   * 고위험 액션 인라인 확인 카드 [승인] 처리 핸들러
+   */
+  const handleApproveConfirmation = React.useCallback(
+    async (messageId: string, confirmation: NavigatorChatConfirmationItem) => {
+      if (isBusy || confirmation.status !== "pending") return;
+
+      updateConfirmationStatus(messageId, confirmation.confirmationId, "executing");
+      setProgressMessage("승인하신 작업을 실행하고 있습니다...");
+      setIsGenerating(true);
+
+      try {
+        const currentContext = resolveCurrentContext();
+        const response = await executeAction({
+          mode,
+          prompt: `[승인] ${confirmation.title}`,
+          confirmedAction: {
+            confirmationId: confirmation.confirmationId,
+            toolName: confirmation.toolName,
+            payload: confirmation.payload,
+          },
+          currentContext,
+        });
+
+        const actionsToExecute: NavigatorAction[] =
+          response.actions && response.actions.length > 0
+            ? response.actions
+            : response.action
+              ? [response.action]
+              : [];
+
+        if (actionsToExecute.length === 0) {
+          const errorText = response.reply || "승인된 작업을 실행하지 못했습니다.";
+          updateConfirmationStatus(messageId, confirmation.confirmationId, "error", errorText);
+          toast.error(errorText);
+          return;
+        }
+
+        updateConfirmationStatus(messageId, confirmation.confirmationId, "approved");
+
+        if (response.updatedAnalysisView) {
+          queryClient.setQueryData?.(
+            analysisViewKeys.detail(response.updatedAnalysisView.id, false),
+            response.updatedAnalysisView
+          );
+        }
+
+        for (const act of actionsToExecute) {
+          dispatchAction(act);
+        }
+      } catch (err) {
+        const errorText =
+          err instanceof Error ? err.message : "승인된 작업 실행 중 오류가 발생했습니다.";
+        updateConfirmationStatus(messageId, confirmation.confirmationId, "error", errorText);
+        toast.error(errorText);
+      } finally {
+        setIsGenerating(false);
+        setProgressMessage(null);
+      }
+    },
+    [
+      isBusy,
+      updateConfirmationStatus,
+      setProgressMessage,
+      setIsGenerating,
+      resolveCurrentContext,
+      executeAction,
+      mode,
+      queryClient,
+      dispatchAction,
+    ]
+  );
+
+  /**
+   * 고위험 액션 인라인 확인 카드 [취소] 처리 핸들러
+   */
+  const handleRejectConfirmation = React.useCallback(
+    (messageId: string, confirmationId: string) => {
+      updateConfirmationStatus(messageId, confirmationId, "rejected");
+      toast.info("요청하신 작업 실행을 취소했습니다.");
+    },
+    [updateConfirmationStatus]
   );
 
   const handleSubmit = React.useCallback(
@@ -559,8 +785,15 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
     toggleStepsExpanded,
     inputValue,
     setInputValue,
+    attachments,
+    handleAddAttachmentFiles,
+    handleRemoveAttachment,
+    handlePaste,
+    handleApproveConfirmation,
+    handleRejectConfirmation,
     messagesEndRef,
     inputRef,
+    fileInputRef,
     handleExecutePrompt,
     handleSubmit,
   };

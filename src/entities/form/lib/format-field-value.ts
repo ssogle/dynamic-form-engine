@@ -58,6 +58,20 @@ export function formatFieldDisplayValue(
     return JSON.stringify(rawValue);
   }
 
+  if (field?.type === "number") {
+    if (typeof rawValue === "number") {
+      if (Number.isFinite(rawValue)) {
+        return rawValue.toLocaleString("ko-KR", { maximumFractionDigits: 10 });
+      }
+    } else {
+      const normalized = String(rawValue).replace(/,/g, "").trim();
+      const parsed = normalized !== "" ? Number(normalized) : Number.NaN;
+      if (Number.isFinite(parsed)) {
+        return parsed.toLocaleString("ko-KR", { maximumFractionDigits: 10 });
+      }
+    }
+  }
+
   const strVal = String(rawValue);
   if (optionLabelMap) {
     return optionLabelMap.get(strVal) ?? strVal;

@@ -240,7 +240,7 @@ describe("createQueryTools (features/execute-navigator-action/lib/tools)", () =>
     expect(result.groups[0]?.items[0]?.primaryValue).toBe("팀 회식");
     expect(result.groups[0]?.items[0]?.values).toEqual({
       "지출 항목": "팀 회식",
-      금액: "120000",
+      금액: "120,000",
     });
   });
 });

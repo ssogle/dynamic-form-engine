@@ -438,4 +438,119 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
     expect(result.reply).toContain("완료하지 못했습니다");
     expect(result.reply).not.toBe("요청을 처리했습니다.");
   });
+
+  it("attachments 이미지 첨부가 전달되면 마지막 user 메시지에 멀티모달 file 파트를 포함해 generateText에 전달해야 한다", async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: "영수증 이미지를 분석했습니다.",
+      toolResults: [],
+    });
+
+    await runNavigatorEngine({
+      mode: "consumer",
+      prompt: "영수증 채워줘",
+      attachments: [
+        {
+          name: "receipt.png",
+          mimeType: "image/png",
+          dataUrl: "data:image/png;base64,iVBORw0KGgo=",
+        },
+      ],
+    });
+
+    const callArgs = mockGenerateText.mock.calls[0]?.[0];
+    const lastMessage = callArgs?.messages?.[callArgs.messages.length - 1];
+    expect(Array.isArray(lastMessage?.content)).toBe(true);
+    expect(lastMessage?.content?.[0]).toMatchObject({ type: "text" });
+    expect(lastMessage?.content?.[1]).toEqual({
+      type: "file",
+      data: "iVBORw0KGgo=",
+      mediaType: "image/png",
+      filename: "receipt.png",
+    });
+  });
+
+  it("고위험 도구 실행 시 pendingConfirmations를 추출하고, confirmedAction 승인 요청 시 generateText 없이 도구를 직접 실행해야 한다", async () => {
+    const validFormUuid = "11111111-1111-4111-a111-111111111111";
+    const { findFormById, publishFormById } = await import("@/entities/form/server");
+    vi.mocked(findFormById).mockResolvedValueOnce({
+      id: validFormUuid,
+      title: "테스트 폼",
+      description: null,
+      schemaDefinition: {
+        primaryFieldId: "f1",
+        fields: [
+          {
+            id: "f1",
+            label: "제목",
+            type: "text",
+            required: true,
+            description: "제목",
+          },
+        ],
+      },
+      publishedAt: null,
+      version: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+    });
+    vi.mocked(publishFormById).mockResolvedValueOnce({
+      id: validFormUuid,
+      title: "테스트 폼",
+      description: null,
+      schemaDefinition: { primaryFieldId: "f1", fields: [] },
+      publishedAt: new Date(),
+      version: 2,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+    });
+
+    mockGenerateText.mockResolvedValueOnce({
+      text: "",
+      toolResults: [
+        {
+          output: {
+            requiresConfirmation: true,
+            status: "PENDING_CONFIRMATION",
+            pendingConfirmation: {
+              confirmationId: "conf-123",
+              toolName: "publishForm",
+              title: "폼 발행 승인",
+              description: "공개 발행합니다.",
+              targetIds: [validFormUuid],
+              payload: { formId: validFormUuid, isPublished: true },
+            },
+          },
+        },
+      ],
+    });
+
+    const pendingResult = await runNavigatorEngine({
+      mode: "builder",
+      prompt: "이 폼 발행해줘",
+    });
+    expect(pendingResult.pendingConfirmations).toHaveLength(1);
+    expect(pendingResult.pendingConfirmations?.[0]?.confirmationId).toBe("conf-123");
+
+    mockGenerateText.mockClear();
+    const confirmedResult = await runNavigatorEngine({
+      mode: "builder",
+      prompt: "[승인] 폼 발행",
+      confirmedAction: {
+        confirmationId: "conf-123",
+        toolName: "publishForm",
+        payload: { formId: validFormUuid, isPublished: true },
+      },
+    });
+
+    expect(mockGenerateText).not.toHaveBeenCalled();
+    expect(publishFormById).toHaveBeenCalledWith(validFormUuid, true);
+    expect(confirmedResult.action).toMatchObject({
+      type: "PUBLISH_FORM",
+      formId: validFormUuid,
+      isPublished: true,
+    });
+    expect(confirmedResult.updatedForm?.id).toBe(validFormUuid);
+  });
 });

@@ -419,7 +419,14 @@ export function SubmissionDetailView({
                 if (!activeGroup) {
                   return null;
                 }
-                return <RelatedSubmissionSubtable mode={mode} group={activeGroup} />;
+                return (
+                  <RelatedSubmissionSubtable
+                    mode={mode}
+                    group={activeGroup}
+                    targetFormId={formId}
+                    targetSubmissionId={submissionId}
+                  />
+                );
               })()
             )}
           </CardContent>

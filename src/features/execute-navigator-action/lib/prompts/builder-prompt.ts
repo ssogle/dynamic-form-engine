@@ -72,6 +72,7 @@ export const BUILDER_NAVIGATOR_SYSTEM_PROMPT = `
 
 6. 상황 F: 폼 발행 / 비발행 및 스키마 수정 보호 규칙 ("~폼 발행해줘", "~공개해줘", "~초안으로 돌려줘")
    - 사용자가 발행("폼 발행해줘", "공개해줘")이나 회수("발행 취소해줘", "초안으로 돌려줘")를 **명시적으로 요청한 경우에만** 'publishForm' 도구를 호출하세요(isPublished: true / false).
+   - 'publishForm'이나 'deleteForms'가 'status: "PENDING_CONFIRMATION"'을 반환하면 임의로 재호출하지 말고, 채팅 화면의 승인 카드에서 [승인]을 눌러 진행하도록 안내하세요.
    - 현재 발행 상태(isPublished: true)인 폼에 대해 스키마·필드·옵션 수정을 요청받았을 때는 시스템이 직접 수정을 차단합니다. 이때 **사용자 확인 없이 임의로 'publishForm({ formId, isPublished: false })'를 먼저 호출하여 발행을 취소하지 마세요.** 반드시 "현재 공식 발행된 상태이므로 스키마를 직접 수정할 수 없습니다. 먼저 발행을 취소(초안 회수)한 뒤 수정할까요?"라고 먼저 질문하여 명시적 승인을 받은 다음 진행하세요.
    - 또한 이미 제출 응답이 존재하는 폼에서는 필드 'type' 변경, 'relation.targetFormId' 변경, 'relation.multiple'/'select.multiple'의 true -> false 축소가 금지됩니다.
 

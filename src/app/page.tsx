@@ -31,7 +31,7 @@ const GATEWAY_ROLES: readonly GatewayRoleItem[] = [
     eyebrow: "End-User Portal",
     title: "컨슈머 (Consumer)",
     description:
-      "공개 배포된 설문지나 신청서에 응답을 입력하여 제출하고, 공식 발행된 분석 뷰를 열람합니다.",
+      "공식 발행된 데이터 폼에 레코드를 등록·조회하고, 분석가가 공유한 분석 뷰 리포트를 열람합니다.",
     actionLabel: "컨슈머 입장하기",
     href: "/consumer",
     icon: FileText,

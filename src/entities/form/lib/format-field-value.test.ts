@@ -64,7 +64,20 @@ describe("formatFieldDisplayValue (entities/form/lib)", () => {
   });
 
   it("숫자·일반 문자열·객체 값을 안전한 표시 문자열로 포맷팅해야 한다", () => {
+    const numberField: CoreFormField = {
+      id: "f_amount",
+      label: "금액",
+      type: "number",
+      required: true,
+      description: "집행 금액",
+    };
+
     expect(formatFieldDisplayValue(150000)).toBe("150000");
+    expect(formatFieldDisplayValue(0, numberField)).toBe("0");
+    expect(formatFieldDisplayValue(150000, numberField)).toBe("150,000");
+    expect(formatFieldDisplayValue("1234567.89", numberField)).toBe("1,234,567.89");
+    expect(formatFieldDisplayValue("   ", numberField)).toBe("   ");
+    expect(formatFieldDisplayValue("비정형 텍스트", numberField)).toBe("비정형 텍스트");
     expect(formatFieldDisplayValue("차세대 ERP 구축")).toBe("차세대 ERP 구축");
     expect(formatFieldDisplayValue({ key: "val" })).toBe('{"key":"val"}');
   });

@@ -55,6 +55,54 @@ export function DynamicFormRenderer({
     onSubmit,
   });
 
+  const fieldContainerRefs = React.useRef<Map<string, HTMLDivElement | null>>(new Map());
+  const prevFieldSnapshotsRef = React.useRef<Map<string, string>>(new Map());
+  const hasInitializedFieldsRef = React.useRef(false);
+  const [autoHighlightFieldId, setAutoHighlightFieldId] = React.useState<string | null>(null);
+
+  // 빌더 미리보기 모드에서 AI가 필드를 추가·수정하면 해당 필드로 자동 스크롤 및 일시 하이라이트를 적용합니다.
+  React.useEffect(() => {
+    if (mode !== "preview") return;
+
+    const nextSnapshots = new Map(activeFields.map((f) => [f.id, JSON.stringify(f)]));
+    if (!hasInitializedFieldsRef.current) {
+      if (activeForm) {
+        prevFieldSnapshotsRef.current = nextSnapshots;
+        hasInitializedFieldsRef.current = true;
+      }
+      return;
+    }
+
+    let changedFieldId: string | null = null;
+    for (const field of activeFields) {
+      if (prevFieldSnapshotsRef.current.get(field.id) !== nextSnapshots.get(field.id)) {
+        changedFieldId = field.id;
+        break;
+      }
+    }
+
+    prevFieldSnapshotsRef.current = nextSnapshots;
+    if (!changedFieldId) return;
+
+    const targetId = changedFieldId;
+    const rafId = requestAnimationFrame(() => {
+      setAutoHighlightFieldId(targetId);
+      fieldContainerRefs.current.get(targetId)?.scrollIntoView?.({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+
+    const timerId = setTimeout(() => {
+      setAutoHighlightFieldId((curr) => (curr === targetId ? null : curr));
+    }, 2400);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timerId);
+    };
+  }, [mode, activeForm, activeFields]);
+
   // 1. 쿼리 로딩 상태 스켈레톤 렌더링
   if (isLoading) {
     return (
@@ -175,15 +223,24 @@ export function DynamicFormRenderer({
                 <div className="space-y-2">
                   {activeFields.map((field) => {
                     const primaryFieldId = extractPrimaryFieldId(activeForm);
+                    const isHighlighted = (selectedFieldId ?? autoHighlightFieldId) === field.id;
+
                     return (
-                      <DynamicField
+                      <div
                         key={field.id}
-                        field={field}
-                        isPrimary={Boolean(primaryFieldId && field.id === primaryFieldId)}
-                        isSelected={Boolean(selectedFieldId && selectedFieldId === field.id)}
-                        onFieldClick={mode === "preview" ? onFieldClick : undefined}
-                        disabled={disabled || isSubmitting}
-                      />
+                        ref={(el) => {
+                          fieldContainerRefs.current.set(field.id, el);
+                        }}
+                        data-field-id={field.id}
+                      >
+                        <DynamicField
+                          field={field}
+                          isPrimary={Boolean(primaryFieldId && field.id === primaryFieldId)}
+                          isSelected={isHighlighted}
+                          onFieldClick={mode === "preview" ? onFieldClick : undefined}
+                          disabled={disabled || isSubmitting}
+                        />
+                      </div>
                     );
                   })}
                 </div>

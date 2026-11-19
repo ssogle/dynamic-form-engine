@@ -34,6 +34,7 @@ import {
 } from "../../schema/navigator-tools.schema";
 import type { OptimisticUpdateResult } from "@/shared/lib/http";
 import type { NavigatorAnalystAction } from "../../types/navigator-action.types";
+import { buildPendingConfirmationResult } from "./confirmation-gate";
 
 export {
   createAnalysisViewInputSchema,
@@ -64,6 +65,8 @@ export interface AnalystToolsDependencies {
   queryFormSubmissionsForAnalysis: (
     input: QuerySubmissionsForAnalysisInput
   ) => Promise<AnalyticsResult<AnalysisRecordsResult>>;
+  /** 고위험 도구(publishAnalysisView, deleteAnalysisViews) 실행 전 사용자 확인 게이트 활성화 여부 */
+  requireConfirmation?: boolean | undefined;
 }
 
 /**
@@ -455,6 +458,20 @@ export function createAnalystTools(deps: AnalystToolsDependencies) {
           };
         }
 
+        if (deps.requireConfirmation) {
+          return buildPendingConfirmationResult({
+            toolName: "publishAnalysisView",
+            title: isPublished
+              ? `'${existing.title}' 분석 뷰 발행`
+              : `'${existing.title}' 분석 뷰 발행 취소`,
+            description: isPublished
+              ? "공식 발행 시 컨슈머 포털에 분석 뷰가 공유됩니다."
+              : "초안으로 회수하면 컨슈머 포털 노출이 중단됩니다.",
+            targetIds: [existing.id],
+            payload: { viewId: existing.id, isPublished },
+          });
+        }
+
         const updated = await deps.publishAnalysisViewById(viewId, isPublished);
         if (!updated) {
           return {
@@ -484,6 +501,16 @@ export function createAnalystTools(deps: AnalystToolsDependencies) {
     description: "지정된 하나 이상의 분석 뷰 문서를 소프트 삭제(Soft Delete) 처리합니다.",
     inputSchema: deleteAnalysisViewsInputSchema,
     execute: async ({ viewIds }: DeleteAnalysisViewsInput) => {
+      if (deps.requireConfirmation) {
+        return buildPendingConfirmationResult({
+          toolName: "deleteAnalysisViews",
+          title: `분석 뷰 ${viewIds.length}건 삭제`,
+          description: "선택한 분석 뷰 문서를 삭제 처리합니다.",
+          targetIds: viewIds,
+          payload: { viewIds },
+        });
+      }
+
       const deleted = await deps.softDeleteAnalysisViewsByIds(viewIds);
       if (deleted.length === 0) {
         return {

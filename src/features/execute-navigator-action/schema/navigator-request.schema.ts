@@ -102,12 +102,57 @@ export const navigatorClientContextSchema = z.object({
 export type NavigatorClientContext = z.infer<typeof navigatorClientContextSchema>;
 
 /**
+ * 고위험 액션 사전 실행 확인(HITL) 대상 도구 목록 (단일 진실 원천 - SSOT)
+ */
+export const HIGH_RISK_CONFIRMATION_TOOLS = [
+  "publishForm",
+  "deleteForms",
+  "deleteSubmissions",
+  "publishAnalysisView",
+  "deleteAnalysisViews",
+] as const;
+
+/**
+ * 고위험 액션 사전 확인 대상 도구명 스키마
+ */
+export const highRiskConfirmationToolSchema = z.enum(HIGH_RISK_CONFIRMATION_TOOLS);
+export type HighRiskConfirmationToolName = z.infer<typeof highRiskConfirmationToolSchema>;
+
+/**
+ * 멀티모달 이미지 첨부 파일 검증 스키마 (Gemini Vision 입력용)
+ */
+export const navigatorAttachmentSchema = z.object({
+  name: z.string().max(120).optional(),
+  mimeType: z.enum(["image/png", "image/jpeg", "image/webp"]),
+  dataUrl: z
+    .string()
+    .max(4_000_000, "이미지 첨부 크기가 허용 한도(약 3MB)를 초과했습니다.")
+    .refine((val) => val.startsWith("data:image/"), "유효한 이미지 Data URL 형식이 아닙니다."),
+});
+export type NavigatorAttachmentDto = z.infer<typeof navigatorAttachmentSchema>;
+
+/**
+ * 사용자가 인라인 확인 카드에서 승인한 고위험 액션 직접 실행 페이로드 스키마
+ */
+export const confirmedNavigatorActionSchema = z.object({
+  confirmationId: z.string().min(1, "승인 식별자(confirmationId)는 필수입니다."),
+  toolName: highRiskConfirmationToolSchema,
+  payload: z.record(z.string(), z.unknown()),
+});
+export type ConfirmedNavigatorActionDto = z.infer<typeof confirmedNavigatorActionSchema>;
+
+/**
  * 네비게이터 HTTP 요청 페이로드 검증 스키마
  */
 export const navigatorRequestSchema = z.object({
   mode: navigatorModeSchema.default("builder"),
   prompt: z.string().min(1, "사용자 명령 프롬프트는 필수입니다."),
   messages: z.array(navigatorChatMessageSchema).optional(),
+  attachments: z
+    .array(navigatorAttachmentSchema)
+    .max(3, "이미지는 한 번에 최대 3장까지 첨부할 수 있습니다.")
+    .optional(),
+  confirmedAction: confirmedNavigatorActionSchema.optional(),
   currentContext: navigatorClientContextSchema.optional(),
 });
 

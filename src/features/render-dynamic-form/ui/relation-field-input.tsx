@@ -17,6 +17,7 @@ import {
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Checkbox } from "@/shared/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group";
 import {
   Dialog,
   DialogContent,
@@ -240,11 +241,25 @@ function RelationPickerDialogBody({
                     )}
                   >
                     <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => handleRowSelect(row)}
-                        aria-label="레코드 선택"
-                      />
+                      {multiple ? (
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => handleRowSelect(row)}
+                          aria-label="레코드 선택"
+                        />
+                      ) : (
+                        <RadioGroup
+                          value={selectedIds[0] ?? ""}
+                          onValueChange={() => handleRowSelect(row)}
+                          className="justify-center"
+                        >
+                          <RadioGroupItem
+                            value={row.id}
+                            aria-label="레코드 단일 선택"
+                            className="mx-auto cursor-pointer"
+                          />
+                        </RadioGroup>
+                      )}
                     </TableCell>
                     {columns.map((col) => {
                       const isPrimary = col.id === primaryFieldId;

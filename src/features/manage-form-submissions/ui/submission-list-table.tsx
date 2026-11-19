@@ -27,6 +27,10 @@ export interface SubmissionListTableProps {
   initialSort?: SortItem[] | undefined;
   /** 테이블 동작 모드 (기본값: "consumer") */
   mode?: FormSubmissionViewMode | undefined;
+  /** 상세 화면 내 임베디드 렌더링 여부 */
+  embedded?: boolean | undefined;
+  /** 초기화 시에도 유지되는 고정 필터 조건 목록 */
+  lockedFilters?: FieldFilterCondition[] | undefined;
   /** 프리뷰 모드에서 실데이터 0건 시 폴백으로 표시할 가상 샘플 레코드 목록 */
   sampleSubmissions?: FormSubmission[] | undefined;
   /** 프리뷰 모드에서 행/상세 클릭 시 호출할 인라인 콜백 */
@@ -46,6 +50,8 @@ export function SubmissionListTable({
   initialFilters,
   initialSort,
   mode = "consumer",
+  embedded = false,
+  lockedFilters,
   sampleSubmissions,
   onSelectSubmission,
 }: SubmissionListTableProps) {
@@ -77,6 +83,8 @@ export function SubmissionListTable({
     initialFilters,
     initialSort,
     mode,
+    embedded,
+    lockedFilters,
     sampleSubmissions,
     onSelectSubmission,
   });
