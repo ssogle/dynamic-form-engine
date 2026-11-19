@@ -1,6 +1,10 @@
 import * as React from "react";
 import Link from "next/link";
-import { isValidCalendarDate, type SubmissionDateRangeFilter } from "@/entities/form-submission";
+import {
+  isValidCalendarDate,
+  parseSortParam,
+  type SubmissionDateRangeFilter,
+} from "@/entities/form-submission";
 import { parseFieldFiltersParam } from "@/shared/schema";
 import { Button } from "@/shared/ui/button";
 import { ManageFormSubmissions } from "@/features/manage-form-submissions";
@@ -14,6 +18,7 @@ interface ConsumerFormIdPageProps {
     endDate?: string | undefined;
     dateFieldId?: string | undefined;
     filters?: string | undefined;
+    sort?: string | undefined;
   }>;
 }
 
@@ -46,6 +51,8 @@ export default async function ConsumerFormIdPage({
 
   const parsedFilters = parseFieldFiltersParam(rawQuery.filters);
   const initialFilters = parsedFilters.length > 0 ? parsedFilters : undefined;
+  const initialSort =
+    rawQuery.sort && rawQuery.sort.trim().length > 0 ? parseSortParam(rawQuery.sort) : undefined;
 
   return (
     <div className="w-full space-y-6">
@@ -65,6 +72,7 @@ export default async function ConsumerFormIdPage({
         formId={id}
         initialDateRange={initialDateRange}
         initialFilters={initialFilters}
+        initialSort={initialSort}
       />
     </div>
   );

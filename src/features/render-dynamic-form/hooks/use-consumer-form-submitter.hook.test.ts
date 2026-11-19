@@ -113,4 +113,15 @@ describe("useConsumerFormSubmitter (features/render-dynamic-form/hooks)", () => 
     expect(result.current.isSuccessSubmitted).toBe(false);
     consoleErrorSpy.mockRestore();
   });
+
+  it("원샷 이동(FILL_FIELDS + NAVIGATE)으로 마운트 전 선주입된 초안 데이터는 마운트 시 보존되어야 한다", () => {
+    const formId = "form-test-uuid-5";
+    useConsumerFormDraftStore.getState().applyDraftFields(formId, { title: "선주입 프로젝트" });
+
+    const { result } = renderHook(() => useConsumerFormSubmitter({ formId }), {
+      wrapper: createWrapper(),
+    });
+
+    expect(result.current.activeDraftValues).toEqual({ title: "선주입 프로젝트" });
+  });
 });

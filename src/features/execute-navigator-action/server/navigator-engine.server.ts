@@ -129,10 +129,15 @@ function extractUpdatedAnalysisView(toolResults: Array<{ output: unknown }>): An
  * 본 맵에 선언적으로 도구와 프롬프트 팩토리를 등록하여 손쉽게 확장할 수 있습니다.
  */
 const NAVIGATOR_MODE_REGISTRY: Record<NavigatorMode, ModeConfigFactory> = {
-  consumer: (queryTools) => ({
+  consumer: (queryTools, currentContext) => ({
     instructions: CONSUMER_NAVIGATOR_SYSTEM_PROMPT,
     tools: {
-      ...createConsumerTools({ softDeleteSubmissionsByIds }),
+      ...createConsumerTools({
+        softDeleteSubmissionsByIds,
+        findFormById,
+        currentFormId: currentContext?.currentFormId,
+        initialDraftValues: currentContext?.currentDraftValues,
+      }),
       ...queryTools,
     },
     formatPrompt: formatConsumerContextPrompt,
@@ -234,6 +239,9 @@ function resolveToolStartProgressMessage(toolName: string): string {
   }
   if (["createForm", "updateFormSchema", "publishForm", "deleteForms"].includes(toolName)) {
     return "폼 스키마 및 상태를 반영하고 있습니다...";
+  }
+  if (toolName === "applySubmissionListQuery") {
+    return "요청한 필터와 정렬 조건을 목록에 반영하고 있습니다...";
   }
   return "요청 작업을 실행하고 있습니다...";
 }

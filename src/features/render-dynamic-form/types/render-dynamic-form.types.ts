@@ -33,6 +33,11 @@ export interface DynamicFormRendererProps {
   values?: Record<string, unknown> | undefined;
 
   /**
+   * 컨슈머 모드: 사용자가 키보드·마우스로 폼 입력값을 변경했을 때 현재 전체 값 스냅샷을 알리는 콜백
+   */
+  onValuesChange?: ((values: Record<string, unknown>) => void) | undefined;
+
+  /**
    * AI Navigator 등 외부에서 제출을 프로그래밍 방식으로 트리거하기 위한 증분 카운터
    */
   submitTriggerCount?: number | undefined;

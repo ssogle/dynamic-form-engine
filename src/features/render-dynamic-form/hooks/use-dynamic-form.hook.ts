@@ -32,6 +32,10 @@ export interface UseDynamicFormOptions {
    */
   values?: Record<string, unknown> | undefined;
   /**
+   * 사용자가 키보드·마우스로 폼 입력값을 변경했을 때 현재 전체 값 스냅샷을 알리는 콜백
+   */
+  onValuesChange?: ((values: Record<string, unknown>) => void) | undefined;
+  /**
    * AI Navigator 또는 상위에서 프로그래밍 방식으로 폼 제출을 트리거하는 카운터
    */
   submitTriggerCount?: number | undefined;
@@ -84,17 +88,36 @@ export interface UseDynamicFormReturn {
   handleFormSubmit: (e?: React.BaseSyntheticEvent) => Promise<void>;
 }
 
+function areFieldValuesEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((item, idx) => Object.is(item, b[idx]));
+  }
+  return false;
+}
+
+function areDefaultValueMapsEqual(
+  prev: Record<string, unknown>,
+  next: Record<string, unknown>
+): boolean {
+  const prevKeys = Object.keys(prev);
+  const nextKeys = Object.keys(next);
+  if (prevKeys.length !== nextKeys.length) return false;
+  return nextKeys.every((key) => areFieldValuesEqual(prev[key], next[key]));
+}
+
 /**
  * 동적 폼 렌더링 및 유효성 검사, 비즈니스 오케스트레이션 전용 커스텀 훅 (useDynamicForm)
  *
  * 폼 상세 쿼리 조회, Zod 유효성 스키마 동적 조립, React Hook Form 인스턴스 라이프사이클,
- * 외부 값(AI Navigator) 동기화, 프로그래밍 방식 자동 제출 및 폼 발행 토글 로직을 캡슐화합니다.
+ * 외부 값(AI Navigator) 및 사용자 수동 입력 양방향 동기화, 자동 제출 트리거 로직을 캡슐화합니다.
  */
 export function useDynamicForm({
   form: propForm,
   formId,
   mode = "submission",
   values,
+  onValuesChange,
   submitTriggerCount,
   onSubmit,
 }: UseDynamicFormOptions): UseDynamicFormReturn {
@@ -130,18 +153,50 @@ export function useDynamicForm({
     mode: "onBlur",
   });
 
-  // 7. 외부 또는 AI Navigator로부터 주입된 필드값 동기화
+  const isApplyingExternalValuesRef = React.useRef(false);
+  const hasPopulatedValuesRef = React.useRef(false);
+  const prevDefaultValuesRef = React.useRef<Record<string, unknown>>(defaultValues);
+  const onValuesChangeRef = React.useRef(onValuesChange);
+  onValuesChangeRef.current = onValuesChange;
+
+  // 7. 외부 또는 AI Navigator로부터 주입된 필드값 동기화 (동일 값 덮어쓰기 및 역동기화 루프 방지)
   React.useEffect(() => {
-    if (values && Object.keys(values).length > 0) {
-      for (const [key, val] of Object.entries(values)) {
-        if (val !== undefined) {
-          methods.setValue(key, val, { shouldValidate: true, shouldDirty: true });
+    const defaultsChanged = !areDefaultValueMapsEqual(prevDefaultValuesRef.current, defaultValues);
+    prevDefaultValuesRef.current = defaultValues;
+
+    isApplyingExternalValuesRef.current = true;
+    try {
+      if (values && Object.keys(values).length > 0) {
+        hasPopulatedValuesRef.current = true;
+        for (const [key, val] of Object.entries(values)) {
+          if (val !== undefined && !areFieldValuesEqual(methods.getValues(key), val)) {
+            methods.setValue(key, val, { shouldValidate: true, shouldDirty: true });
+          }
         }
+      } else if (hasPopulatedValuesRef.current || defaultsChanged) {
+        hasPopulatedValuesRef.current = false;
+        methods.reset(defaultValues);
       }
-    } else {
-      methods.reset(defaultValues);
+    } finally {
+      isApplyingExternalValuesRef.current = false;
     }
   }, [values, methods, defaultValues]);
+
+  // 7-1. 사용자의 마우스·키보드 직접 입력/수정 내역을 상위 초안 스토어로 역동기화
+  React.useEffect(() => {
+    if (mode !== "submission") {
+      return;
+    }
+    const subscription = methods.watch((watchedValues) => {
+      if (isApplyingExternalValuesRef.current) {
+        return;
+      }
+      onValuesChangeRef.current?.({ ...(watchedValues as Record<string, unknown>) });
+    });
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [methods, mode]);
 
   // 8. 폼 제출 이벤트 핸들러
   const handleFormSubmit = methods.handleSubmit(async (data) => {

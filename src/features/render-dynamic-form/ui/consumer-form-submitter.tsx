@@ -38,6 +38,7 @@ export function ConsumerFormSubmitter({ formId }: ConsumerFormSubmitterProps) {
     isSuccessSubmitted,
     activeDraftValues,
     activeSubmitTriggerCount,
+    handleDraftValuesChange,
     handleSubmit,
     handleResetSuccess,
   } = useConsumerFormSubmitter({ formId });
@@ -137,6 +138,7 @@ export function ConsumerFormSubmitter({ formId }: ConsumerFormSubmitterProps) {
       form={form}
       mode="submission"
       values={activeDraftValues}
+      onValuesChange={handleDraftValuesChange}
       submitTriggerCount={activeSubmitTriggerCount}
       onSubmit={handleSubmit}
       isSubmitting={isSubmitting}

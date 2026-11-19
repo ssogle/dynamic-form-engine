@@ -188,11 +188,13 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
   const dispatchAction = React.useCallback(
     (action: NavigatorAction) => {
       switch (action.type) {
-        case "NAVIGATE":
-          if (action.targetPath && action.targetPath !== pathname) {
+        case "NAVIGATE": {
+          const currentLocationPath = `${pathname}${typeof window !== "undefined" ? window.location.search : ""}`;
+          if (action.targetPath && action.targetPath !== currentLocationPath) {
             router.push(action.targetPath);
           }
           break;
+        }
 
         case "CREATE_FORM":
           if (action.formId) {
@@ -309,12 +311,29 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
             label: f.label,
             type: f.type,
             required: f.required ?? false,
+            multiple: f.multiple,
             description: f.description,
             options: f.options ?? undefined,
+            relationConfig: f.relationConfig,
           }));
         }
       }
-      context.currentDraftValues = currentDraftValues;
+
+      // 1-1. 응답 상세/수정 화면에서는 캐시된 기존 submission.data를 currentDraftValues의 베이스로 병합 전달합니다.
+      const submissionMatch = pathname.match(
+        /^\/consumer\/forms\/[^/]+\/submissions\/([^/]+)(?:\/edit)?$/
+      );
+      const cachedSubmission =
+        submissionMatch && submissionMatch[1]
+          ? queryClient.getQueryData<FormSubmission>(formSubmissionsKeys.detail(submissionMatch[1]))
+          : undefined;
+
+      context.currentDraftValues = cachedSubmission?.data
+        ? {
+            ...cachedSubmission.data,
+            ...(currentDraftValues ?? {}),
+          }
+        : currentDraftValues;
 
       // 2. 현재 화면의 기제출 응답 목록 캐시가 존재할 때 (단순 캐시 또는 무한 스크롤 캐시)
       let cachedSubmissions: FormSubmission[] | undefined;

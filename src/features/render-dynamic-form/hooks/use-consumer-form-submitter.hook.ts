@@ -45,6 +45,10 @@ export interface UseConsumerFormSubmitterReturn {
    */
   activeSubmitTriggerCount: number | undefined;
   /**
+   * 사용자가 키보드·마우스로 폼을 직접 수정할 때 초안 스토어에 역동기화하는 핸들러
+   */
+  handleDraftValuesChange: (values: Record<string, unknown>) => void;
+  /**
    * 정제된 폼 데이터를 서버로 제출하는 핸들러
    */
   handleSubmit: (cleanedData: Record<string, unknown>) => Promise<void>;
@@ -73,20 +77,40 @@ export function useConsumerFormSubmitter({
   const currentDraftFormId = useConsumerFormDraftStore((state) => state.currentFormId);
   const draftValues = useConsumerFormDraftStore((state) => state.draftValues);
   const submitTriggerCount = useConsumerFormDraftStore((state) => state.submitTriggerCount);
-  const setCurrentFormId = useConsumerFormDraftStore((state) => state.setCurrentFormId);
+  const syncDraftValues = useConsumerFormDraftStore((state) => state.syncDraftValues);
   const resetDraft = useConsumerFormDraftStore((state) => state.resetDraft);
+  const preservedDraftRef = React.useRef<{
+    formId: string;
+    values: Record<string, unknown>;
+  } | null>(null);
 
-  // 컴포넌트 마운트 시 기존 드래프트 초기화 후 대상 폼 동기화, 언마운트 시 클린업
+  // 컴포넌트 마운트 시 대상 폼 동기화 (StrictMode 이중 마운트에서도 원샷 선주입 초안 보존), 언마운트 시 클린업
   React.useEffect(() => {
-    resetDraft();
-    setCurrentFormId(formId);
+    const storeState = useConsumerFormDraftStore.getState();
+    if (preservedDraftRef.current?.formId === formId) {
+      storeState.applyDraftFields(formId, preservedDraftRef.current.values);
+      preservedDraftRef.current = null;
+    } else {
+      storeState.setCurrentFormId(formId);
+      const synced = useConsumerFormDraftStore.getState();
+      if (synced.currentFormId === formId && Object.keys(synced.draftValues).length > 0) {
+        preservedDraftRef.current = { formId, values: { ...synced.draftValues } };
+      }
+    }
     return () => {
       resetDraft();
     };
-  }, [formId, setCurrentFormId, resetDraft]);
+  }, [formId, resetDraft]);
 
   const activeDraftValues = currentDraftFormId === formId ? draftValues : undefined;
   const activeSubmitTriggerCount = currentDraftFormId === formId ? submitTriggerCount : undefined;
+
+  const handleDraftValuesChange = React.useCallback(
+    (nextValues: Record<string, unknown>) => {
+      syncDraftValues(formId, nextValues);
+    },
+    [formId, syncDraftValues]
+  );
 
   /**
    * 유효성 검증을 통과한 폼 데이터를 서버에 제출
@@ -117,6 +141,7 @@ export function useConsumerFormSubmitter({
     isSuccessSubmitted,
     activeDraftValues,
     activeSubmitTriggerCount,
+    handleDraftValuesChange,
     handleSubmit,
     handleResetSuccess,
   };

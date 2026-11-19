@@ -406,4 +406,86 @@ describe("useNavigatorShell (widgets/navigator-shell/hooks)", () => {
     });
     expect(result.current.expandedStepMessageIds["msg-1"]).toBe(false);
   });
+
+  it("컨슈머 응답 수정/상세 화면에서 캐시된 submission.data를 currentDraftValues와 병합해 전달해야 한다", async () => {
+    currentPathname = "/consumer/forms/form-uuid-1/submissions/sub-edit-1/edit";
+    useConsumerFormDraftStore.setState({
+      currentFormId: "form-uuid-1",
+      draftValues: { f_amount: 50000 },
+      submitTriggerCount: 0,
+    });
+
+    mockGetQueryData.mockImplementation((key: unknown) => {
+      if (Array.isArray(key) && key[0] === "forms") {
+        return {
+          id: "form-uuid-1",
+          title: "비용 정산서",
+          schemaDefinition: {
+            primaryFieldId: "f_title",
+            fields: [
+              {
+                id: "f_title",
+                label: "항목명",
+                type: "text",
+                required: true,
+                description: "항목명",
+              },
+              {
+                id: "f_amount",
+                label: "금액",
+                type: "number",
+                required: true,
+                description: "금액",
+              },
+            ],
+          },
+        };
+      }
+      if (Array.isArray(key) && key[0] === "submissions" && key[1] === "detail") {
+        return {
+          id: "sub-edit-1",
+          formId: "form-uuid-1",
+          version: 2,
+          data: { f_title: "팀 회식", f_amount: 30000 },
+        };
+      }
+      return undefined;
+    });
+
+    mockMutateAsync.mockResolvedValueOnce({ reply: "확인했습니다.", action: null });
+
+    const { result } = renderHook(() => useNavigatorShell({ mode: "consumer" }));
+    await act(async () => {
+      await result.current.handleExecutePrompt("지금 입력된 값 확인해줘");
+    });
+
+    const callArg = mockMutateAsync.mock.calls[0]?.[0] as {
+      currentContext?: { currentDraftValues?: Record<string, unknown> };
+    };
+    expect(callArg.currentContext?.currentDraftValues).toEqual({
+      f_title: "팀 회식",
+      f_amount: 50000,
+    });
+  });
+
+  it("동일 경로에서 쿼리스트링이 다른 NAVIGATE 액션(예: 필터 초기화) 시 router.push를 실행해야 한다", async () => {
+    currentPathname = "/consumer/forms/form-uuid-1";
+    window.history.replaceState(null, "", "/consumer/forms/form-uuid-1?sort=f_amount%3Adesc");
+
+    mockMutateAsync.mockResolvedValueOnce({
+      reply: "필터와 정렬을 초기화했습니다.",
+      action: {
+        type: "NAVIGATE",
+        targetPath: "/consumer/forms/form-uuid-1",
+      },
+    });
+
+    const { result } = renderHook(() => useNavigatorShell({ mode: "consumer" }));
+    await act(async () => {
+      await result.current.handleExecutePrompt("필터 초기화해줘");
+    });
+
+    expect(mockPush).toHaveBeenCalledWith("/consumer/forms/form-uuid-1");
+    window.history.replaceState(null, "", "/");
+  });
 });

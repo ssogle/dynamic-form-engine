@@ -5,6 +5,7 @@ import {
   selectOptionSchema,
   validatePrimaryFieldSelection,
 } from "@/entities/form";
+import { calendarDateStringSchema, fieldFilterConditionSchema } from "@/shared/schema";
 
 /**
  * 폼 스키마 변경 오퍼레이션 상수 목록 (단일 진실 원천 - SSOT)
@@ -263,6 +264,11 @@ export const consumerNavigateInputSchema = z.object({
 export type ConsumerNavigateInput = z.infer<typeof consumerNavigateInputSchema>;
 
 /**
+ * 관계형 레코드 UUID 검증용 공용 Zod 스키마 (도구 계층 SSOT)
+ */
+export const relationRecordIdSchema = z.uuid("유효한 UUID 형식이어야 합니다.");
+
+/**
  * 컨슈머 폼 필드 자동 채우기 도구(fillFields) 입력 스키마
  */
 export const consumerFillFieldsInputSchema = z.object({
@@ -300,6 +306,52 @@ export const consumerDeleteSubmissionsInputSchema = z.object({
   reason: z.string().optional().describe("삭제 사유"),
 });
 export type ConsumerDeleteSubmissionsInput = z.infer<typeof consumerDeleteSubmissionsInputSchema>;
+
+/**
+ * 컨슈머 응답 목록 필터·기간·정렬 적용/초기화 도구(applySubmissionListQuery) 입력 스키마
+ */
+export const consumerApplySubmissionListQueryInputSchema = z.object({
+  formId: z
+    .uuid("목록을 제어할 대상 폼 ID(UUID)는 필수입니다.")
+    .describe("필터·기간·정렬을 적용할 대상 폼의 UUID"),
+  filters: z
+    .array(fieldFilterConditionSchema)
+    .optional()
+    .describe(
+      "컬럼 필터 조건 배열 ([{ fieldId, op, value?, values?, min?, max? }] — eq/neq/contains/gt/gte/lt/lte/between/in/notIn/hasAny/hasAll/isEmpty/isNotEmpty)"
+    ),
+  dateRange: z
+    .object({
+      startDate: calendarDateStringSchema.optional(),
+      endDate: calendarDateStringSchema.optional(),
+      dateFieldId: z.string().min(1).optional(),
+    })
+    .optional()
+    .describe("기간 필터 범위 (YYYY-MM-DD 형식의 startDate, endDate 및 기준 dateFieldId)"),
+  sort: z
+    .array(
+      z.object({
+        id: z
+          .string()
+          .min(1)
+          .describe("정렬 대상 필드 ID 또는 시스템 컬럼('createdAt', 'updatedAt')"),
+        desc: z
+          .boolean()
+          .default(true)
+          .describe("내림차순 여부 (true: 높은순/최신순, false: 낮은순/오래된순)"),
+      })
+    )
+    .optional()
+    .describe("다중 정렬 조건 배열 (예: [{ id: 'f_amount', desc: true }])"),
+  reset: z
+    .boolean()
+    .optional()
+    .describe("true 전달 시 현재 적용된 필터·기간·정렬을 모두 초기화하고 기본 목록으로 복귀"),
+  reason: z.string().optional().describe("사용자에게 안내할 필터/정렬 적용 사유"),
+});
+export type ConsumerApplySubmissionListQueryInput = z.infer<
+  typeof consumerApplySubmissionListQueryInputSchema
+>;
 
 // ==========================================
 // 4. 분석가 도구 입력 스키마 (Analyst Tools)

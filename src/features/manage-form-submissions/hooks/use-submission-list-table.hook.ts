@@ -30,6 +30,7 @@ import {
   useInfiniteFormSubmissionsQuery,
   useDeleteSubmissionMutation,
   type FormSubmission,
+  type SortItem,
   type SubmissionDateRangeFilter,
 } from "@/entities/form-submission";
 import { formatDateTime } from "@/shared/lib/date";
@@ -73,6 +74,10 @@ export interface UseSubmissionListTableParams {
    * URL 쿼리 파라미터로부터 전달된 초기 컬럼 필터 목록 (분석 뷰 드릴다운 연동)
    */
   initialFilters?: FieldFilterCondition[] | undefined;
+  /**
+   * URL 쿼리 파라미터로부터 전달된 초기 다중 정렬 목록
+   */
+  initialSort?: SortItem[] | undefined;
   /**
    * 테이블 동작 모드 (기본값: "consumer")
    */
@@ -199,10 +204,16 @@ function buildInitialFiltersMap(
   return map;
 }
 
+function serializeSortItems(sorting: SortingState): string {
+  if (sorting.length === 0) return "createdAt:desc";
+  return sorting.map((s) => `${s.id}:${s.desc ? "desc" : "asc"}`).join(",");
+}
+
 function buildConsumerFormUrl(
   formId: string,
   dateRange?: SubmissionDateRangeFilter,
-  filters?: Record<string, FieldFilterCondition>
+  filters?: Record<string, FieldFilterCondition>,
+  sorting?: SortingState
 ): string {
   const basePath = `/consumer/forms/${formId}`;
   const searchParams = new URLSearchParams();
@@ -215,6 +226,10 @@ function buildConsumerFormUrl(
   );
   if (serializedFilters) {
     searchParams.set("filters", serializedFilters);
+  }
+  const serializedSort = sorting ? serializeSortItems(sorting) : undefined;
+  if (serializedSort && serializedSort !== "createdAt:desc") {
+    searchParams.set("sort", serializedSort);
   }
   const qs = searchParams.toString();
   return qs ? `${basePath}?${qs}` : basePath;
@@ -230,6 +245,7 @@ export function useSubmissionListTable({
   form,
   initialDateRange,
   initialFilters,
+  initialSort,
   mode = "consumer",
   sampleSubmissions,
   onSelectSubmission,
@@ -237,7 +253,11 @@ export function useSubmissionListTable({
   const router = useRouter();
   const activeFields = React.useMemo(() => extractActiveFields(form), [form]);
   const primaryFieldId = extractPrimaryFieldId(form);
-  const [sorting, setSorting] = React.useState<SortingState>([{ id: "createdAt", desc: true }]);
+  const resolvedInitialSorting = React.useMemo<SortingState>(
+    () => (initialSort && initialSort.length > 0 ? initialSort : [{ id: "createdAt", desc: true }]),
+    [initialSort]
+  );
+  const [sorting, setSorting] = React.useState<SortingState>(resolvedInitialSorting);
   const [columnFilters, setColumnFilters] = React.useState<Record<string, FieldFilterCondition>>(
     () => buildInitialFiltersMap(initialFilters, activeFields)
   );
@@ -252,6 +272,13 @@ export function useSubmissionListTable({
   const initialEndDate = initialDateRange?.endDate;
   const initialDateFieldId = initialDateRange?.dateFieldId;
   const initialFiltersSignature = serializeFieldFiltersParam(initialFilters) ?? "";
+  const initialSortSignature = serializeSortItems(resolvedInitialSorting);
+
+  React.useEffect(() => {
+    setSorting((prev) =>
+      serializeSortItems(prev) === initialSortSignature ? prev : resolvedInitialSorting
+    );
+  }, [initialSortSignature, resolvedInitialSorting]);
 
   React.useEffect(() => {
     setDateRangeFilter((prev) => {
@@ -362,19 +389,23 @@ export function useSubmissionListTable({
 
       setColumnFilters(next);
       if (mode !== "preview") {
-        router.replace(buildConsumerFormUrl(form.id, dateRangeFilter, next), { scroll: false });
+        router.replace(buildConsumerFormUrl(form.id, dateRangeFilter, next, sorting), {
+          scroll: false,
+        });
       }
     },
-    [activeFields, columnFilters, dateRangeFilter, form.id, mode, router]
+    [activeFields, columnFilters, dateRangeFilter, form.id, mode, router, sorting]
   );
 
   // 기간 필터만 해제하고 URL 쿼리스트링도 함께 정리
   const handleClearDateRange = React.useCallback(() => {
     setDateRangeFilter(undefined);
     if (mode !== "preview") {
-      router.replace(buildConsumerFormUrl(form.id, undefined, columnFilters), { scroll: false });
+      router.replace(buildConsumerFormUrl(form.id, undefined, columnFilters, sorting), {
+        scroll: false,
+      });
     }
-  }, [router, form.id, columnFilters, mode]);
+  }, [router, form.id, columnFilters, mode, sorting]);
 
   // 전체 필터 초기화
   const handleClearAllFilters = React.useCallback(() => {
@@ -383,9 +414,11 @@ export function useSubmissionListTable({
       setDateRangeFilter(undefined);
     }
     if (mode !== "preview") {
-      router.replace(`/consumer/forms/${form.id}`, { scroll: false });
+      router.replace(buildConsumerFormUrl(form.id, undefined, undefined, sorting), {
+        scroll: false,
+      });
     }
-  }, [hasActiveDateRange, router, form.id, mode]);
+  }, [hasActiveDateRange, router, form.id, mode, sorting]);
 
   // 단건 응답 삭제 핸들러 (프리뷰 모드에서는 차단)
   const handleDelete = React.useCallback(
