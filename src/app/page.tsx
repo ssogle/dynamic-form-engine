@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, BarChart3, FileText, Wrench, type LucideIcon } from "lucide-react";
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
+import { LandingOntologyBackground } from "./_components/landing-ontology-background";
 
 interface GatewayRoleItem {
   readonly id: "builder" | "consumer" | "analyst";
@@ -56,8 +57,9 @@ const GATEWAY_ROLES: readonly GatewayRoleItem[] = [
  */
 export default function HomePage() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50/50 p-6 font-sans dark:bg-black">
-      <main className="flex w-full max-w-5xl flex-col items-center gap-10 text-center">
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-zinc-50/50 p-6 font-sans dark:bg-black">
+      <LandingOntologyBackground />
+      <main className="relative z-10 flex w-full max-w-5xl flex-col items-center gap-10 text-center">
         {/* 서비스 헤더 */}
         <div className="space-y-3">
           <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
@@ -83,7 +85,7 @@ export default function HomePage() {
                 href={role.href}
                 className="group focus-visible:ring-ring/50 block h-full rounded-xl outline-none focus-visible:ring-3"
               >
-                <Card className="bg-card group-hover:ring-primary/40 group-hover:bg-accent/20 flex h-full flex-col justify-between shadow-xs transition-all duration-150 group-hover:-translate-y-0.5 group-hover:shadow-md group-active:translate-y-0 group-active:scale-[0.99] group-active:shadow-xs">
+                <Card className="bg-card/90 group-hover:ring-primary/40 group-hover:bg-accent/30 flex h-full flex-col justify-between shadow-xs backdrop-blur-xs transition-all duration-150 group-hover:-translate-y-0.5 group-hover:shadow-md group-active:translate-y-0 group-active:scale-[0.99] group-active:shadow-xs">
                   <CardHeader className="space-y-3 pt-2">
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-primary text-xs font-semibold tracking-wider uppercase">

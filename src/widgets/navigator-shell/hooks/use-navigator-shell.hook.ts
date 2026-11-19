@@ -573,8 +573,8 @@ export function useNavigatorShell({ mode }: UseNavigatorShellParams): UseNavigat
       setIsGenerating(true);
 
       try {
-        // 과도한 과거 대화 누적으로 인한 LLM 토큰·레이턴시 급증을 방지하기 위해 최근 12개 메시지만 전달합니다.
-        const historyMessages = messages.slice(-12).map((m) => ({
+        // 과도한 과거 대화 누적으로 인한 LLM 토큰·레이턴시 급증을 방지하기 위해 최근 6개 메시지만 전달합니다.
+        const historyMessages = messages.slice(-6).map((m) => ({
           role: m.role,
           content: m.content,
         }));

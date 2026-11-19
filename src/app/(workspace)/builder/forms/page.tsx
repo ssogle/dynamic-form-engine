@@ -1,10 +1,10 @@
 import * as React from "react";
-import { BuilderFormList } from "@/features/manage-builder-forms";
+import { BuilderFormsWorkspace } from "@/features/manage-builder-forms";
 
 /**
  * 빌더 내부 폼 목록 화면 (/builder/forms)
  *
- * 데이터베이스에 저장된 모든 폼 목록을 표시하며,
+ * 데이터베이스에 저장된 모든 폼 목록과 3D 관계 그래프를 함께 표시하며,
  * AI Navigator에게 명령하여 새로운 폼을 생성하거나 기존 폼의 라이브 캔버스로 진입합니다.
  */
 export default function BuilderFormsPage() {
@@ -20,7 +20,7 @@ export default function BuilderFormsPage() {
       </div>
 
       <div className="w-full">
-        <BuilderFormList />
+        <BuilderFormsWorkspace />
       </div>
     </div>
   );

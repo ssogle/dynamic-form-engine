@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { runNavigatorEngine } from "./navigator-engine.server";
+import { runNavigatorEngine, shouldStopAfterTerminalStep } from "./navigator-engine.server";
 import { findActiveForms, findPublishedForms } from "@/entities/form/server";
 
 // 1. Entities DB 함수 모킹
@@ -100,7 +100,11 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
     expect(mockGenerateText).toHaveBeenCalledTimes(1);
     const callArgs = mockGenerateText.mock.calls[0]?.[0];
     expect(callArgs).toBeDefined();
-    expect(callArgs?.stopWhen).toEqual({ type: "stepCount", count: 10 });
+    expect(callArgs?.stopWhen).toEqual([
+      { type: "stepCount", count: 10 },
+      shouldStopAfterTerminalStep,
+    ]);
+    expect(callArgs?.providerOptions).toBeUndefined();
     expect(callArgs?.tools).toHaveProperty("searchForms");
     expect(callArgs?.tools).toHaveProperty("getFormDetails");
     expect(callArgs?.tools).toHaveProperty("searchSubmissions");
@@ -119,7 +123,10 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
 
     expect(mockGenerateText).toHaveBeenCalledTimes(1);
     const callArgs = mockGenerateText.mock.calls[0]?.[0];
-    expect(callArgs?.stopWhen).toEqual({ type: "stepCount", count: 5 });
+    expect(callArgs?.stopWhen).toEqual([
+      { type: "stepCount", count: 5 },
+      shouldStopAfterTerminalStep,
+    ]);
   });
 
   it("빌더 모드에서 navigate 도구 호출 시 output.clientAction을 올바르게 반환해야 한다", async () => {
@@ -344,7 +351,10 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
     });
 
     const callArgs = mockGenerateText.mock.calls[0]?.[0];
-    expect(callArgs?.stopWhen).toEqual({ type: "stepCount", count: 10 });
+    expect(callArgs?.stopWhen).toEqual([
+      { type: "stepCount", count: 10 },
+      shouldStopAfterTerminalStep,
+    ]);
     expect(callArgs?.providerOptions).toEqual({
       google: {
         thinkingConfig: {
@@ -552,5 +562,92 @@ describe("runNavigatorEngine (features/execute-navigator-action/server)", () => 
       isPublished: true,
     });
     expect(confirmedResult.updatedForm?.id).toBe(validFormUuid);
+  });
+
+  it("shouldStopAfterTerminalStep은 navigate 등 종단 액션 또는 PENDING_CONFIRMATION 성공 시 즉시 종료하고 조회·실패 스텝에서는 계속 진행해야 한다", () => {
+    expect(
+      shouldStopAfterTerminalStep({
+        steps: [
+          {
+            toolResults: [
+              {
+                toolName: "navigate",
+                output: {
+                  success: true,
+                  clientAction: { type: "NAVIGATE", targetPath: "/consumer/forms/1" },
+                },
+              },
+            ],
+          },
+        ],
+      })
+    ).toBe(true);
+
+    expect(
+      shouldStopAfterTerminalStep({
+        steps: [
+          {
+            toolResults: [
+              {
+                toolName: "submitForm",
+                output: {
+                  success: true,
+                  status: "PENDING_CONFIRMATION",
+                  pendingConfirmation: { confirmationId: "c1" },
+                },
+              },
+            ],
+          },
+        ],
+      })
+    ).toBe(true);
+
+    expect(
+      shouldStopAfterTerminalStep({
+        steps: [
+          {
+            toolResults: [
+              {
+                toolName: "createForm",
+                output: {
+                  success: true,
+                  clientAction: { type: "CREATE_FORM", formId: "f1" },
+                },
+              },
+            ],
+          },
+        ],
+      })
+    ).toBe(true);
+
+    expect(
+      shouldStopAfterTerminalStep({
+        steps: [
+          {
+            toolResults: [
+              {
+                toolName: "searchForms",
+                output: { success: true, forms: [] },
+              },
+            ],
+          },
+        ],
+      })
+    ).toBe(false);
+
+    expect(
+      shouldStopAfterTerminalStep({
+        steps: [
+          {
+            toolResults: [
+              {
+                toolName: "submitForm",
+                output: { success: false, error: "필수 항목 누락" },
+              },
+            ],
+          },
+        ],
+      })
+    ).toBe(false);
   });
 });

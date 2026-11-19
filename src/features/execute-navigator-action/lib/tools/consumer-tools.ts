@@ -53,11 +53,13 @@ export interface ConsumerToolsDependencies {
   queryFormSubmissionsForAnalysis: (
     input: QuerySubmissionsForAnalysisInput
   ) => Promise<AnalyticsResult<AnalysisRecordsResult>>;
+  /** 현재 화면 URL 경로 (신규 작성 vs 수정 저장 맥락 구분용) */
+  currentPath?: string | undefined;
   /** 현재 화면 컨텍스트의 활성 폼 ID */
   currentFormId?: string | undefined;
   /** 현재 화면의 기존/임시 입력값 스냅샷 */
   initialDraftValues?: Record<string, unknown> | undefined;
-  /** 고위험 도구(deleteSubmissions) 실행 전 사용자 확인 게이트 활성화 여부 */
+  /** 최종 확정/고위험 도구(submitForm, deleteSubmissions) 실행 전 사용자 확인 게이트 활성화 여부 */
   requireConfirmation?: boolean | undefined;
 }
 
@@ -338,6 +340,24 @@ export function createConsumerTools(deps: ConsumerToolsDependencies) {
             "필수 입력 항목이 누락되었거나 입력 형식이 올바르지 않아 제출할 수 없습니다. 누락된 항목을 확인해 보완해 주세요.",
           fieldErrors: validation.errors,
         };
+      }
+
+      // 필수/형식 검증 통과 후 실제 제출·수정 저장 트리거 직전에 사용자 승인 게이트 적용
+      if (deps.requireConfirmation) {
+        const isEditMode = Boolean(
+          deps.currentPath && /\/submissions\/[^/]+\/edit(?:$|\?)/.test(deps.currentPath)
+        );
+        return buildPendingConfirmationResult({
+          toolName: "submitForm",
+          title: isEditMode
+            ? `'${formResult.form.title}' 수정 응답 저장`
+            : `'${formResult.form.title}' 응답 제출`,
+          description: isEditMode
+            ? "변경한 응답 내용을 확인한 뒤 [승인]을 누르면 수정 내용이 저장됩니다."
+            : "작성한 응답 내용을 확인한 뒤 [승인]을 누르면 최종 제출됩니다.",
+          targetIds: [formResult.form.id],
+          payload: { formId: formResult.form.id, confirmationMessage },
+        });
       }
 
       const action: NavigatorConsumerAction = {

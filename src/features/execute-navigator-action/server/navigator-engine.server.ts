@@ -103,6 +103,73 @@ function extractClientActions(toolResults: Array<{ output: unknown }>): Navigato
 }
 
 /**
+ * 2단계 추가 LLM 왕복 없이 즉시 응답으로 종결해도 되는 단발·종단 도구 목록
+ * (조회는 후속 분석·입력 단계가 필요하므로 제외)
+ */
+const TERMINAL_ACTION_TOOLS = new Set([
+  "navigate",
+  "fillFields",
+  "submitForm",
+  "applySubmissionListQuery",
+  "createForm",
+  "updateSchema",
+  "addRelationField",
+  "updateFieldOptions",
+  "publishForm",
+  "deleteForms",
+  "deleteSubmissions",
+  "publishAnalysisView",
+  "deleteAnalysisViews",
+]);
+
+/**
+ * 현재 스텝이 조회·실패 없이 종단 클라이언트 액션 또는 사전 승인 대기(PENDING_CONFIRMATION)만으로
+ * 정상 완료된 경우, 불필요한 후속 텍스트 생성 스텝(LLM 왕복)을 생략하기 위한 조기 종료 조건
+ */
+export function shouldStopAfterTerminalStep({
+  steps,
+}: {
+  steps: ReadonlyArray<{
+    toolResults?: ReadonlyArray<{ toolName?: string; output?: unknown }>;
+  }>;
+}): boolean {
+  const lastStep = steps[steps.length - 1];
+  const toolResults = lastStep?.toolResults;
+  if (!toolResults || toolResults.length === 0) {
+    return false;
+  }
+
+  let hasTerminalOrConfirmation = false;
+  for (const tr of toolResults) {
+    const output = tr.output as
+      | {
+          success?: boolean;
+          clientAction?: unknown;
+          pendingConfirmation?: unknown;
+          status?: string;
+        }
+      | undefined;
+
+    if (!output || output.success === false) {
+      return false;
+    }
+
+    if (output.status === "PENDING_CONFIRMATION" || output.pendingConfirmation) {
+      hasTerminalOrConfirmation = true;
+      continue;
+    }
+
+    if (!tr.toolName || !TERMINAL_ACTION_TOOLS.has(tr.toolName) || !output.clientAction) {
+      return false;
+    }
+
+    hasTerminalOrConfirmation = true;
+  }
+
+  return hasTerminalOrConfirmation;
+}
+
+/**
  * 고위험 도구 실행 결과(toolResults)로부터 사전 승인 대기 메타데이터 목록을 추출합니다.
  */
 function extractPendingConfirmations(
@@ -156,6 +223,7 @@ const NAVIGATOR_MODE_REGISTRY: Record<NavigatorMode, ModeConfigFactory> = {
         softDeleteSubmissionsByIds,
         findFormById,
         queryFormSubmissionsForAnalysis,
+        currentPath: currentContext?.currentPath,
         currentFormId: currentContext?.currentFormId,
         initialDraftValues: currentContext?.currentDraftValues,
         requireConfirmation,
@@ -354,8 +422,23 @@ function resolveToolStartProgressMessage(toolName: string): string {
   ) {
     return "분석 뷰 문서를 최신 상태로 반영하고 있습니다...";
   }
-  if (["createForm", "updateFormSchema", "publishForm", "deleteForms"].includes(toolName)) {
+  if (
+    [
+      "createForm",
+      "updateSchema",
+      "addRelationField",
+      "updateFieldOptions",
+      "publishForm",
+      "deleteForms",
+    ].includes(toolName)
+  ) {
     return "폼 스키마 및 상태를 반영하고 있습니다...";
+  }
+  if (["fillFields", "submitForm", "deleteSubmissions"].includes(toolName)) {
+    return "응답 데이터를 검증·반영하고 있습니다...";
+  }
+  if (toolName === "navigate") {
+    return "요청한 화면으로 이동 준비 중입니다...";
   }
   if (toolName === "applySubmissionListQuery") {
     return "요청한 필터와 정렬 조건을 목록에 반영하고 있습니다...";
@@ -393,7 +476,14 @@ function resolveStepEndProgressMessage(toolNames: string[], finishReason: string
   }
   if (
     toolNames.some((name) =>
-      ["createForm", "updateFormSchema", "publishForm", "deleteForms"].includes(name)
+      [
+        "createForm",
+        "updateSchema",
+        "addRelationField",
+        "updateFieldOptions",
+        "publishForm",
+        "deleteForms",
+      ].includes(name)
     )
   ) {
     return "폼 설정을 반영했습니다. 결과를 정리하고 있습니다...";
@@ -452,10 +542,12 @@ export async function runNavigatorEngine(
     },
   ];
 
-  // 4. 단일 LLM 추론 완주 (Thinking 예산 상한 512 제한, 스텝/전체 타임아웃 및 무응답 재시도 차단 적용)
+  // 4. 단일 LLM 추론 완주 (단순 컨슈머 텍스트 요청은 thinkingConfig 생략으로 호환성·저지연 확보, 종단 액션 시 조기 종료)
   const startedAt = Date.now();
   let stepIndex = 0;
   let lastStepFinishReason: string | undefined;
+  const hasAttachments = Boolean(attachments && attachments.length > 0);
+  const shouldEnableThinking = mode !== "consumer" || hasAttachments;
 
   options?.onProgress?.("요청을 분석하고 필요한 작업을 준비하고 있습니다...");
 
@@ -464,20 +556,24 @@ export async function runNavigatorEngine(
     instructions: config.instructions,
     messages: conversationMessages,
     tools: config.tools,
-    stopWhen: stepCountIs(config.maxSteps ?? 5),
+    stopWhen: [stepCountIs(config.maxSteps ?? 5), shouldStopAfterTerminalStep],
     maxRetries: 0,
     timeout: {
       stepMs: 25_000,
       totalMs: 65_000,
     },
     ...(options?.abortSignal ? { abortSignal: options.abortSignal } : {}),
-    providerOptions: {
-      google: {
-        thinkingConfig: {
-          thinkingBudget: 512,
-        },
-      },
-    },
+    ...(shouldEnableThinking
+      ? {
+          providerOptions: {
+            google: {
+              thinkingConfig: {
+                thinkingBudget: 512,
+              },
+            },
+          },
+        }
+      : {}),
     onStepStart: ({ stepNumber }) => {
       options?.onProgress?.(resolveStepStartProgressMessage(stepNumber));
     },
@@ -519,7 +615,11 @@ export async function runNavigatorEngine(
       : resolvedFinishReason && resolvedFinishReason !== "stop" && clientActions.length === 0
         ? "처리 단계가 많아 작업을 끝까지 완료하지 못했습니다. 조건을 좁히거나 나누어 다시 요청해 주세요."
         : "요청을 처리했습니다.";
-  const reply = result.text || singleAction?.message || fallbackReply;
+  const reply =
+    result.text ||
+    (pendingConfirmations.length > 0 && singleAction?.message
+      ? `${singleAction.message} 아래 승인 카드에서 [승인] 또는 [취소]를 선택해 주세요.`
+      : singleAction?.message || fallbackReply);
 
   // 6. 통합 단일 반환
   return {
