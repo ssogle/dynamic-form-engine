@@ -131,8 +131,8 @@ export function DynamicFormRenderer({
                   </Badge>
                 )}
               </div>
-              <div className="flex items-center gap-2">
-                {mode === "preview" && formId && (
+              {mode === "preview" && formId && (
+                <div className="flex items-center gap-2">
                   <Button
                     type="button"
                     size="xs"
@@ -142,11 +142,8 @@ export function DynamicFormRenderer({
                   >
                     {isPublished ? "발행 취소" : "발행하기"}
                   </Button>
-                )}
-                {formId ? (
-                  <span className="text-muted-foreground font-mono text-xs">ID: {formId}</span>
-                ) : null}
-              </div>
+                </div>
+              )}
             </div>
 
             <CardTitle className="text-2xl font-bold tracking-tight">{activeForm.title}</CardTitle>
