@@ -30,6 +30,11 @@ export interface ConsumerFormDraftState {
   applyDraftFields: (formId: string, fields: Record<string, unknown>) => void;
 
   /**
+   * 사용자가 폼(RHF)에서 직접 입력·수정한 전체 현재 스냅샷을 스토어에 역동기화
+   */
+  syncDraftValues: (formId: string, values: Record<string, unknown>) => void;
+
+  /**
    * AI에 의한 폼 제출 신호 발생
    */
   triggerSubmit: (formId: string) => void;
@@ -38,6 +43,24 @@ export interface ConsumerFormDraftState {
    * 임시 데이터 초기화
    */
   resetDraft: () => void;
+}
+
+function areDraftFieldValuesEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((item, idx) => Object.is(item, b[idx]));
+  }
+  return false;
+}
+
+function areDraftRecordsEqual(
+  prev: Record<string, unknown>,
+  next: Record<string, unknown>
+): boolean {
+  const prevKeys = Object.keys(prev);
+  const nextKeys = Object.keys(next);
+  if (prevKeys.length !== nextKeys.length) return false;
+  return nextKeys.every((key) => areDraftFieldValuesEqual(prev[key], next[key]));
 }
 
 /**
@@ -71,6 +94,17 @@ export const useConsumerFormDraftStore = create<ConsumerFormDraftState>((set) =>
             }
           : { ...fields },
     })),
+
+  syncDraftValues: (formId, values) =>
+    set((state) => {
+      if (state.currentFormId === formId && areDraftRecordsEqual(state.draftValues, values)) {
+        return state;
+      }
+      return {
+        currentFormId: formId,
+        draftValues: { ...values },
+      };
+    }),
 
   triggerSubmit: (formId) =>
     set((state) => ({

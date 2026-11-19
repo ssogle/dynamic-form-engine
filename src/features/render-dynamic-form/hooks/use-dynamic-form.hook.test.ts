@@ -174,4 +174,41 @@ describe("useDynamicForm (features/render-dynamic-form/hooks)", () => {
       isPublished: false,
     });
   });
+
+  it("사용자 직접 입력(RHF 변경)은 onValuesChange로 역동기화하고 외부 values prop 주입은 재방출하지 않아야 한다", async () => {
+    const onValuesChangeMock = vi.fn();
+    const { result, rerender } = renderHook(
+      (props: { values?: Record<string, unknown> | undefined }) =>
+        useDynamicForm({
+          form: dummyForm,
+          mode: "submission",
+          values: props.values,
+          onValuesChange: onValuesChangeMock,
+        }),
+      {
+        initialProps: { values: undefined as Record<string, unknown> | undefined },
+      }
+    );
+
+    // 1. 외부 values prop 반영 시 onValuesChange 루프 재방출이 없어야 함
+    rerender({ values: { "field-1": "AI입력" } });
+    await waitFor(() => {
+      expect(result.current.methods.getValues("field-1")).toBe("AI입력");
+    });
+    expect(onValuesChangeMock).not.toHaveBeenCalled();
+
+    // 2. 사용자가 직접 폼 값을 변경하면 onValuesChange가 최신 스냅샷과 함께 호출되어야 함
+    act(() => {
+      result.current.methods.setValue("field-1", "사용자직접수정", {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    });
+
+    expect(onValuesChangeMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        "field-1": "사용자직접수정",
+      })
+    );
+  });
 });

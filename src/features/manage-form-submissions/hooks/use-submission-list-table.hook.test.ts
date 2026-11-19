@@ -562,4 +562,38 @@ describe("useSubmissionListTable (features/manage-form-submissions/hooks)", () =
     expect(result.current.flatSubmissions).toEqual([]);
     expect(result.current.totalCount).toBe(0);
   });
+
+  it("initialSort가 전달되면 초기 정렬 상태와 쿼리 파라미터를 반영하고 변경 시 동기화해야 한다", () => {
+    const { rerender } = renderHook(
+      ({ initialSort }) =>
+        useSubmissionListTable({
+          form: dummyForm,
+          initialSort,
+        }),
+      {
+        wrapper: createWrapper(),
+        initialProps: {
+          initialSort: [{ id: "field-name", desc: false }],
+        },
+      }
+    );
+
+    expect(mockUseInfiniteQuery).toHaveBeenLastCalledWith(
+      "form-uuid-1",
+      expect.objectContaining({
+        sort: "field-name:asc",
+      })
+    );
+
+    rerender({
+      initialSort: [{ id: "createdAt", desc: true }],
+    });
+
+    expect(mockUseInfiniteQuery).toHaveBeenLastCalledWith(
+      "form-uuid-1",
+      expect.objectContaining({
+        sort: "createdAt:desc",
+      })
+    );
+  });
 });

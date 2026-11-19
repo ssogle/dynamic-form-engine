@@ -3,7 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { useFormDetailQuery } from "@/entities/form";
-import type { FormSubmission, SubmissionDateRangeFilter } from "@/entities/form-submission";
+import type {
+  FormSubmission,
+  SortItem,
+  SubmissionDateRangeFilter,
+} from "@/entities/form-submission";
 import type { FieldFilterCondition } from "@/shared/schema";
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
@@ -24,6 +28,10 @@ export interface ManageFormSubmissionsProps {
    * 분석 뷰 드릴다운 등에서 URL 쿼리로 전달된 초기 컬럼 필터 목록
    */
   initialFilters?: FieldFilterCondition[] | undefined;
+  /**
+   * URL 쿼리 파라미터로부터 전달된 초기 정렬 조건 목록
+   */
+  initialSort?: SortItem[] | undefined;
   /**
    * 목록 동작 모드 (기본값: "consumer")
    */
@@ -48,6 +56,7 @@ export function ManageFormSubmissions({
   formId,
   initialDateRange,
   initialFilters,
+  initialSort,
   mode = "consumer",
   sampleSubmissions,
   onSelectSubmission,
@@ -105,6 +114,7 @@ export function ManageFormSubmissions({
         form={form}
         initialDateRange={initialDateRange}
         initialFilters={initialFilters}
+        initialSort={initialSort}
         mode={mode}
         sampleSubmissions={sampleSubmissions}
         onSelectSubmission={onSelectSubmission}

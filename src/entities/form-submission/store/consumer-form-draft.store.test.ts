@@ -70,4 +70,16 @@ describe("useConsumerFormDraftStore (entities/form-submission/store)", () => {
     store.triggerSubmit("form-a");
     expect(useConsumerFormDraftStore.getState().submitTriggerCount).toBe(2);
   });
+
+  it("syncDraftValues 호출 시 수동 입력 스냅샷이 저장되고 동일 값 재호출 시 상태 참조를 불필요하게 바꾸지 않아야 한다", () => {
+    const store = useConsumerFormDraftStore.getState();
+    store.setCurrentFormId("form-a");
+
+    store.syncDraftValues("form-a", { f1: "직접입력", f2: ["MEAL"] });
+    const firstState = useConsumerFormDraftStore.getState();
+    expect(firstState.draftValues).toEqual({ f1: "직접입력", f2: ["MEAL"] });
+
+    store.syncDraftValues("form-a", { f1: "직접입력", f2: ["MEAL"] });
+    expect(useConsumerFormDraftStore.getState()).toBe(firstState);
+  });
 });

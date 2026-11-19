@@ -62,6 +62,10 @@ export interface UseConsumerSubmissionEditorReturn {
    */
   activeSubmitTriggerCount: number | undefined;
   /**
+   * 사용자가 키보드·마우스로 폼을 직접 수정할 때 초안 스토어에 역동기화하는 핸들러
+   */
+  handleDraftValuesChange: (values: Record<string, unknown>) => void;
+  /**
    * 수정된 데이터를 서버로 전송하는 핸들러
    */
   handleUpdate: (cleanedData: Record<string, unknown>) => Promise<void>;
@@ -108,19 +112,39 @@ export function useConsumerSubmissionEditor({
   const currentDraftFormId = useConsumerFormDraftStore((state) => state.currentFormId);
   const draftValues = useConsumerFormDraftStore((state) => state.draftValues);
   const submitTriggerCount = useConsumerFormDraftStore((state) => state.submitTriggerCount);
-  const setCurrentFormId = useConsumerFormDraftStore((state) => state.setCurrentFormId);
+  const syncDraftValues = useConsumerFormDraftStore((state) => state.syncDraftValues);
   const resetDraft = useConsumerFormDraftStore((state) => state.resetDraft);
+  const preservedDraftRef = React.useRef<{
+    formId: string;
+    values: Record<string, unknown>;
+  } | null>(null);
 
   React.useEffect(() => {
-    resetDraft();
-    setCurrentFormId(formId);
+    const storeState = useConsumerFormDraftStore.getState();
+    if (preservedDraftRef.current?.formId === formId) {
+      storeState.applyDraftFields(formId, preservedDraftRef.current.values);
+      preservedDraftRef.current = null;
+    } else {
+      storeState.setCurrentFormId(formId);
+      const synced = useConsumerFormDraftStore.getState();
+      if (synced.currentFormId === formId && Object.keys(synced.draftValues).length > 0) {
+        preservedDraftRef.current = { formId, values: { ...synced.draftValues } };
+      }
+    }
     return () => {
       resetDraft();
     };
-  }, [formId, setCurrentFormId, resetDraft]);
+  }, [formId, resetDraft]);
 
   const activeDraftValues = currentDraftFormId === formId ? draftValues : undefined;
   const activeSubmitTriggerCount = currentDraftFormId === formId ? submitTriggerCount : undefined;
+
+  const handleDraftValuesChange = React.useCallback(
+    (nextValues: Record<string, unknown>) => {
+      syncDraftValues(formId, nextValues);
+    },
+    [formId, syncDraftValues]
+  );
 
   // 기존 제출된 응답 데이터와 AI Navigator가 수정한 임시 필드값을 안전하게 병합
   const submissionData = submission?.data;
@@ -191,6 +215,7 @@ export function useConsumerSubmissionEditor({
     updateErrorMessage,
     mergedValues,
     activeSubmitTriggerCount,
+    handleDraftValuesChange,
     handleUpdate,
     handleResetSuccess,
   };

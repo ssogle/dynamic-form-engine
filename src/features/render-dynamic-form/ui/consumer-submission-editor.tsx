@@ -46,6 +46,7 @@ export function ConsumerSubmissionEditor({ formId, submissionId }: ConsumerSubmi
     updateErrorMessage,
     mergedValues,
     activeSubmitTriggerCount,
+    handleDraftValuesChange,
     handleUpdate,
     handleResetSuccess,
   } = useConsumerSubmissionEditor({ formId, submissionId });
@@ -183,6 +184,7 @@ export function ConsumerSubmissionEditor({ formId, submissionId }: ConsumerSubmi
         form={form}
         mode="submission"
         values={mergedValues}
+        onValuesChange={handleDraftValuesChange}
         submitTriggerCount={activeSubmitTriggerCount}
         onSubmit={handleUpdate}
         isSubmitting={isUpdating}

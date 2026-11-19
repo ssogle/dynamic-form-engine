@@ -26,6 +26,7 @@ export function DynamicFormRenderer({
   mode = "submission",
   onSubmit,
   values,
+  onValuesChange,
   submitTriggerCount,
   selectedFieldId,
   onFieldClick,
@@ -49,6 +50,7 @@ export function DynamicFormRenderer({
     formId,
     mode,
     values,
+    onValuesChange,
     submitTriggerCount,
     onSubmit,
   });

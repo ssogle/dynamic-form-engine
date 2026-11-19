@@ -4,7 +4,11 @@ import * as React from "react";
 import { SlidersHorizontal, X } from "lucide-react";
 import { VirtualTable } from "@/shared/lib/virtual-table";
 import type { Form } from "@/entities/form";
-import type { FormSubmission, SubmissionDateRangeFilter } from "@/entities/form-submission";
+import type {
+  FormSubmission,
+  SortItem,
+  SubmissionDateRangeFilter,
+} from "@/entities/form-submission";
 import type { FieldFilterCondition } from "@/shared/schema";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
@@ -20,6 +24,7 @@ export interface SubmissionListTableProps {
   form: Form;
   initialDateRange?: SubmissionDateRangeFilter | undefined;
   initialFilters?: FieldFilterCondition[] | undefined;
+  initialSort?: SortItem[] | undefined;
   /** 테이블 동작 모드 (기본값: "consumer") */
   mode?: FormSubmissionViewMode | undefined;
   /** 프리뷰 모드에서 실데이터 0건 시 폴백으로 표시할 가상 샘플 레코드 목록 */
@@ -39,6 +44,7 @@ export function SubmissionListTable({
   form,
   initialDateRange,
   initialFilters,
+  initialSort,
   mode = "consumer",
   sampleSubmissions,
   onSelectSubmission,
@@ -69,6 +75,7 @@ export function SubmissionListTable({
     form,
     initialDateRange,
     initialFilters,
+    initialSort,
     mode,
     sampleSubmissions,
     onSelectSubmission,

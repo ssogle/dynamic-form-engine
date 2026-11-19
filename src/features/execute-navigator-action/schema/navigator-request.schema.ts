@@ -68,8 +68,15 @@ export const navigatorClientContextSchema = z.object({
         label: z.string(),
         type: z.string(),
         required: z.boolean().optional(),
+        multiple: z.boolean().optional(),
         description: z.string().optional(),
         options: z.array(selectOptionSchema).optional(),
+        relationConfig: z
+          .object({
+            targetFormId: z.string(),
+            multiple: z.boolean().optional(),
+          })
+          .optional(),
       })
     )
     .optional(),

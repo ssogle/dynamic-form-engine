@@ -129,10 +129,17 @@ function extractUpdatedAnalysisView(toolResults: Array<{ output: unknown }>): An
  * 본 맵에 선언적으로 도구와 프롬프트 팩토리를 등록하여 손쉽게 확장할 수 있습니다.
  */
 const NAVIGATOR_MODE_REGISTRY: Record<NavigatorMode, ModeConfigFactory> = {
-  consumer: (queryTools) => ({
+  consumer: (queryTools, currentContext) => ({
     instructions: CONSUMER_NAVIGATOR_SYSTEM_PROMPT,
+    maxSteps: 10,
     tools: {
-      ...createConsumerTools({ softDeleteSubmissionsByIds }),
+      ...createConsumerTools({
+        softDeleteSubmissionsByIds,
+        findFormById,
+        queryFormSubmissionsForAnalysis,
+        currentFormId: currentContext?.currentFormId,
+        initialDraftValues: currentContext?.currentDraftValues,
+      }),
       ...queryTools,
     },
     formatPrompt: formatConsumerContextPrompt,
@@ -216,6 +223,9 @@ function resolveToolStartProgressMessage(toolName: string): string {
   ) {
     return "데이터베이스에서 최신 데이터를 집계·조회하고 있습니다...";
   }
+  if (toolName === "searchSubmissions") {
+    return "등록된 제출 데이터를 데이터베이스에서 검색·조회하고 있습니다...";
+  }
   if (["searchForms", "getFormDetails"].includes(toolName)) {
     return "대상 폼 구조와 필드 정보를 확인하고 있습니다...";
   }
@@ -234,6 +244,9 @@ function resolveToolStartProgressMessage(toolName: string): string {
   }
   if (["createForm", "updateFormSchema", "publishForm", "deleteForms"].includes(toolName)) {
     return "폼 스키마 및 상태를 반영하고 있습니다...";
+  }
+  if (toolName === "applySubmissionListQuery") {
+    return "요청한 필터와 정렬 조건을 목록에 반영하고 있습니다...";
   }
   return "요청 작업을 실행하고 있습니다...";
 }
@@ -255,6 +268,9 @@ function resolveStepEndProgressMessage(toolNames: string[], finishReason: string
     )
   ) {
     return "데이터 집계·조회를 마쳤습니다. 분석 결과를 구성하고 있습니다...";
+  }
+  if (toolNames.includes("searchSubmissions")) {
+    return "등록된 데이터 검색을 마쳤습니다. 결과를 정리하고 있습니다...";
   }
   if (
     toolNames.some((name) =>
