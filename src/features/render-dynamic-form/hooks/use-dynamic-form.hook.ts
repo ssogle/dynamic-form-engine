@@ -157,7 +157,9 @@ export function useDynamicForm({
   const hasPopulatedValuesRef = React.useRef(false);
   const prevDefaultValuesRef = React.useRef<Record<string, unknown>>(defaultValues);
   const onValuesChangeRef = React.useRef(onValuesChange);
-  onValuesChangeRef.current = onValuesChange;
+  React.useEffect(() => {
+    onValuesChangeRef.current = onValuesChange;
+  }, [onValuesChange]);
 
   // 7. 외부 또는 AI Navigator로부터 주입된 필드값 동기화 (동일 값 덮어쓰기 및 역동기화 루프 방지)
   React.useEffect(() => {
@@ -183,19 +185,20 @@ export function useDynamicForm({
   }, [values, methods, defaultValues]);
 
   // 7-1. 사용자의 마우스·키보드 직접 입력/수정 내역을 상위 초안 스토어로 역동기화
+  // React Compiler 호환성을 위해 `watch` 대신 공식 비렌더링 구독 API(`subscribe`)를 사용합니다.
   React.useEffect(() => {
     if (mode !== "submission") {
       return;
     }
-    const subscription = methods.watch((watchedValues) => {
-      if (isApplyingExternalValuesRef.current) {
-        return;
-      }
-      onValuesChangeRef.current?.({ ...(watchedValues as Record<string, unknown>) });
+    return methods.subscribe({
+      formState: { values: true },
+      callback: ({ values: watchedValues }) => {
+        if (isApplyingExternalValuesRef.current) {
+          return;
+        }
+        onValuesChangeRef.current?.({ ...(watchedValues as Record<string, unknown>) });
+      },
     });
-    return () => {
-      subscription.unsubscribe();
-    };
   }, [methods, mode]);
 
   // 8. 폼 제출 이벤트 핸들러

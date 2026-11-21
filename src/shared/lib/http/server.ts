@@ -68,13 +68,20 @@ export const apiResponse = {
     }
 
     // 2. 일반 자바스크립트 Error (e.g. new Error)인 경우
+    // 프로덕션 환경에서는 DB 연결 문자열, SQL 제약 조건, 외부 API 원시 오류 등이
+    // 클라이언트로 직접 노출되지 않도록 서버 로그에만 기록하고 일반화된 안내 문구를 반환합니다.
     if (error instanceof Error) {
+      const isProduction = process.env.NODE_ENV === "production";
+      if (isProduction) {
+        console.error("[API Internal Error]", error);
+      }
+
       return NextResponse.json(
         {
           success: false,
           error: {
             code: "INTERNAL_SERVER_ERROR",
-            message: error.message,
+            message: isProduction ? "서버 처리 중 오류가 발생했습니다." : error.message,
           },
         },
         { status: 500 }

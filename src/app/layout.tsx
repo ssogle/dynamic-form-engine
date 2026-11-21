@@ -15,8 +15,26 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Dynamic Form Engine",
-  description: "자연어 기반 동적 폼 스키마 빌더 및 비정형 데이터 정제 런타임 엔진",
+  title: {
+    default: "AI Dynamic Form Engine",
+    template: "%s | AI Dynamic Form Engine",
+  },
+  description:
+    "자연어 기반 관계형 도메인 폼 빌더, 멀티모달 비정형 데이터 정제 런타임 및 결정론적 데이터 분석 엔진",
+  openGraph: {
+    title: "AI Dynamic Form Engine",
+    description:
+      "자연어 기반 관계형 도메인 폼 빌더, 멀티모달 비정형 데이터 정제 런타임 및 결정론적 데이터 분석 엔진",
+    type: "website",
+    locale: "ko_KR",
+    siteName: "AI Dynamic Form Engine",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AI Dynamic Form Engine",
+    description:
+      "자연어 기반 관계형 도메인 폼 빌더, 멀티모달 비정형 데이터 정제 런타임 및 결정론적 데이터 분석 엔진",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

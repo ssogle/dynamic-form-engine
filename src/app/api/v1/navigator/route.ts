@@ -4,7 +4,13 @@ import {
   navigatorRequestSchema,
   type NavigatorStreamEvent,
 } from "@/features/execute-navigator-action/server";
-import { apiResponse, parseRequestData, withErrorHandler } from "@/shared/lib/http";
+import { apiResponse, isHttpError, parseRequestData, withErrorHandler } from "@/shared/lib/http";
+
+/**
+ * 서버리스 환경(Vercel 등)에서 다중 스텝 Tool Calling 및 PostgreSQL 서버 집계 스트리밍이
+ * 기본 함수 타임아웃으로 중단되지 않도록 최대 실행 시간을 60초로 명시합니다.
+ */
+export const maxDuration = 60;
 
 /**
  * AI Navigator 통합 HTTP 엔드포인트 핸들러 (POST /api/v1/navigator)
@@ -89,11 +95,28 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
         });
         enqueueEvent({ type: "result", data: result });
       } catch (err) {
-        const errorMessage = streamAbortController.signal.aborted
-          ? "요청이 중단되었거나 응답 제한 시간을 초과했습니다. 다시 시도해 주세요."
-          : err instanceof Error
-            ? err.message
-            : "AI 네비게이터 처리 중 오류가 발생했습니다.";
+        const isProduction = process.env.NODE_ENV === "production";
+        const defaultErrorMessage = "AI 네비게이터 처리 중 오류가 발생했습니다.";
+        let errorMessage: string;
+
+        if (streamAbortController.signal.aborted) {
+          errorMessage = "요청이 중단되었거나 응답 제한 시간을 초과했습니다. 다시 시도해 주세요.";
+        } else if (isHttpError(err)) {
+          errorMessage = err.message;
+        } else if (err instanceof Error) {
+          if (isProduction) {
+            console.error("[Navigator Stream Error]", err);
+            errorMessage = defaultErrorMessage;
+          } else {
+            errorMessage = err.message;
+          }
+        } else {
+          if (isProduction) {
+            console.error("[Navigator Stream Unknown Error]", err);
+          }
+          errorMessage = defaultErrorMessage;
+        }
+
         enqueueEvent({
           type: "error",
           message: errorMessage,
