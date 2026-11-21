@@ -1,19 +1,16 @@
-<!-- 아카이브(동결) 전환 시 아래 WARNING 주석을 해제하고 상단 NOTE 블록을 대체하세요 -->
-<!--
 > [!WARNING]
 > **ARCHIVED SPECIFICATION (READ-ONLY)**
 > 본 문서는 구현 완료 후 동결된 과거 기록입니다.
 > 현재 시스템의 구현 규격은 `/src` 실제 코드를 참조하세요. AI 에이전트는 이 문서를 최신 코드로 인용하지 마십시오.
--->
 
 # [Spec-016] 공통 데이터 테이블 통합 및 AI 필터·파생 정렬 엔진 정합성
 
 > [!NOTE]
 >
-> - **상태 (Status)**: Active (기획/구현 중)
+> - **상태 (Status)**: Archived (구현 완료 및 동결)
 > - **브랜치 (Branch)**: `feat/spec-016-unified-table-and-ai-sort-engine`
 > - **작성일 (Created)**: 2026-11-21
-> - **완료일 (Archived)**: -
+> - **완료일 (Archived)**: 2026-11-21
 
 ## 1. 배경 및 문제 정의 (Context & Problem Statement)
 
@@ -41,16 +38,18 @@
 
 - **아키텍처 및 FSD 계층 배치**:
   - `src/shared/lib/debounce/`: 공용 `useDebouncedValue<T>(value: T, delayMs?: number)` 훅
+  - `src/shared/lib/virtual-table/virtual-table.tsx`: 네임드 `group/resizer` 적용으로 상위 래퍼 호버 간섭 격리
+  - `src/shared/schema/uuid.schema.ts`: 공용 `uuidSchema` (`z.uuid()`) 및 `isUuid` 판별 헬퍼 단일 진실 원천화
   - `src/shared/schema/field-capability.schema.ts`: `SYSTEM_FIELD_CAPABILITIES.id.filterOperators`에 `"in"` 추가
   - `src/entities/form-submission/server/field-filter-sql.server.ts`: `buildSystemFieldConditionSql`에 `id` `"in"` 필터 SQL (`inArray` / UUID 검증) 구현
   - `src/entities/form-submission/schema/analytics-query.schema.ts` & `src/entities/form-submission/lib/analytics-calculator.ts`: `computeSeriesMetric` `sortBy` / `sortOrder` 확장
   - `src/features/manage-form-submissions/`:
-    - `types/submission-view.types.ts`, `manage-form-submissions.tsx`, `use-submission-list-table.hook.ts`, `submission-list-table.tsx`: `selectionMode` / `compact` 지원, 활성 정렬 칩/해제 핸들러, `columnFilters` `relation` UUID 룩업 포함
+    - `types/submission-view.types.ts`, `manage-form-submissions.tsx`, `use-submission-list-table.hook.ts`, `submission-list-table.tsx`: `selectionMode` / `compact` / `onRemoveSelectedRow`(`__unlink` 열) 지원, 활성 정렬 칩/해제 핸들러, 상단 툴바 `컬럼 표시` 우측 고정, `columnFilters` `relation` UUID 룩업 포함
     - `lib/filter-summary.ts`: 숫자 천 단위 콤마 및 `eq` `relation` 라벨 치환
     - `ui/column-header-filter.tsx`, `ui/relation-column-filter-picker.tsx`: `eq` → `in` 정규화 및 `useDebouncedValue(300)` 적용
     - `ui/submission-detail-view.tsx`: 정방향 `relation` 영역 `ManageFormSubmissions` 공통 테이블로 교체
-  - `src/features/render-dynamic-form/`: `renderRelationPicker?: (slot: RelationPickerSlotProps) => React.ReactNode` 슬롯을 통해 FSD 수평 참조 없이 피커 테이블 주입 수용
-  - `src/widgets/relational-form-picker/`: `render-dynamic-form`과 `manage-form-submissions`를 결합해 `RelationalFormSubmitter`, `RelationalSubmissionEditor`, `RelationalDynamicFormRenderer` 조립 (각 App 페이지에서 사용)
+  - `src/features/render-dynamic-form/`: `renderRelationPicker`, `renderRelationSelectedTable` 슬롯을 통해 FSD 수평 참조 없이 피커 및 선택 결과 테이블 주입 수용
+  - `src/widgets/relational-form-picker/`: `render-dynamic-form`과 `manage-form-submissions`를 결합해 `RelationalFormSubmitter`, `RelationalSubmissionEditor` 조립 (각 App 페이지에서 사용)
   - `src/features/execute-navigator-action/`: `consumer-prompt.ts`, `consumer-tools.ts`, `navigator-tools.schema.ts`, `analyst-tools.ts`, `analyst-prompt.ts` 업데이트 (`SORT_BLOCK_DATA`, `computeSeriesMetric` 정렬, `relation` `in` 통일, 원격 이동/위임 지침)
 - **데이터 계약 (Schema & Interfaces)**:
   ```typescript
