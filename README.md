@@ -1,5 +1,8 @@
 # AI Dynamic Form Builder & Runtime Engine
 
+[![CI](https://github.com/ssogle/dynamic-form-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/ssogle/dynamic-form-engine/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 > **자연어 기반 관계형 도메인 폼 빌더, 비정형 데이터 정제 런타임 및 결정론적 데이터 분석 엔진**  
 > Next.js 16 (App Router) · FSD(Feature-Sliced Design) · SDD(Spec-Driven Development) · TDD Harness
 
@@ -125,10 +128,20 @@ src/
 | **UI & 스타일링** | `@/shared/ui` 직접 임포트, Tailwind v4 시맨틱 토큰           | 배럴 파일 금지, 시스템 팝업(`alert`/`confirm`) 금지, `Thin View` + `use-*.hook.ts` 분리 | [.agents/rules/ui-and-styling-rule.md](.agents/rules/ui-and-styling-rule.md)                                        |
 | **테스트 전략**   | Vitest (`*.test.ts`)                                         | 순수 비즈니스 로직·스키마·스토어·서버 단위 테스트 집중 (`*.test.tsx` UI 테스트 배제)    | [.agents/rules/testing-strategy-rule.md](.agents/rules/testing-strategy-rule.md)                                    |
 | **SDD & Git**     | `docs/specs/{active,archived}`, Husky + Commitlint           | 스펙 선설계 후 구현·완료 시 아카이빙 동결, GitHub Flow 및 PR 템플릿 준수                | [SDD 규칙](.agents/rules/spec-driven-development-rule.md) / [Git 규칙](.agents/rules/git-commit-automation-rule.md) |
+| **CI 자동 검증**  | GitHub Actions (`.github/workflows/ci.yml`)                  | `master` Push 및 PR 단위 `npm run verify`(타입·린트·포맷·전체 단위 테스트) 자동 게이트  | [ci.yml](.github/workflows/ci.yml)                                                                                  |
+
+### Agentic Engineering Workflow (Harness-Driven Development)
+
+본 프로젝트는 AI 코딩 에이전트를 단순 코드 생성기가 아닌 **규칙과 테스트로 통제되는 협업 파트너**로 운영하기 위해 다음 4단계 하네스 루프를 적용했습니다:
+
+1. **명세 선행(Spec-First)**: 구현 전 [AGENTS.md](AGENTS.md)와 `.agents/skills/spec-authoring/` 스킬을 통해 Goals/Non-Goals, FSD 배치, Zod 계약을 합의하고 `docs/specs/active/`에 기록합니다.
+2. **정적 가드레일(Static Guardrails)**: `eslint-plugin-boundaries`, `check-file`, `no-restricted-imports`(날짜 라이브러리 직접 import 차단), `no-restricted-syntax`(`class`/`this` 금지)로 아키텍처 드리프트를 컴파일·린트 단계에서 즉시 차단합니다.
+3. **로직 중심 TDD(High-ROI Unit Tests)**: 외부 인프라(DB/LLM)에 의존하지 않는 순수 비즈니스 로직·스키마·스토어·서버 계약을 Vitest 단위 테스트로 고정합니다.
+4. **PR 단위 CI 게이트 및 아카이빙**: `npm run verify` 통과 후 완료된 스펙을 `docs/specs/archived/`로 동결하고, GitHub Actions CI를 통과한 PR만 `master`에 머지합니다.
 
 ---
 
-## 6. Spec-Driven Evolution (Archived Specs 001 ~ 016)
+## 6. Spec-Driven Evolution (Archived Specs 001 ~ 017)
 
 완료된 모든 기능 명세와 기술 의사결정 이력은 [`docs/specs/archived/`](docs/specs/archived/)에 읽기 전용으로 보존되어 있습니다.
 
@@ -150,6 +163,7 @@ src/
 | 014  | [014-relation-graph-visualization.md](docs/specs/archived/014-relation-graph-visualization.md)                           | `react-force-graph-3d` + `three-spritetext` 3D 관계 그래프, 랜딩 3D 배경, 제출 HITL·지연 최적화, 모바일 가드                 |
 | 015  | [015-workspace-ux-shell-and-focus-polish.md](docs/specs/archived/015-workspace-ux-shell-and-focus-polish.md)             | 랜딩 헤더·다크 테마 통합, `BackLink` 통일, AI 패널 좌/우 도킹·`Cmd+K`, 3D 그래프 드래그/시점·블록 포커스 개선                |
 | 016  | [016-unified-table-and-ai-sort-engine.md](docs/specs/archived/016-unified-table-and-ai-sort-engine.md)                   | 관계형 피커·선택결과·상세 테이블 `ManageFormSubmissions` 통합, 정렬 칩·UUID 스키마 통일, AI 파생 지표·`SORT_BLOCK_DATA` 정렬 |
+| 017  | [017-studio-ux-preview-and-filter-unification.md](docs/specs/archived/017-studio-ux-preview-and-filter-unification.md)   | 랜딩 데모 안내, 발행 상태 UI 통일, 빌더·분석가 AI 편집 동선, 프리뷰·드릴다운 필터 통합                                       |
 
 ---
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { apiResponse, parseRequestData, withErrorHandler } from "./server";
@@ -54,6 +54,29 @@ describe("HTTP Server Utilities (apiResponse & withErrorHandler)", () => {
     expect(json.error.code).toBe("BAD_REQUEST");
     expect(json.error.message).toBe("잘못된 필드 값입니다.");
     expect(json.error.details).toEqual({ field: "title" });
+  });
+
+  it("apiResponse.fail은 프로덕션 환경에서 일반 Error의 내부 메시지를 마스킹하고 서버 로그만 기록해야 한다", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const res = apiResponse.fail(new Error('relation "forms" violates constraint fk_secret'));
+      expect(res.status).toBe(500);
+
+      const json = await res.json();
+      expect(json).toEqual({
+        success: false,
+        error: {
+          code: "INTERNAL_SERVER_ERROR",
+          message: "서버 처리 중 오류가 발생했습니다.",
+        },
+      });
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      consoleErrorSpy.mockRestore();
+      vi.unstubAllEnvs();
+    }
   });
 
   describe("parseRequestData", () => {

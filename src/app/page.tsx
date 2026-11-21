@@ -92,7 +92,7 @@ export default function HomePage() {
             <h1 className="text-foreground text-3xl font-bold tracking-tight sm:text-4xl">
               AI Dynamic Form Engine
             </h1>
-            <p className="text-muted-foreground max-w-2xl text-base/relaxed sm:text-lg">
+            <p className="text-muted-foreground max-w-2xl text-base/relaxed text-balance break-keep sm:text-lg">
               자연어로 도메인 폼을 설계하는 빌더, 편리하게 응답을 제출하는 컨슈머, 수집 데이터를
               비교·시각화하여 리포트를 발행하는 분석가 환경을 제공합니다.
             </p>
@@ -137,21 +137,15 @@ export default function HomePage() {
             })}
           </div>
 
-          {/* 사전 구축 데모 환경 & 권장 체험 순서 안내 */}
+          {/* 빠른 체험 가이드 */}
           <Card className="border-border/70 bg-card/80 w-full text-left shadow-xs backdrop-blur-xs">
-            <CardHeader className="space-y-1.5 pb-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <CardTitle className="text-foreground text-sm font-semibold">
-                  사전 구축 데모 환경 안내
-                </CardTitle>
-                <span className="text-muted-foreground font-mono text-[11px]">
-                  IT 서비스 에이전시 ERP 도메인 · 폼 7종 · 누적 응답 3만 건 이상 · 발행 리포트 3종
-                </span>
-              </div>
-              <CardDescription className="text-muted-foreground text-xs leading-relaxed">
-                고객사, 프로젝트, 임직원, 작업일지, 비용 전표, 매출 정산 등 상호 연결된 도메인
-                데이터가 사전 구성되어 있어 별도 데이터 입력 없이도 모든 역할을 바로 체험할 수
-                있습니다.
+            <CardHeader className="space-y-1 pb-3">
+              <CardTitle className="text-foreground text-sm font-semibold">
+                빠른 체험 가이드
+              </CardTitle>
+              <CardDescription className="text-muted-foreground text-xs leading-relaxed break-keep">
+                샘플 폼과 연결 데이터가 미리 준비되어 있어 별도 데이터 입력 없이도 아래 순서로
+                서비스 흐름을 바로 체험할 수 있습니다.
               </CardDescription>
             </CardHeader>
             <div className="grid grid-cols-1 gap-3 px-6 pb-5 sm:grid-cols-3">
@@ -165,7 +159,9 @@ export default function HomePage() {
                     <span className="text-muted-foreground">·</span>
                     <span className="text-foreground">{item.role}</span>
                   </div>
-                  <p className="text-muted-foreground text-xs leading-relaxed">{item.summary}</p>
+                  <p className="text-muted-foreground text-xs leading-relaxed break-keep">
+                    {item.summary}
+                  </p>
                 </div>
               ))}
             </div>

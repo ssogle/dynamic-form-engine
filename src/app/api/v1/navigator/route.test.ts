@@ -190,4 +190,43 @@ describe("POST /api/v1/navigator (AI Navigator Thin Route Handler)", () => {
       vi.useRealTimers();
     }
   });
+
+  it("?stream=1 프로덕션 환경에서 일반 Error 발생 시 내부 메시지를 마스킹하여 error 이벤트를 전송해야 한다", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      vi.spyOn(navigatorServer, "runNavigatorEngine").mockRejectedValueOnce(
+        new Error("GEMINI_API_KEY quota detail: internal-stack")
+      );
+
+      const request = new NextRequest("http://localhost:3000/api/v1/navigator?stream=1", {
+        method: "POST",
+        body: JSON.stringify({
+          mode: "builder",
+          prompt: "폼 생성해줘",
+        }),
+      });
+
+      const response = await POST(request, {});
+      expect(response.status).toBe(200);
+
+      const text = await response.text();
+      const lines = text
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line) as { type: string; message?: string });
+
+      expect(lines).toEqual([
+        {
+          type: "error",
+          message: "AI 네비게이터 처리 중 오류가 발생했습니다.",
+        },
+      ]);
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      consoleErrorSpy.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
 });
