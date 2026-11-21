@@ -74,8 +74,6 @@ export function SubmissionListTable({
     activeFields,
     columnFilters,
     relationLookupMap,
-    dateRangeFilter,
-    dateRangeFieldLabel,
     activeFilterCount,
     sorting,
     isDefaultSorting,
@@ -88,7 +86,6 @@ export function SubmissionListTable({
     tableContainerRef,
     handleSetFieldFilter,
     handleClearAllFilters,
-    handleClearDateRange,
     handleRemoveSort,
     handleResetSorting,
     handleRowClick,
@@ -160,20 +157,6 @@ export function SubmissionListTable({
               샘플 데이터 미리보기
             </Badge>
           )}
-          {dateRangeFilter && (dateRangeFilter.startDate || dateRangeFilter.endDate) ? (
-            <Badge variant="outline" className="gap-1 px-2 py-0.5 text-[11px]">
-              기간({dateRangeFieldLabel}): {dateRangeFilter.startDate ?? "..."} ~{" "}
-              {dateRangeFilter.endDate ?? "..."}
-              <button
-                type="button"
-                onClick={handleClearDateRange}
-                className="hover:text-foreground ml-1 text-xs"
-                title="기간 필터 해제"
-              >
-                <X className="size-3" />
-              </button>
-            </Badge>
-          ) : null}
           {activeColumnFilters.map((condition) => {
             const fieldMeta = activeFields.find((f) => f.id === condition.fieldId);
             const fieldLabel = resolveFilterFieldLabel(condition.fieldId, activeFields);

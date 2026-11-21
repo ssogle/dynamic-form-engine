@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Controller, useFormContext } from "react-hook-form";
-import type { SelectOption } from "@/entities/form";
+import { getFieldTypeLabel, type SelectOption } from "@/entities/form";
 import { Input } from "@/shared/ui/input";
 import { Textarea } from "@/shared/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
@@ -215,6 +215,7 @@ export function DynamicField({
   onFieldClick,
   error: propError,
   disabled = false,
+  showTypeBadge = false,
   renderRelationPicker,
   renderRelationSelectedTable,
 }: DynamicFieldProps) {
@@ -693,6 +694,7 @@ export function DynamicField({
       label={label}
       required={required}
       isPrimary={isPrimary}
+      typeLabel={showTypeBadge ? getFieldTypeLabel(type) : undefined}
       description={description}
       error={displayError}
       isSelected={isSelected}

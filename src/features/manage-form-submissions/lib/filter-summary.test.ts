@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { CoreFormField } from "@/entities/form";
-import { formatFilterConditionSummary, resolveFilterFieldLabel } from "./filter-summary";
+import {
+  formatFilterConditionSummary,
+  normalizeConditionOptionTokens,
+  resolveFilterFieldLabel,
+} from "./filter-summary";
 
 describe("filter-summary (manage-form-submissions/lib)", () => {
   const fields: CoreFormField[] = [
@@ -89,5 +93,28 @@ describe("filter-summary (manage-form-submissions/lib)", () => {
     expect(resolveFilterFieldLabel("createdAt", fields)).toBe("제출 일시");
     expect(resolveFilterFieldLabel("f_cat", fields)).toBe("카테고리");
     expect(resolveFilterFieldLabel("unknown_id", fields)).toBe("unknown_id");
+  });
+
+  it("normalizeConditionOptionTokens는 옵션 라벨을 value 코드로 치환하고 중복을 제거해야 한다", () => {
+    const catOptions = fields[0]?.options;
+
+    expect(
+      normalizeConditionOptionTokens({ fieldId: "f_cat", op: "eq", value: "식대" }, catOptions)
+    ).toEqual({
+      fieldId: "f_cat",
+      op: "eq",
+      value: "MEAL",
+    });
+
+    expect(
+      normalizeConditionOptionTokens(
+        { fieldId: "f_cat", op: "in", values: ["식대", "MEAL", "구분류"] },
+        catOptions
+      )
+    ).toEqual({
+      fieldId: "f_cat",
+      op: "in",
+      values: ["MEAL", "OLD"],
+    });
   });
 });

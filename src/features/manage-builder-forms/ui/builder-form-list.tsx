@@ -2,10 +2,10 @@
 
 import React from "react";
 import Link from "next/link";
-import { FileText, Sparkles, Trash2 } from "lucide-react";
+import { FileText, Globe, RotateCcw, Sparkles, Trash2 } from "lucide-react";
 import { dispatchFocusNavigator } from "@/shared/lib/navigator-focus";
-import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
+import { PublishStatusBadge } from "@/shared/ui/publish-status-badge";
 import {
   Card,
   CardContent,
@@ -121,18 +121,7 @@ export function BuilderFormList() {
                 >
                   {form.title}
                 </Link>
-                {isPublished ? (
-                  <Badge
-                    variant="default"
-                    className="shrink-0 bg-emerald-600 text-[10px] hover:bg-emerald-700"
-                  >
-                    발행됨
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary" className="shrink-0 text-[10px]">
-                    초안
-                  </Badge>
-                )}
+                <PublishStatusBadge isPublished={isPublished} />
               </div>
               <CardDescription className="line-clamp-2 min-h-10 text-xs/relaxed">
                 {form.description || "설명이 등록되지 않은 동적 폼입니다."}
@@ -147,7 +136,7 @@ export function BuilderFormList() {
                     {formatDate(form.publishedAt)} 발행
                   </span>
                 ) : (
-                  <span>미발행 초안</span>
+                  <span>초안</span>
                 )}
               </div>
             </CardContent>
@@ -161,11 +150,22 @@ export function BuilderFormList() {
                 <Button
                   type="button"
                   size="sm"
-                  variant={isPublished ? "secondary" : "default"}
+                  className="gap-1.5"
+                  variant={isPublished ? "outline" : "default"}
                   onClick={() => handleTogglePublish(form.id, !isPublished)}
-                  disabled={isPublishPending}
+                  disabled={isPublishPending || (!isPublished && activeFieldCount === 0)}
                 >
-                  {isPublished ? "발행 취소" : "공식 발행"}
+                  {isPublished ? (
+                    <>
+                      <RotateCcw className="size-3.5" />
+                      발행 취소
+                    </>
+                  ) : (
+                    <>
+                      <Globe className="size-3.5" />
+                      공식 발행
+                    </>
+                  )}
                 </Button>
 
                 <Popover

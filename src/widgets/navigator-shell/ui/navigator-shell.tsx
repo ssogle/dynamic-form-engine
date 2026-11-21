@@ -98,6 +98,12 @@ export function NavigatorShell({
   } = useNavigatorShell({ mode });
 
   const canSubmit = !isBusy && (Boolean(inputValue.trim()) || attachments.length > 0);
+  const inputValueRef = React.useRef(inputValue);
+  const lastAutoPrefillRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    inputValueRef.current = inputValue;
+  }, [inputValue]);
 
   // 전역 Cmd/Ctrl + K 단축키 및 본문 포커스 트리거 수신 시 채팅 입력창으로 즉시 포커스 이동
   React.useEffect(() => {
@@ -110,10 +116,23 @@ export function NavigatorShell({
 
     const unsubscribe = subscribeFocusNavigator(({ prefillText, replace }) => {
       if (prefillText !== undefined) {
-        setInputValue((prev) => (replace || !prev.trim() ? prefillText : prev));
+        const current = inputValueRef.current;
+        const shouldReplace =
+          Boolean(replace) ||
+          !current.trim() ||
+          (lastAutoPrefillRef.current !== null && current === lastAutoPrefillRef.current);
+        if (shouldReplace) {
+          lastAutoPrefillRef.current = prefillText;
+          inputValueRef.current = prefillText;
+          setInputValue(prefillText);
+        }
       }
       requestAnimationFrame(() => {
-        inputRef.current?.focus();
+        const el = inputRef.current;
+        if (!el) return;
+        el.focus();
+        const len = el.value.length;
+        el.setSelectionRange(len, len);
       });
     });
 

@@ -26,12 +26,14 @@ import { BlockSourceLinksFooter } from "./block-source-links-footer";
 
 export interface ChartBlockRendererProps {
   block: ChartAnalysisBlock;
+  /** 카드 헤더 우측에 삽입할 추가 액션 (예: 분석가 캔버스 AI 수정 버튼) */
+  headerAction?: React.ReactNode | undefined;
 }
 
 /**
  * 분석 뷰 문서의 Recharts/shadcn 시각화 차트 블록 렌더러 (`bar` | `line` | `pie`)
  */
-export function ChartBlockRenderer({ block }: ChartBlockRendererProps) {
+export function ChartBlockRenderer({ block, headerAction }: ChartBlockRendererProps) {
   const chartConfig = React.useMemo(() => buildChartConfig(block), [block]);
   const pieSegments = React.useMemo(
     () => (block.chartType === "pie" ? buildPieChartSegments(block) : []),
@@ -42,9 +44,12 @@ export function ChartBlockRenderer({ block }: ChartBlockRendererProps) {
 
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold">{block.title}</CardTitle>
-        {block.description ? <CardDescription>{block.description}</CardDescription> : null}
+      <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
+        <div className="min-w-0 space-y-1">
+          <CardTitle className="text-base font-semibold">{block.title}</CardTitle>
+          {block.description ? <CardDescription>{block.description}</CardDescription> : null}
+        </div>
+        {headerAction}
       </CardHeader>
       <CardContent>
         {!hasChartData ? (

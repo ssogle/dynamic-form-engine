@@ -62,7 +62,7 @@ export function AnalysisViewActionBar({ viewId }: AnalysisViewActionBarProps) {
               {isPublished ? (
                 <>
                   <RotateCcw className="size-3.5" />
-                  발행 취소 (초안)
+                  발행 취소
                 </>
               ) : (
                 <>

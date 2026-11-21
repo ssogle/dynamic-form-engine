@@ -1,12 +1,15 @@
 "use client";
 
 import * as React from "react";
+import { Sparkles } from "lucide-react";
 import { FormProvider } from "react-hook-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
+import { PublishStatusBadge } from "@/shared/ui/publish-status-badge";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { cn } from "@/shared/lib/cn";
+import { dispatchFocusNavigator } from "@/shared/lib/navigator-focus";
 import { extractPrimaryFieldId } from "@/entities/form";
 import type { DynamicFormRendererProps } from "../types/render-dynamic-form.types";
 import { useDynamicForm } from "../hooks/use-dynamic-form.hook";
@@ -44,8 +47,6 @@ export function DynamicFormRenderer({
     isError,
     error,
     isPublished,
-    isPublishPending,
-    handlePublishToggle,
     handleFormSubmit,
   } = useDynamicForm({
     form: propForm,
@@ -104,6 +105,22 @@ export function DynamicFormRenderer({
       clearTimeout(timerId);
     };
   }, [mode, activeForm, activeFields]);
+
+  // 프리뷰 모드에서 필드 카드 클릭 시 AI 네비게이터에 해당 필드를 즉시 멘션 프리필합니다.
+  const handlePreviewFieldClick = React.useCallback(
+    (fieldId: string) => {
+      if (onFieldClick) {
+        onFieldClick(fieldId);
+        return;
+      }
+      const target = activeFields.find((f) => f.id === fieldId);
+      dispatchFocusNavigator({
+        prefillText: target ? `'${target.label}(${target.id})' 필드를 ` : `'${fieldId}' 필드를 `,
+        replace: true,
+      });
+    },
+    [onFieldClick, activeFields]
+  );
 
   // 1. 쿼리 로딩 상태 스켈레톤 렌더링
   if (isLoading) {
@@ -172,31 +189,16 @@ export function DynamicFormRenderer({
         <Card className="border-border/60 shadow-xs">
           {/* 폼 메타데이터 헤더 */}
           <CardHeader className="space-y-3 pb-6">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <Badge variant={isPublished ? "default" : "secondary"}>
-                  {isPublished ? "발행됨" : "작성 중"}
-                </Badge>
-                {mode === "preview" && (
+            {mode === "preview" && (
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <PublishStatusBadge isPublished={isPublished} />
                   <Badge variant="outline" className="border-primary/40 text-primary">
                     미리보기 모드
                   </Badge>
-                )}
-              </div>
-              {mode === "preview" && formId && (
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant={isPublished ? "outline" : "default"}
-                    onClick={handlePublishToggle}
-                    disabled={isPublishPending}
-                  >
-                    {isPublished ? "발행 취소" : "발행하기"}
-                  </Button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             <CardTitle className="text-2xl font-bold tracking-tight">{activeForm.title}</CardTitle>
 
@@ -215,9 +217,26 @@ export function DynamicFormRenderer({
                   등록된 폼 필드가 없습니다.
                 </p>
                 {mode === "preview" && (
-                  <p className="text-muted-foreground/80 mt-1 text-xs">
-                    AI Navigator와 대화하여 필요한 입력 항목을 추가해 보세요.
-                  </p>
+                  <>
+                    <p className="text-muted-foreground/80 mt-1 text-xs">
+                      AI Navigator와 대화하여 필요한 입력 항목과 관계형 필드를 추가해 보세요.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-4 gap-1.5 text-xs"
+                      onClick={() =>
+                        dispatchFocusNavigator({
+                          prefillText: "새 필드를 추가해줘: ",
+                          replace: true,
+                        })
+                      }
+                    >
+                      <Sparkles className="text-primary size-3.5" />
+                      AI에게 필드 추가 요청
+                    </Button>
+                  </>
                 )}
               </div>
             ) : (
@@ -239,7 +258,8 @@ export function DynamicFormRenderer({
                           field={field}
                           isPrimary={Boolean(primaryFieldId && field.id === primaryFieldId)}
                           isSelected={isHighlighted}
-                          onFieldClick={mode === "preview" ? onFieldClick : undefined}
+                          onFieldClick={mode === "preview" ? handlePreviewFieldClick : undefined}
+                          showTypeBadge={mode === "preview"}
                           disabled={disabled || isSubmitting}
                           renderRelationPicker={renderRelationPicker}
                           renderRelationSelectedTable={renderRelationSelectedTable}
@@ -263,12 +283,29 @@ export function DynamicFormRenderer({
                   </div>
                 )}
 
-                {/* 프리뷰 모드 안내 */}
+                {/* 프리뷰 모드 안내 및 AI 편집 동선 */}
                 {mode === "preview" && (
-                  <div className="border-border/60 bg-muted/30 rounded-lg border p-3 text-center">
+                  <div className="border-border/60 bg-muted/30 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3">
                     <p className="text-muted-foreground text-xs">
-                      현재 미리보기 모드입니다. 입력값 인터랙션과 디자인을 점검할 수 있습니다.
+                      각 필드의 <strong className="text-foreground font-medium">AI로 수정</strong>을
+                      누르거나 AI Navigator에게 필드 추가·수정·순서 변경을 요청하면 실시간으로
+                      반영됩니다.
                     </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      className="shrink-0 gap-1.5 text-xs"
+                      onClick={() =>
+                        dispatchFocusNavigator({
+                          prefillText: "새 필드를 추가해줘: ",
+                          replace: true,
+                        })
+                      }
+                    >
+                      <Sparkles className="text-primary size-3" />
+                      AI에게 필드 추가 요청
+                    </Button>
                   </div>
                 )}
               </form>
