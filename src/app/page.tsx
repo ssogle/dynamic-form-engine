@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, BarChart3, FileText, Wrench, type LucideIcon } from "lucide-react";
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
 import { LandingOntologyBackground } from "./_components/landing-ontology-background";
+import { WorkspaceAppBar } from "./_components/workspace-app-bar";
 
 interface GatewayRoleItem {
   readonly id: "builder" | "consumer" | "analyst";
@@ -57,62 +58,65 @@ const GATEWAY_ROLES: readonly GatewayRoleItem[] = [
  */
 export default function HomePage() {
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-zinc-50/50 p-6 font-sans dark:bg-black">
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-zinc-50/50 font-sans dark:bg-black">
+      <WorkspaceAppBar />
       <LandingOntologyBackground />
-      <main className="relative z-10 flex w-full max-w-5xl flex-col items-center gap-10 text-center">
-        {/* 서비스 헤더 */}
-        <div className="space-y-3">
-          <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-            Autonomous Form Engine
-          </span>
-          <h1 className="text-foreground text-3xl font-bold tracking-tight sm:text-4xl">
-            AI Dynamic Form Engine
-          </h1>
-          <p className="text-muted-foreground max-w-2xl text-base/relaxed sm:text-lg">
-            자연어로 도메인 폼을 설계하는 빌더, 편리하게 응답을 제출하는 컨슈머, 수집 데이터를
-            비교·시각화하여 리포트를 발행하는 분석가 환경을 제공합니다.
-          </p>
-        </div>
+      <div className="relative z-10 flex flex-1 items-center justify-center p-6">
+        <main className="flex w-full max-w-5xl flex-col items-center gap-10 text-center">
+          {/* 서비스 헤더 */}
+          <div className="space-y-3">
+            <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+              Autonomous Form Engine
+            </span>
+            <h1 className="text-foreground text-3xl font-bold tracking-tight sm:text-4xl">
+              AI Dynamic Form Engine
+            </h1>
+            <p className="text-muted-foreground max-w-2xl text-base/relaxed sm:text-lg">
+              자연어로 도메인 폼을 설계하는 빌더, 편리하게 응답을 제출하는 컨슈머, 수집 데이터를
+              비교·시각화하여 리포트를 발행하는 분석가 환경을 제공합니다.
+            </p>
+          </div>
 
-        {/* 3열 역할 선택 인터랙티브 카드 게이트웨이 */}
-        <div className="grid w-full grid-cols-1 gap-6 text-left sm:grid-cols-3">
-          {GATEWAY_ROLES.map((role) => {
-            const Icon = role.icon;
+          {/* 3열 역할 선택 인터랙티브 카드 게이트웨이 */}
+          <div className="grid w-full grid-cols-1 gap-6 text-left sm:grid-cols-3">
+            {GATEWAY_ROLES.map((role) => {
+              const Icon = role.icon;
 
-            return (
-              <Link
-                key={role.id}
-                href={role.href}
-                className="group focus-visible:ring-ring/50 block h-full rounded-xl outline-none focus-visible:ring-3"
-              >
-                <Card className="bg-card/90 group-hover:ring-primary/40 group-hover:bg-accent/30 flex h-full flex-col justify-between shadow-xs backdrop-blur-xs transition-all duration-150 group-hover:-translate-y-0.5 group-hover:shadow-md group-active:translate-y-0 group-active:scale-[0.99] group-active:shadow-xs">
-                  <CardHeader className="space-y-3 pt-2">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-primary text-xs font-semibold tracking-wider uppercase">
-                        {role.eyebrow}
-                      </span>
-                      <span className="bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors">
-                        <Icon className="size-4" />
-                      </span>
-                    </div>
-                    <CardTitle className="text-foreground group-hover:text-primary text-xl font-bold transition-colors">
-                      {role.title}
-                    </CardTitle>
-                    <CardDescription className="text-muted-foreground text-sm/relaxed">
-                      {role.description}
-                    </CardDescription>
-                  </CardHeader>
+              return (
+                <Link
+                  key={role.id}
+                  href={role.href}
+                  className="group focus-visible:ring-ring/50 block h-full rounded-xl outline-none focus-visible:ring-3"
+                >
+                  <Card className="bg-card/90 group-hover:ring-primary/40 group-hover:bg-accent/30 flex h-full flex-col justify-between shadow-xs backdrop-blur-xs transition-all duration-150 group-hover:-translate-y-0.5 group-hover:shadow-md group-active:translate-y-0 group-active:scale-[0.99] group-active:shadow-xs">
+                    <CardHeader className="space-y-3 pt-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-primary text-xs font-semibold tracking-wider uppercase">
+                          {role.eyebrow}
+                        </span>
+                        <span className="bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors">
+                          <Icon className="size-4" />
+                        </span>
+                      </div>
+                      <CardTitle className="text-foreground group-hover:text-primary text-xl font-bold transition-colors">
+                        {role.title}
+                      </CardTitle>
+                      <CardDescription className="text-muted-foreground text-sm/relaxed">
+                        {role.description}
+                      </CardDescription>
+                    </CardHeader>
 
-                  <CardFooter className="group-hover:bg-primary/5 group-hover:text-primary justify-between py-3.5 text-sm font-medium transition-colors">
-                    <span>{role.actionLabel}</span>
-                    <ArrowRight className="text-muted-foreground group-hover:text-primary size-4 transition-transform duration-150 group-hover:translate-x-1" />
-                  </CardFooter>
-                </Card>
-              </Link>
-            );
-          })}
-        </div>
-      </main>
+                    <CardFooter className="group-hover:bg-primary/5 group-hover:text-primary justify-between py-3.5 text-sm font-medium transition-colors">
+                      <span>{role.actionLabel}</span>
+                      <ArrowRight className="text-muted-foreground group-hover:text-primary size-4 transition-transform duration-150 group-hover:translate-x-1" />
+                    </CardFooter>
+                  </Card>
+                </Link>
+              );
+            })}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

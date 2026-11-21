@@ -1,6 +1,5 @@
 import * as React from "react";
-import Link from "next/link";
-import { Button } from "@/shared/ui/button";
+import { BackLink } from "@/shared/ui/back-link";
 import { ConsumerFormSubmitter } from "@/features/render-dynamic-form";
 
 interface ConsumerFormNewSubmissionPageProps {
@@ -23,11 +22,7 @@ export default async function ConsumerFormNewSubmissionPage({
   return (
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <Button asChild variant="ghost" size="sm" className="text-muted-foreground text-xs">
-            <Link href={`/consumer/forms/${id}`}>← 데이터 목록으로 돌아가기</Link>
-          </Button>
-        </div>
+        <BackLink href={`/consumer/forms/${id}`} label="데이터 목록으로" />
       </div>
 
       <ConsumerFormSubmitter formId={id} />

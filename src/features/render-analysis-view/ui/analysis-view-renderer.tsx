@@ -1,15 +1,19 @@
 "use client";
 
 import * as React from "react";
-import { FileBarChart2 } from "lucide-react";
+import { FileBarChart2, Sparkles } from "lucide-react";
 import {
   extractAnalysisBlocks,
   useAnalysisViewDetailQuery,
   type AnalysisView,
 } from "@/entities/analysis-view";
+import { cn } from "@/shared/lib/cn";
 import { formatDateTime } from "@/shared/lib/date";
+import { dispatchFocusNavigator } from "@/shared/lib/navigator-focus";
 import { Badge } from "@/shared/ui/badge";
+import { Button } from "@/shared/ui/button";
 import { Skeleton } from "@/shared/ui/skeleton";
+import { detectChangedAnalysisBlockId } from "../lib/detect-changed-block";
 import { ChartBlockRenderer } from "./chart-block-renderer";
 import { TableBlockRenderer } from "./table-block-renderer";
 import { TextBlockRenderer } from "./text-block-renderer";
@@ -49,6 +53,69 @@ export function AnalysisViewRenderer({
     isLoadingProp || (Boolean(viewId) && viewProp === undefined && detailQuery.isLoading);
   const isError = isErrorProp || (Boolean(viewId) && viewProp === undefined && detailQuery.isError);
   const errorMessage = errorMessageProp ?? detailQuery.error?.message;
+  const blocks = React.useMemo(() => (view ? extractAnalysisBlocks(view) : []), [view]);
+
+  const blockContainerRefs = React.useRef<Map<string, HTMLDivElement | null>>(new Map());
+  const prevViewIdRef = React.useRef<string | null>(null);
+  const prevBlockSnapshotsRef = React.useRef<Map<string, string>>(new Map());
+  const prevBlockOrderRef = React.useRef<string[]>([]);
+  const hasInitializedBlocksRef = React.useRef(false);
+  const [autoHighlightBlockId, setAutoHighlightBlockId] = React.useState<string | null>(null);
+
+  // 분석가 편집 캔버스(!publishedOnly)에서 AI가 블록을 추가·수정·재배치하면 해당 블록으로 자동 스크롤 및 일시 하이라이트를 적용합니다.
+  React.useEffect(() => {
+    if (publishedOnly || !view) {
+      return;
+    }
+
+    if (prevViewIdRef.current !== view.id) {
+      prevViewIdRef.current = view.id;
+      prevBlockSnapshotsRef.current = new Map(blocks.map((b) => [b.id, JSON.stringify(b)]));
+      prevBlockOrderRef.current = blocks.map((b) => b.id);
+      hasInitializedBlocksRef.current = true;
+      setAutoHighlightBlockId(null);
+      return;
+    }
+
+    if (!hasInitializedBlocksRef.current) {
+      prevBlockSnapshotsRef.current = new Map(blocks.map((b) => [b.id, JSON.stringify(b)]));
+      prevBlockOrderRef.current = blocks.map((b) => b.id);
+      hasInitializedBlocksRef.current = true;
+      return;
+    }
+
+    const { changedBlockId, nextSnapshots, nextOrder } = detectChangedAnalysisBlockId(
+      prevBlockSnapshotsRef.current,
+      prevBlockOrderRef.current,
+      blocks
+    );
+
+    prevBlockSnapshotsRef.current = nextSnapshots;
+    prevBlockOrderRef.current = nextOrder;
+
+    if (!changedBlockId) {
+      return;
+    }
+
+    const targetId = changedBlockId;
+    const rafId = requestAnimationFrame(() => {
+      setAutoHighlightBlockId(targetId);
+      blockContainerRefs.current.get(targetId)?.scrollIntoView?.({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+
+    const timerId = setTimeout(() => {
+      setAutoHighlightBlockId((curr) => (curr === targetId ? null : curr));
+    }, 2400);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timerId);
+    };
+  }, [publishedOnly, view, blocks]);
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -82,7 +149,6 @@ export function AnalysisViewRenderer({
     );
   }
 
-  const blocks = extractAnalysisBlocks(view);
   const isPublished = Boolean(view.publishedAt);
 
   return (
@@ -124,20 +190,47 @@ export function AnalysisViewRenderer({
           <FileBarChart2 className="text-muted-foreground/60 mb-3 size-10" />
           <p className="text-foreground text-sm font-medium">아직 작성된 분석 블록이 없습니다.</p>
           <p className="text-muted-foreground mt-1 text-xs">
-            우측 Analyst AI Navigator에게 데이터 집계 및 차트/표 블록 추가를 요청해 보세요.
+            Analyst AI Navigator에게 데이터 집계 및 차트/표 블록 추가를 요청해 보세요.
           </p>
+          {!publishedOnly ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-4 gap-1.5 text-xs"
+              onClick={() => dispatchFocusNavigator({ prefillText: "분석 블록을 추가해줘: " })}
+            >
+              <Sparkles className="text-primary size-3.5" />
+              AI에게 블록 추가 요청
+            </Button>
+          ) : null}
         </div>
       ) : (
         <div className="space-y-5">
           {blocks.map((block) => {
-            switch (block.type) {
-              case "text":
-                return <TextBlockRenderer key={block.id} block={block} />;
-              case "table":
-                return <TableBlockRenderer key={block.id} block={block} />;
-              case "chart":
-                return <ChartBlockRenderer key={block.id} block={block} />;
-            }
+            const isHighlighted = !publishedOnly && autoHighlightBlockId === block.id;
+            return (
+              <div
+                key={block.id}
+                ref={(el) => {
+                  blockContainerRefs.current.set(block.id, el);
+                }}
+                data-block-id={block.id}
+                data-highlighted={isHighlighted ? "true" : undefined}
+                className={cn(
+                  "rounded-xl transition-all duration-300",
+                  isHighlighted && "ring-primary/50 bg-primary/5 ring-2 ring-offset-2"
+                )}
+              >
+                {block.type === "text" ? (
+                  <TextBlockRenderer block={block} />
+                ) : block.type === "table" ? (
+                  <TableBlockRenderer block={block} />
+                ) : (
+                  <ChartBlockRenderer block={block} />
+                )}
+              </div>
+            );
           })}
         </div>
       )}

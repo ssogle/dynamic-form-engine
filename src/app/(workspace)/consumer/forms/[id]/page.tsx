@@ -6,6 +6,7 @@ import {
   type SubmissionDateRangeFilter,
 } from "@/entities/form-submission";
 import { parseFieldFiltersParam } from "@/shared/schema";
+import { BackLink } from "@/shared/ui/back-link";
 import { Button } from "@/shared/ui/button";
 import { ManageFormSubmissions } from "@/features/manage-form-submissions";
 
@@ -57,11 +58,7 @@ export default async function ConsumerFormIdPage({
   return (
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <Button asChild variant="ghost" size="sm" className="text-muted-foreground text-xs">
-            <Link href="/consumer">목록으로 돌아가기</Link>
-          </Button>
-        </div>
+        <BackLink href="/consumer" label="포털 목록으로" />
 
         <Button asChild size="sm">
           <Link href={`/consumer/forms/${id}/new`}>신규 데이터 작성</Link>

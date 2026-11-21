@@ -1,9 +1,18 @@
 "use client";
 
+import * as React from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Monitor } from "lucide-react";
 import type { NavigatorMode } from "@/features/execute-navigator-action";
+import {
+  DEFAULT_NAVIGATOR_DOCK_SIDE,
+  readSavedNavigatorDockSide,
+  saveNavigatorDockSide,
+  subscribeNavigatorDockSide,
+  type NavigatorDockSide,
+} from "@/shared/lib/navigator-focus";
+import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/ui/button";
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
 import { NavigatorShell } from "@/widgets/navigator-shell";
@@ -11,7 +20,7 @@ import { NavigatorShell } from "@/widgets/navigator-shell";
 interface WorkspaceSplitShellProps {
   /** 현재 작업 공간 앱의 AI Navigator 동작 모드 */
   readonly mode: NavigatorMode;
-  /** 우측 본문 작업 영역에 렌더링할 페이지 콘텐츠 */
+  /** 본문 작업 영역에 렌더링할 페이지 콘텐츠 */
   readonly children: ReactNode;
 }
 
@@ -19,9 +28,21 @@ interface WorkspaceSplitShellProps {
  * 작업 공간 공통 좌우 분할 쉘 (WorkspaceSplitShell)
  *
  * 최상위 WorkspaceLayout의 글로벌 앱 바 하단(h-full)을 채우며,
- * 좌측 상주형 AI Navigator 패널과 우측 스크롤 가능한 메인 작업 캔버스로 구성됩니다.
+ * 상주형 AI Navigator 패널(기본 우측 코파일럿 배치, 좌/우 도킹 전환 지원)과
+ * 스크롤 가능한 메인 작업 캔버스로 구성됩니다.
  */
 export function WorkspaceSplitShell({ mode, children }: WorkspaceSplitShellProps) {
+  const dockSide = React.useSyncExternalStore(
+    subscribeNavigatorDockSide,
+    readSavedNavigatorDockSide,
+    () => DEFAULT_NAVIGATOR_DOCK_SIDE
+  );
+
+  const handleToggleDockSide = React.useCallback(() => {
+    const next: NavigatorDockSide = dockSide === "right" ? "left" : "right";
+    saveNavigatorDockSide(next);
+  }, [dockSide]);
+
   return (
     <>
       {/* 1024px 미만 좁은 뷰포트(모바일/소형 태블릿) 전용 데스크톱 안내 하드 가드 */}
@@ -49,13 +70,23 @@ export function WorkspaceSplitShell({ mode, children }: WorkspaceSplitShellProps
 
       {/* 데스크톱(1024px 이상) 전용 좌우 분할 워크스페이스 */}
       <div className="bg-background hidden h-full w-full overflow-hidden lg:flex">
-        {/* 좌측 상주형 AI Navigator 관제탑 패널 */}
-        <div className="border-border/80 h-full w-80 shrink-0 border-r lg:w-96">
-          <NavigatorShell mode={mode} />
+        {/* 상주형 AI Navigator 관제탑 패널 (dockSide에 따라 좌/우 순서 및 테두리 전환) */}
+        <div
+          className={cn(
+            "border-border/80 h-full w-80 shrink-0 lg:w-96",
+            dockSide === "left" ? "order-1 border-r" : "order-2 border-l"
+          )}
+        >
+          <NavigatorShell mode={mode} dockSide={dockSide} onToggleDockSide={handleToggleDockSide} />
         </div>
 
-        {/* 우측 본문 작업 화면 (상단 앱 바 아래 1024px 통일 캔버스) */}
-        <main className="bg-muted/10 min-w-0 flex-1 overflow-y-auto">
+        {/* 본문 작업 화면 (상단 앱 바 아래 1024px 통일 캔버스) */}
+        <main
+          className={cn(
+            "bg-muted/10 min-w-0 flex-1 overflow-y-auto",
+            dockSide === "left" ? "order-2" : "order-1"
+          )}
+        >
           <div className="mx-auto min-h-full w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
             {children}
           </div>

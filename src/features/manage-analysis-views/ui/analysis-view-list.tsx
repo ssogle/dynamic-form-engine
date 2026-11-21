@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { FileBarChart2, Trash2 } from "lucide-react";
+import { FileBarChart2, Sparkles, Trash2 } from "lucide-react";
 import { extractAnalysisBlocks } from "@/entities/analysis-view";
 import { formatDate } from "@/shared/lib/date";
+import { dispatchFocusNavigator } from "@/shared/lib/navigator-focus";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import {
@@ -83,8 +84,18 @@ export function AnalysisViewList() {
           <FileBarChart2 className="text-muted-foreground/60 mb-3 size-10" />
           <p className="text-foreground text-sm font-medium">등록된 분석 뷰가 없습니다.</p>
           <p className="text-muted-foreground mt-1 text-xs">
-            우측 Analyst AI Navigator에게 폼 데이터 비교·집계 및 새 분석 뷰 작성을 요청해 보세요.
+            Analyst AI Navigator에게 폼 데이터 비교·집계 및 새 분석 뷰 작성을 요청해 보세요.
           </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-4 gap-1.5 text-xs"
+            onClick={() => dispatchFocusNavigator({ prefillText: "분석 뷰를 새로 만들어줘: " })}
+          >
+            <Sparkles className="text-primary size-3.5" />
+            AI에게 분석 뷰 요청하기
+          </Button>
         </CardContent>
       </Card>
     );
@@ -92,6 +103,19 @@ export function AnalysisViewList() {
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Button
+          type="button"
+          size="xs"
+          variant="outline"
+          className="gap-1.5 text-xs"
+          onClick={() => dispatchFocusNavigator({ prefillText: "분석 뷰를 새로 만들어줘: " })}
+        >
+          <Sparkles className="text-primary size-3.5" />
+          AI에게 새 분석 뷰 요청
+        </Button>
+      </div>
+
       {actionErrorMessage ? (
         <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-lg border px-4 py-3 text-sm">
           {actionErrorMessage}

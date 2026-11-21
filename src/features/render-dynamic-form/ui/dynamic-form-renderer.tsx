@@ -214,7 +214,7 @@ export function DynamicFormRenderer({
                 </p>
                 {mode === "preview" && (
                   <p className="text-muted-foreground/80 mt-1 text-xs">
-                    좌측 AI Navigator와 대화하여 필요한 입력 항목을 추가해 보세요.
+                    AI Navigator와 대화하여 필요한 입력 항목을 추가해 보세요.
                   </p>
                 )}
               </div>

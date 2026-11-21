@@ -6,6 +6,8 @@ import {
   CheckCircle2,
   ImagePlusIcon,
   LoaderCircleIcon,
+  PanelLeft,
+  PanelRight,
   ShieldAlertIcon,
   XCircleIcon,
   XIcon,
@@ -56,6 +58,7 @@ import {
   TraceTitle,
 } from "@/shared/ui/trace";
 import { cn } from "@/shared/lib/cn";
+import { subscribeFocusNavigator } from "@/shared/lib/navigator-focus";
 import { useNavigatorShell } from "../hooks/use-navigator-shell.hook";
 import type { NavigatorShellProps } from "../types/navigator-shell.types";
 
@@ -66,7 +69,12 @@ import type { NavigatorShellProps } from "../types/navigator-shell.types";
  * 공용 GFM 마크다운 렌더러를 조합해 대화 타임라인, 멀티모달 이미지 첨부,
  * 고위험 액션 인라인 사전 승인(HITL) UI를 렌더링하는 얇은 뷰(Thin View)입니다.
  */
-export function NavigatorShell({ mode, className }: NavigatorShellProps) {
+export function NavigatorShell({
+  mode,
+  dockSide = "right",
+  onToggleDockSide,
+  className,
+}: NavigatorShellProps) {
   const {
     config,
     messages,
@@ -91,16 +99,64 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
 
   const canSubmit = !isBusy && (Boolean(inputValue.trim()) || attachments.length > 0);
 
+  // 전역 Cmd/Ctrl + K 단축키 및 본문 포커스 트리거 수신 시 채팅 입력창으로 즉시 포커스 이동
+  React.useEffect(() => {
+    const handleGlobalKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+
+    const unsubscribe = subscribeFocusNavigator(({ prefillText, replace }) => {
+      if (prefillText !== undefined) {
+        setInputValue((prev) => (replace || !prev.trim() ? prefillText : prev));
+      }
+      requestAnimationFrame(() => {
+        inputRef.current?.focus();
+      });
+    });
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleGlobalKeyDown);
+      unsubscribe();
+    };
+  }, [inputRef, setInputValue]);
+
   return (
     <aside
       aria-label={`${config.badgeLabel} AI Navigator`}
-      className={cn("bg-card border-border/80 flex h-full flex-col border-r shadow-xs", className)}
+      className={cn("bg-card flex h-full flex-col shadow-xs", className)}
     >
       {/* 상단 헤더 */}
       <header className="border-border/60 bg-muted/20 flex h-14 shrink-0 items-center justify-between border-b px-4">
         <div className="flex items-center gap-2">
           <span className="bg-primary size-2 animate-pulse rounded-full" />
           <h2 className="text-foreground text-sm font-semibold tracking-tight">{config.title}</h2>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <kbd className="bg-muted text-muted-foreground border-border/70 hidden rounded border px-1.5 py-0.5 font-mono text-[10px] sm:inline-block">
+            ⌘K
+          </kbd>
+          {onToggleDockSide && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label="AI Navigator 패널 좌우 위치 전환"
+              title={dockSide === "right" ? "패널을 왼쪽으로 이동" : "패널을 오른쪽으로 이동"}
+              className="text-muted-foreground hover:text-foreground"
+              onClick={onToggleDockSide}
+            >
+              {dockSide === "right" ? (
+                <PanelLeft className="size-3.5" />
+              ) : (
+                <PanelRight className="size-3.5" />
+              )}
+            </Button>
+          )}
         </div>
       </header>
 
@@ -299,7 +355,7 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
       </MessageScrollerProvider>
 
       {/* 하단 Prompt Input 입력 폼 영역 (멀티라인 + 이미지 첨부 미리보기 + 전송) */}
-      <footer className="border-border/60 bg-background/80 shrink-0 border-t p-3 backdrop-blur-sm">
+      <footer className="border-border/70 bg-muted/20 shrink-0 border-t p-3 backdrop-blur-sm">
         <form onSubmit={handleSubmit}>
           <input
             ref={fileInputRef}
@@ -315,7 +371,7 @@ export function NavigatorShell({ mode, className }: NavigatorShellProps) {
             }}
           />
 
-          <InputGroup className="bg-background">
+          <InputGroup className="bg-background border-primary/25 focus-within:border-primary/60 focus-within:ring-primary/20 shadow-xs transition-shadow focus-within:ring-2">
             {attachments.length > 0 && (
               <InputGroupAddon align="block-start" className="border-b pb-2">
                 <AttachmentGroup className="w-full gap-2 py-0">
