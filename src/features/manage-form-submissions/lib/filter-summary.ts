@@ -1,4 +1,4 @@
-import type { CoreFormField } from "@/entities/form";
+import type { CoreFormField, SelectOption } from "@/entities/form";
 import {
   FIELD_FILTER_OPERATOR_LABELS,
   isUuid,
@@ -7,6 +7,52 @@ import {
   SYSTEM_FIELD_LABELS,
   type FieldFilterCondition,
 } from "@/shared/schema";
+
+/**
+ * 선택형 필드(`select`/`radio`/`checkbox`) 필터 조건의 라벨 문자열을 옵션 `value` 코드로 정규화합니다.
+ *
+ * AI 에이전트 또는 레거시 URL이 옵션 `value`(예: `"MEAL"`) 대신 사람이 읽는 `label`(예: `"식대"`)을
+ * 전달하더라도 동일한 필터 결과와 팝오버 체크 상태를 유지하도록 보정합니다.
+ */
+export function normalizeConditionOptionTokens(
+  condition: FieldFilterCondition,
+  options?: ReadonlyArray<Pick<SelectOption, "label" | "value">> | null
+): FieldFilterCondition {
+  const normalized = normalizeFieldFilterCondition(condition);
+  if (!options || options.length === 0) {
+    return normalized;
+  }
+
+  const resolveTokenToValue = (token: string): string => {
+    const trimmed = token.trim();
+    if (!trimmed) return token;
+    // 이미 정확한 option.value 코드와 일치하면 우선 유지합니다.
+    const exactValue = options.find((opt) => opt.value === trimmed);
+    if (exactValue) return exactValue.value;
+    // 라벨과 일치(정확 또는 공백/대소문자 무시)하면 해당 option.value 코드로 치환합니다.
+    const exactLabel = options.find((opt) => opt.label.trim() === trimmed);
+    if (exactLabel) return exactLabel.value;
+    const lowered = trimmed.toLowerCase();
+    const ciLabel = options.find((opt) => opt.label.trim().toLowerCase() === lowered);
+    return ciLabel ? ciLabel.value : trimmed;
+  };
+
+  if (normalized.values && normalized.values.length > 0) {
+    return {
+      ...normalized,
+      values: Array.from(new Set(normalized.values.map(resolveTokenToValue))),
+    };
+  }
+
+  if (typeof normalized.value === "string") {
+    return {
+      ...normalized,
+      value: resolveTokenToValue(normalized.value),
+    };
+  }
+
+  return normalized;
+}
 
 /**
  * 숫자 필터 피연산자를 천 단위 콤마가 포함된 가독성 문자열로 변환합니다.
@@ -70,11 +116,14 @@ export function formatFilterConditionSummary(
   ) {
     const rawValues = normalized.values ?? [];
     const optionMap = new Map((field?.options ?? []).map((opt) => [opt.value, opt.label]));
+    const labelSet = new Set((field?.options ?? []).map((opt) => opt.label.trim()));
     const displayValues = rawValues.map((val) => {
       if (field?.type === "relation") {
         return relationLabelMap?.get(val) ?? val.slice(0, 8);
       }
-      return optionMap.get(val) ?? val;
+      const mapped = optionMap.get(val);
+      if (mapped !== undefined) return mapped;
+      return labelSet.has(val.trim()) ? val.trim() : val;
     });
     const joined =
       displayValues.length <= 2
@@ -92,7 +141,9 @@ export function formatFilterConditionSummary(
 
   const rawValue = normalized.value !== undefined ? String(normalized.value) : "";
   if (field?.type === "select" || field?.type === "radio") {
-    const option = (field.options ?? []).find((opt) => opt.value === rawValue);
+    const option = (field.options ?? []).find(
+      (opt) => opt.value === rawValue || opt.label.trim() === rawValue.trim()
+    );
     const display = option?.label ?? rawValue;
     return normalized.op === "eq" ? display : `${opLabel}: ${display}`;
   }

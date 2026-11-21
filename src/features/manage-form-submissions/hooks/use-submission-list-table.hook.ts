@@ -25,7 +25,6 @@ import {
   extractActiveFields,
   extractPrimaryFieldId,
   formatFieldDisplayValue,
-  PrimaryFieldBadge,
 } from "@/entities/form";
 import {
   useInfiniteFormSubmissionsQuery,
@@ -37,6 +36,7 @@ import {
 import { formatDateTime } from "@/shared/lib/date";
 import { Button } from "@/shared/ui/button";
 import { Checkbox } from "@/shared/ui/checkbox";
+import { normalizeConditionOptionTokens } from "../lib/filter-summary";
 import { formatRelationSummaryCell, type RelationLookupMap } from "../lib/relation-summary";
 import type {
   FormSubmissionViewMode,
@@ -148,15 +148,7 @@ export interface UseSubmissionListTableReturn {
    */
   relationLookupMap: RelationLookupMap;
   /**
-   * 현재 적용 중인 기간 필터 상태
-   */
-  dateRangeFilter: SubmissionDateRangeFilter | undefined;
-  /**
-   * 기간 필터에 적용 중인 기준 날짜 필드 라벨 (예: "결제일" 또는 "제출일")
-   */
-  dateRangeFieldLabel: string;
-  /**
-   * 현재 적용 중인 컬럼 및 기간 필터 개수
+   * 현재 적용 중인 컬럼 필터 개수
    */
   activeFilterCount: number;
   /**
@@ -208,13 +200,9 @@ export interface UseSubmissionListTableReturn {
    */
   handleSetFieldFilter: (fieldId: string, value: FieldFilterCondition | string | undefined) => void;
   /**
-   * 모든 활성 컬럼 및 기간 필터 초기화 핸들러
+   * 모든 활성 컬럼 필터 초기화 핸들러
    */
   handleClearAllFilters: () => void;
-  /**
-   * 기간 필터만 단독 해제하는 핸들러
-   */
-  handleClearDateRange: () => void;
   /**
    * 단건 응답 삭제 핸들러
    */
@@ -231,18 +219,42 @@ export interface UseSubmissionListTableReturn {
 
 function buildInitialFiltersMap(
   initialFilters: FieldFilterCondition[] | undefined,
-  activeFields: CoreFormField[]
+  activeFields: CoreFormField[],
+  initialDateRange?: SubmissionDateRangeFilter
 ): Record<string, FieldFilterCondition> {
-  if (!initialFilters || initialFilters.length === 0) {
-    return {};
-  }
   const map: Record<string, FieldFilterCondition> = {};
-  for (const item of initialFilters) {
-    const check = validateFiltersAgainstFields([item], activeFields, { allowSystemFields: true });
-    if (check.error === null && check.data[0]) {
-      map[check.data[0].fieldId] = check.data[0];
+  const fieldById = new Map(activeFields.map((f) => [f.id, f]));
+
+  if (initialFilters && initialFilters.length > 0) {
+    for (const item of initialFilters) {
+      const check = validateFiltersAgainstFields([item], activeFields, { allowSystemFields: true });
+      if (check.error === null && check.data[0]) {
+        const targetField = fieldById.get(check.data[0].fieldId);
+        const normalized = normalizeConditionOptionTokens(check.data[0], targetField?.options);
+        map[normalized.fieldId] = normalized;
+      }
     }
   }
+
+  // 분석 뷰 sourceLinks 등에서 레거시 기간 쿼리(?startDate&endDate&dateFieldId)가 전달되면
+  // 별도 기간 상태가 아니라 해당 날짜 컬럼(또는 createdAt)의 `between` 컬럼 필터로 통합 승격합니다.
+  if (initialDateRange && (initialDateRange.startDate || initialDateRange.endDate)) {
+    const requestedAxis = initialDateRange.dateFieldId;
+    const isValidDomainDateField = Boolean(
+      requestedAxis && activeFields.some((f) => f.id === requestedAxis && f.type === "date")
+    );
+    const resolvedAxis = isValidDomainDateField && requestedAxis ? requestedAxis : "createdAt";
+
+    if (!map[resolvedAxis]) {
+      map[resolvedAxis] = {
+        fieldId: resolvedAxis,
+        op: "between",
+        ...(initialDateRange.startDate ? { min: initialDateRange.startDate } : {}),
+        ...(initialDateRange.endDate ? { max: initialDateRange.endDate } : {}),
+      };
+    }
+  }
+
   return map;
 }
 
@@ -253,15 +265,11 @@ function serializeSortItems(sorting: SortingState): string {
 
 function buildConsumerFormUrl(
   formId: string,
-  dateRange?: SubmissionDateRangeFilter,
   filters?: Record<string, FieldFilterCondition>,
   sorting?: SortingState
 ): string {
   const basePath = `/consumer/forms/${formId}`;
   const searchParams = new URLSearchParams();
-  if (dateRange?.startDate) searchParams.set("startDate", dateRange.startDate);
-  if (dateRange?.endDate) searchParams.set("endDate", dateRange.endDate);
-  if (dateRange?.dateFieldId) searchParams.set("dateFieldId", dateRange.dateFieldId);
 
   const serializedFilters = serializeFieldFiltersParam(
     filters ? Object.values(filters) : undefined
@@ -317,18 +325,17 @@ export function useSubmissionListTable({
   );
   const [sorting, setSorting] = React.useState<SortingState>(stableInitialSorting);
   const [columnFilters, setColumnFilters] = React.useState<Record<string, FieldFilterCondition>>(
-    () => buildInitialFiltersMap(initialFilters, activeFields)
+    () => buildInitialFiltersMap(initialFilters, activeFields, initialDateRange)
   );
-  const [dateRangeFilter, setDateRangeFilter] = React.useState<
-    SubmissionDateRangeFilter | undefined
-  >(initialDateRange);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [columnSizing, setColumnSizing] = React.useState<ColumnSizingState>({});
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
 
-  const initialStartDate = initialDateRange?.startDate;
-  const initialEndDate = initialDateRange?.endDate;
-  const initialDateFieldId = initialDateRange?.dateFieldId;
+  const initialDateSignature = [
+    initialDateRange?.startDate ?? "",
+    initialDateRange?.endDate ?? "",
+    initialDateRange?.dateFieldId ?? "",
+  ].join("|");
   const initialFiltersSignature = serializeFieldFiltersParam(initialFilters) ?? "";
 
   React.useEffect(() => {
@@ -338,42 +345,9 @@ export function useSubmissionListTable({
   }, [initialSortSignature, stableInitialSorting]);
 
   React.useEffect(() => {
-    setDateRangeFilter((prev) => {
-      if (!initialStartDate && !initialEndDate) {
-        return prev === undefined ? prev : undefined;
-      }
-      if (
-        prev?.startDate === initialStartDate &&
-        prev?.endDate === initialEndDate &&
-        prev?.dateFieldId === initialDateFieldId
-      ) {
-        return prev;
-      }
-      return {
-        startDate: initialStartDate,
-        endDate: initialEndDate,
-        dateFieldId: initialDateFieldId,
-      };
-    });
-  }, [initialStartDate, initialEndDate, initialDateFieldId]);
-
-  React.useEffect(() => {
-    setColumnFilters(buildInitialFiltersMap(initialFilters, activeFields));
+    setColumnFilters(buildInitialFiltersMap(initialFilters, activeFields, initialDateRange));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialFiltersSignature, activeFields]);
-
-  // 활성 폼 스키마에 실제 존재하는 date 타입 필드인지 검증해 안전한 기준 축 ID/라벨 도출
-  const resolvedDateMeta = React.useMemo(() => {
-    if (!dateRangeFilter?.dateFieldId) return undefined;
-    const matched = activeFields.find(
-      (f) => f.id === dateRangeFilter.dateFieldId && f.type === "date"
-    );
-    return matched;
-  }, [activeFields, dateRangeFilter?.dateFieldId]);
-
-  const resolvedDateFieldId = resolvedDateMeta?.id;
-  const dateRangeFieldLabel = resolvedDateMeta?.label ?? "제출일";
-  const hasActiveDateRange = Boolean(dateRangeFilter?.startDate || dateRangeFilter?.endDate);
+  }, [initialFiltersSignature, initialDateSignature, activeFields]);
 
   // 1. 다중 정렬 파라미터 직렬화 (예: "f_exp:desc,createdAt:desc")
   const sortQueryString = React.useMemo(() => {
@@ -387,26 +361,31 @@ export function useSubmissionListTable({
     return serializeFieldFiltersParam(merged);
   }, [lockedFilters, columnFilters]);
 
-  // 3. 서버 무한 스크롤 쿼리 훅 연동 (프리뷰 모드에서는 실데이터 조회를 전면 비활성화)
+  // 3. 서버 무한 스크롤 쿼리 훅 연동 (프리뷰 모드에서도 실데이터 조회를 허용하고 0건 시 샘플로 폴백)
   const { data, isLoading, isError, error, isFetchingNextPage, hasNextPage, fetchNextPage } =
-    useInfiniteFormSubmissionsQuery(mode === "preview" ? "" : form.id, {
+    useInfiniteFormSubmissionsQuery(form.id, {
       sort: sortQueryString,
       filters: filtersQueryString,
       limit: 20,
-      startDate: dateRangeFilter?.startDate,
-      endDate: dateRangeFilter?.endDate,
-      dateFieldId: resolvedDateFieldId,
     });
 
   const { mutateAsync: deleteSubmission } = useDeleteSubmissionMutation(form.id);
 
-  // 모든 누적 페이지 아이템 평탄화 (프리뷰 모드에서는 항상 스키마 기반 샘플 데이터만 사용)
+  // 모든 누적 페이지 아이템 평탄화 (프리뷰 모드에서 실데이터 0건 + 필터 없음 + 샘플 존재 시 샘플 폴백)
   const serverSubmissions = React.useMemo(() => {
     return data?.pages.flatMap((page) => page.items) ?? [];
   }, [data]);
 
   const serverTotalCount = data?.pages[0]?.totalCount ?? serverSubmissions.length;
-  const isSamplePreview = mode === "preview";
+  const hasActiveFilters =
+    Object.keys(columnFilters).length > 0 || (lockedFilters?.length ?? 0) > 0;
+  const isSamplePreview =
+    mode === "preview" &&
+    !isLoading &&
+    !isError &&
+    serverSubmissions.length === 0 &&
+    !hasActiveFilters &&
+    Boolean(sampleSubmissions && sampleSubmissions.length > 0);
   const flatSubmissions = React.useMemo(
     () => (isSamplePreview ? (sampleSubmissions ?? []) : serverSubmissions),
     [isSamplePreview, sampleSubmissions, serverSubmissions]
@@ -439,12 +418,12 @@ export function useSubmissionListTable({
         nextSorting.length > 0 ? nextSorting : [{ id: "createdAt", desc: true }];
       setSorting(resolved);
       if (mode !== "preview" && !embedded) {
-        router.replace(buildConsumerFormUrl(form.id, dateRangeFilter, columnFilters, resolved), {
+        router.replace(buildConsumerFormUrl(form.id, columnFilters, resolved), {
           scroll: false,
         });
       }
     },
-    [mode, embedded, router, form.id, dateRangeFilter, columnFilters]
+    [mode, embedded, router, form.id, columnFilters]
   );
 
   const handleSortingChange = React.useCallback(
@@ -485,44 +464,37 @@ export function useSubmissionListTable({
           const defaultOp = capability?.filterOperators.includes("contains")
             ? "contains"
             : (capability?.defaultOperator ?? "contains");
-          next[fieldId] = { fieldId, op: defaultOp, value: trimmed };
+          next[fieldId] = normalizeConditionOptionTokens(
+            { fieldId, op: defaultOp, value: trimmed },
+            targetField?.options
+          );
         }
       } else {
-        next[fieldId] = normalizeFieldFilterCondition(value);
+        next[fieldId] = normalizeConditionOptionTokens(
+          normalizeFieldFilterCondition(value),
+          targetField?.options
+        );
       }
 
       setColumnFilters(next);
       if (mode !== "preview" && !embedded) {
-        router.replace(buildConsumerFormUrl(form.id, dateRangeFilter, next, sorting), {
+        router.replace(buildConsumerFormUrl(form.id, next, sorting), {
           scroll: false,
         });
       }
     },
-    [activeFields, columnFilters, dateRangeFilter, embedded, form.id, mode, router, sorting]
+    [activeFields, columnFilters, embedded, form.id, mode, router, sorting]
   );
-
-  // 기간 필터만 해제하고 URL 쿼리스트링도 함께 정리
-  const handleClearDateRange = React.useCallback(() => {
-    setDateRangeFilter(undefined);
-    if (mode !== "preview" && !embedded) {
-      router.replace(buildConsumerFormUrl(form.id, undefined, columnFilters, sorting), {
-        scroll: false,
-      });
-    }
-  }, [router, form.id, columnFilters, embedded, mode, sorting]);
 
   // 전체 필터 초기화
   const handleClearAllFilters = React.useCallback(() => {
     setColumnFilters({});
-    if (hasActiveDateRange) {
-      setDateRangeFilter(undefined);
-    }
     if (mode !== "preview" && !embedded) {
-      router.replace(buildConsumerFormUrl(form.id, undefined, undefined, sorting), {
+      router.replace(buildConsumerFormUrl(form.id, undefined, sorting), {
         scroll: false,
       });
     }
-  }, [hasActiveDateRange, router, embedded, form.id, mode, sorting]);
+  }, [router, embedded, form.id, mode, sorting]);
 
   // 단건 응답 삭제 핸들러 (프리뷰 모드에서는 차단)
   const handleDelete = React.useCallback(
@@ -561,13 +533,6 @@ export function useSubmissionListTable({
 
   const columns = React.useMemo<ColumnDef<FormSubmission>[]>(() => {
     const cols: ColumnDef<FormSubmission>[] = [];
-    const renderStaticHeader = (label: string, isPrimary = false) =>
-      React.createElement(
-        "div",
-        { className: "flex items-center gap-1.5 py-1 text-xs font-semibold whitespace-nowrap" },
-        label,
-        isPrimary ? React.createElement(PrimaryFieldBadge) : null
-      );
 
     // 선택 피커 모드 시 좌측 고정 선택 체크박스/라디오 열 추가
     if (selectionMode) {
@@ -609,23 +574,21 @@ export function useSubmissionListTable({
         id: field.id,
         accessorFn: (row) => row.data?.[field.id],
         header: ({ column }) =>
-          isSamplePreview
-            ? renderStaticHeader(field.label, isPrimary)
-            : React.createElement(ColumnHeaderFilter, {
-                fieldId: field.id,
-                label: field.label,
-                fieldType: field.type,
-                options: field.options,
-                relationTargetFormId: field.relationConfig?.targetFormId,
-                isPrimary,
-                isSorted: column.getIsSorted(),
-                onToggleSort: (e: React.MouseEvent) => {
-                  column.toggleSorting(undefined, e.shiftKey);
-                },
-                filterCondition: columnFilters[field.id],
-                onApplyFilter: (condition?: FieldFilterCondition) =>
-                  handleSetFieldFilter(field.id, condition),
-              }),
+          React.createElement(ColumnHeaderFilter, {
+            fieldId: field.id,
+            label: field.label,
+            fieldType: field.type,
+            options: field.options,
+            relationTargetFormId: field.relationConfig?.targetFormId,
+            isPrimary,
+            isSorted: column.getIsSorted(),
+            onToggleSort: (e: React.MouseEvent) => {
+              column.toggleSorting(undefined, e.shiftKey);
+            },
+            filterCondition: columnFilters[field.id],
+            onApplyFilter: (condition?: FieldFilterCondition) =>
+              handleSetFieldFilter(field.id, condition),
+          }),
         cell: (info) => {
           const rawVal = info.getValue();
           const displayVal =
@@ -655,20 +618,18 @@ export function useSubmissionListTable({
       id: "createdAt",
       accessorKey: "createdAt",
       header: ({ column }) =>
-        isSamplePreview
-          ? renderStaticHeader(SYSTEM_COLUMN_LABELS.createdAt)
-          : React.createElement(ColumnHeaderFilter, {
-              fieldId: "createdAt",
-              label: SYSTEM_COLUMN_LABELS.createdAt,
-              fieldType: "system_date",
-              isSorted: column.getIsSorted(),
-              onToggleSort: (e: React.MouseEvent) => {
-                column.toggleSorting(undefined, e.shiftKey);
-              },
-              filterCondition: columnFilters.createdAt,
-              onApplyFilter: (condition?: FieldFilterCondition) =>
-                handleSetFieldFilter("createdAt", condition),
-            }),
+        React.createElement(ColumnHeaderFilter, {
+          fieldId: "createdAt",
+          label: SYSTEM_COLUMN_LABELS.createdAt,
+          fieldType: "system_date",
+          isSorted: column.getIsSorted(),
+          onToggleSort: (e: React.MouseEvent) => {
+            column.toggleSorting(undefined, e.shiftKey);
+          },
+          filterCondition: columnFilters.createdAt,
+          onApplyFilter: (condition?: FieldFilterCondition) =>
+            handleSetFieldFilter("createdAt", condition),
+        }),
       cell: (info) => {
         const rawDate = info.getValue() as string | Date | undefined;
         const formatted = formatDateTime(rawDate);
@@ -691,20 +652,18 @@ export function useSubmissionListTable({
       id: "updatedAt",
       accessorKey: "updatedAt",
       header: ({ column }) =>
-        isSamplePreview
-          ? renderStaticHeader(SYSTEM_COLUMN_LABELS.updatedAt)
-          : React.createElement(ColumnHeaderFilter, {
-              fieldId: "updatedAt",
-              label: SYSTEM_COLUMN_LABELS.updatedAt,
-              fieldType: "system_date",
-              isSorted: column.getIsSorted(),
-              onToggleSort: (e: React.MouseEvent) => {
-                column.toggleSorting(undefined, e.shiftKey);
-              },
-              filterCondition: columnFilters.updatedAt,
-              onApplyFilter: (condition?: FieldFilterCondition) =>
-                handleSetFieldFilter("updatedAt", condition),
-            }),
+        React.createElement(ColumnHeaderFilter, {
+          fieldId: "updatedAt",
+          label: SYSTEM_COLUMN_LABELS.updatedAt,
+          fieldType: "system_date",
+          isSorted: column.getIsSorted(),
+          onToggleSort: (e: React.MouseEvent) => {
+            column.toggleSorting(undefined, e.shiftKey);
+          },
+          filterCondition: columnFilters.updatedAt,
+          onApplyFilter: (condition?: FieldFilterCondition) =>
+            handleSetFieldFilter("updatedAt", condition),
+        }),
       cell: (info) => {
         const rawDate = info.getValue() as string | Date | undefined;
         const formatted = formatDateTime(rawDate);
@@ -796,7 +755,6 @@ export function useSubmissionListTable({
     selectedIdSet,
     onRemoveSelectedRow,
     onSelectSubmission,
-    isSamplePreview,
   ]);
 
   // 5. TanStack Table 인스턴스화
@@ -825,9 +783,9 @@ export function useSubmissionListTable({
 
   React.useEffect(() => {
     tableContainerRef.current?.scrollTo({ top: 0 });
-  }, [sortQueryString, filtersQueryString, dateRangeFilter]);
+  }, [sortQueryString, filtersQueryString]);
 
-  const activeFilterCount = Object.keys(columnFilters).length + (hasActiveDateRange ? 1 : 0);
+  const activeFilterCount = Object.keys(columnFilters).length;
 
   return {
     table,
@@ -837,14 +795,6 @@ export function useSubmissionListTable({
     primaryFieldId,
     columnFilters,
     relationLookupMap,
-    dateRangeFilter: hasActiveDateRange
-      ? {
-          startDate: dateRangeFilter?.startDate,
-          endDate: dateRangeFilter?.endDate,
-          dateFieldId: resolvedDateFieldId,
-        }
-      : undefined,
-    dateRangeFieldLabel,
     activeFilterCount,
     sorting,
     isDefaultSorting,
@@ -857,7 +807,6 @@ export function useSubmissionListTable({
     tableContainerRef,
     handleSetFieldFilter,
     handleClearAllFilters,
-    handleClearDateRange,
     handleRemoveSort,
     handleResetSorting,
     handleDelete,

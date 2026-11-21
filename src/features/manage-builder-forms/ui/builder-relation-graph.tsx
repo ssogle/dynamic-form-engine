@@ -25,7 +25,7 @@ const MAX_NODE_LABEL_LENGTH = 18;
 
 const getNodeVal = (node: NodeObject<Graph3DNode>) => Math.max(4, 4 + node.relationDegree * 2.5);
 const getNodeLabel = (node: NodeObject<Graph3DNode>) =>
-  `${node.title} (${node.isPublished ? "발행됨" : "작성 중"} · 필드 ${node.activeFieldCount}개 · 관계 ${node.relationDegree}건)`;
+  `${node.title} (${node.isPublished ? "발행됨" : "초안"} · 필드 ${node.activeFieldCount}개 · 관계 ${node.relationDegree}건)`;
 /**
  * 3D 구체 노드 위에 항상 카메라 정면을 향하는 폼 이름 스프라이트를 부착한다.
  * 모듈 스코프 정적 함수로 유지해 hover 상태 변경 시 스프라이트가 불필요하게 재생성되지 않도록 한다.
@@ -211,7 +211,7 @@ export function BuilderRelationGraph({
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span className="size-2.5 rounded-full bg-sky-400" />
-              작성 중
+              초안
             </span>
           </div>
           {graphData.nodes.length > 0 && (

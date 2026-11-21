@@ -3,7 +3,12 @@
 import * as React from "react";
 import Link from "next/link";
 import { Edit, Trash2, Calendar, Clock, FileText, Link2 } from "lucide-react";
-import { formatFieldDisplayValue, PrimaryFieldBadge, type CoreFormField } from "@/entities/form";
+import {
+  FIELD_TYPE_LABELS,
+  formatFieldDisplayValue,
+  PrimaryFieldBadge,
+  type CoreFormField,
+} from "@/entities/form";
 import type { FormSubmission } from "@/entities/form-submission";
 import { normalizeStringIds } from "@/shared/lib/normalize";
 import { BackLink } from "@/shared/ui/back-link";
@@ -36,21 +41,6 @@ export interface SubmissionDetailViewProps {
    */
   sampleSubmission?: FormSubmission | undefined;
 }
-
-/**
- * 폼 필드 타입별 한글 라벨 매핑 사전
- */
-const FIELD_TYPE_LABELS: Record<string, string> = {
-  text: "단문 텍스트",
-  textarea: "장문 텍스트",
-  number: "숫자",
-  select: "선택 항목",
-  radio: "라디오 선택",
-  checkbox: "체크박스",
-  date: "날짜",
-  switch: "스위치",
-  relation: "관계 참조",
-};
 
 /**
  * 컨슈머 폼 응답 단건 상세 조회 뷰 컴포넌트 (SubmissionDetailView)

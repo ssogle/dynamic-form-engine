@@ -364,7 +364,7 @@ describe("useSubmissionListTable (features/manage-form-submissions/hooks)", () =
     expect(renderCellTitle(tagsCell)).toBe("식대, 교통비");
   });
 
-  it("initialDateRange 전달 시 무한 스크롤 쿼리에 기간 파라미터를 전달하고, 해제 시 URL 쿼리를 제거해야 한다", () => {
+  it("initialDateRange 전달 시 해당 날짜 컬럼의 between 필터로 통합 승격하고, 해제 시 URL 쿼리를 제거해야 한다", () => {
     const formWithDate: Form = {
       ...dummyForm,
       schemaDefinition: {
@@ -396,24 +396,80 @@ describe("useSubmissionListTable (features/manage-form-submissions/hooks)", () =
       { wrapper: createWrapper() }
     );
 
+    const expectedCondition = {
+      fieldId: "field-paid-at",
+      op: "between" as const,
+      min: "2026-09-01",
+      max: "2026-11-16",
+    };
+
     expect(mockUseInfiniteQuery).toHaveBeenLastCalledWith(
       "form-uuid-1",
       expect.objectContaining({
-        startDate: "2026-09-01",
-        endDate: "2026-11-16",
-        dateFieldId: "field-paid-at",
+        filters: JSON.stringify([expectedCondition]),
       })
     );
-    expect(result.current.dateRangeFieldLabel).toBe("결제일");
+    expect(result.current.columnFilters["field-paid-at"]).toEqual(expectedCondition);
     expect(result.current.activeFilterCount).toBe(1);
 
     act(() => {
-      result.current.handleClearDateRange();
+      result.current.handleSetFieldFilter("field-paid-at", undefined);
     });
 
-    expect(result.current.dateRangeFilter).toBeUndefined();
+    expect(result.current.columnFilters["field-paid-at"]).toBeUndefined();
     expect(result.current.activeFilterCount).toBe(0);
     expect(mockReplace).toHaveBeenCalledWith("/consumer/forms/form-uuid-1", { scroll: false });
+  });
+
+  it("initialDateRange에 유효한 dateFieldId가 없으면 createdAt between 필터로 승격하고 선택형 라벨 필터는 옵션 코드로 정규화해야 한다", () => {
+    const formWithSelect: Form = {
+      ...dummyForm,
+      schemaDefinition: {
+        primaryFieldId: "field-name",
+        fields: [
+          ...dummyForm.schemaDefinition.fields,
+          {
+            id: "field-category",
+            label: "구분",
+            type: "select",
+            required: false,
+            description: "분류",
+            options: [
+              { label: "식대", value: "MEAL" },
+              { label: "교통", value: "TRANSIT" },
+            ],
+            order: 1,
+          },
+        ],
+      },
+    };
+
+    const { result } = renderHook(
+      () =>
+        useSubmissionListTable({
+          form: formWithSelect,
+          initialDateRange: {
+            startDate: "2026-10-01",
+            endDate: "2026-10-31",
+            dateFieldId: "field-non-existent",
+          },
+          initialFilters: [{ fieldId: "field-category", op: "eq", value: "식대" }],
+        }),
+      { wrapper: createWrapper() }
+    );
+
+    expect(result.current.columnFilters.createdAt).toEqual({
+      fieldId: "createdAt",
+      op: "between",
+      min: "2026-10-01",
+      max: "2026-10-31",
+    });
+    expect(result.current.columnFilters["field-category"]).toEqual({
+      fieldId: "field-category",
+      op: "eq",
+      value: "MEAL",
+    });
+    expect(result.current.activeFilterCount).toBe(2);
   });
 
   it("initialFilters 전달 시 직렬화된 filters 쿼리를 전송하고, 구조화 필터 설정 시 URL 쿼리를 동기화해야 한다", () => {
@@ -499,7 +555,7 @@ describe("useSubmissionListTable (features/manage-form-submissions/hooks)", () =
     expect(result.current.columnFilters).toEqual({});
   });
 
-  it("preview 모드에서는 실데이터 조회를 비활성화하고 sampleSubmissions만 사용하며 행 클릭·라우팅·삭제를 차단해야 한다", async () => {
+  it("preview 모드에서도 실데이터가 존재하면 실데이터와 필터를 사용하고 행 클릭·URL 동기화·삭제만 차단해야 한다", async () => {
     const onSelectSubmission = vi.fn();
     const sampleSubmissions = [
       {
@@ -524,14 +580,14 @@ describe("useSubmissionListTable (features/manage-form-submissions/hooks)", () =
       { wrapper: createWrapper() }
     );
 
-    expect(mockUseInfiniteQuery).toHaveBeenLastCalledWith("", expect.any(Object));
-    expect(result.current.isSamplePreview).toBe(true);
-    expect(result.current.flatSubmissions).toEqual(sampleSubmissions);
+    expect(mockUseInfiniteQuery).toHaveBeenLastCalledWith("form-uuid-1", expect.any(Object));
+    expect(result.current.isSamplePreview).toBe(false);
+    expect(result.current.flatSubmissions).toEqual(dummySubmissions);
     expect(result.current.totalCount).toBe(1);
 
     act(() => {
-      result.current.handleRowClick("sample-preview-1");
-      result.current.handleSetFieldFilter("field-name", "예시");
+      result.current.handleRowClick("sub-1");
+      result.current.handleSetFieldFilter("field-name", "홍길동");
       result.current.handleClearAllFilters();
     });
 
@@ -540,27 +596,59 @@ describe("useSubmissionListTable (features/manage-form-submissions/hooks)", () =
     expect(mockReplace).not.toHaveBeenCalled();
 
     await act(async () => {
-      await result.current.handleDelete("sample-preview-1");
+      await result.current.handleDelete("sub-1");
     });
 
     expect(mockDeleteSubmission).not.toHaveBeenCalled();
   });
 
-  it("preview 모드에서는 sampleSubmissions가 비어 있을 때도 실데이터 대신 빈 목록을 반환해야 한다", () => {
+  it("preview 모드에서 실데이터가 0건이고 활성 필터가 없을 때만 sampleSubmissions로 폴백해야 한다", () => {
+    mockUseInfiniteQuery.mockReturnValue({
+      data: {
+        pages: [{ items: [], totalCount: 0, nextCursor: null }],
+        pageParams: [undefined],
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      isFetchingNextPage: false,
+      hasNextPage: false,
+      fetchNextPage: mockFetchNextPage,
+    });
+
+    const sampleSubmissions = [
+      {
+        id: "sample-preview-1",
+        formId: "form-uuid-1",
+        version: 1,
+        data: { "field-name": "이름 예시 1" },
+        createdAt: new Date("2026-11-18T09:00:00.000Z"),
+        updatedAt: new Date("2026-11-18T09:00:00.000Z"),
+        deletedAt: null,
+      },
+    ];
+
     const { result } = renderHook(
       () =>
         useSubmissionListTable({
           form: dummyForm,
           mode: "preview",
-          sampleSubmissions: [],
+          sampleSubmissions,
         }),
       { wrapper: createWrapper() }
     );
 
-    expect(mockUseInfiniteQuery).toHaveBeenLastCalledWith("", expect.any(Object));
+    expect(mockUseInfiniteQuery).toHaveBeenLastCalledWith("form-uuid-1", expect.any(Object));
     expect(result.current.isSamplePreview).toBe(true);
+    expect(result.current.flatSubmissions).toEqual(sampleSubmissions);
+    expect(result.current.totalCount).toBe(1);
+
+    act(() => {
+      result.current.handleSetFieldFilter("field-name", "예시");
+    });
+
+    expect(result.current.isSamplePreview).toBe(false);
     expect(result.current.flatSubmissions).toEqual([]);
-    expect(result.current.totalCount).toBe(0);
   });
 
   it("initialSort가 전달되면 초기 정렬 상태와 쿼리 파라미터를 반영하고 변경 시 동기화해야 한다", () => {

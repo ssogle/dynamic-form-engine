@@ -10,8 +10,8 @@ import {
 import { cn } from "@/shared/lib/cn";
 import { formatDateTime } from "@/shared/lib/date";
 import { dispatchFocusNavigator } from "@/shared/lib/navigator-focus";
-import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
+import { PublishStatusBadge } from "@/shared/ui/publish-status-badge";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { detectChangedAnalysisBlockId } from "../lib/detect-changed-block";
 import { ChartBlockRenderer } from "./chart-block-renderer";
@@ -157,9 +157,7 @@ export function AnalysisViewRenderer({
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-foreground text-2xl font-bold tracking-tight">{view.title}</h1>
-            <Badge variant={isPublished ? "default" : "secondary"}>
-              {isPublished ? "발행됨" : "초안"}
-            </Badge>
+            {!publishedOnly ? <PublishStatusBadge isPublished={isPublished} /> : null}
           </div>
           {view.description ? (
             <p className="text-muted-foreground text-sm">{view.description}</p>
@@ -183,6 +181,25 @@ export function AnalysisViewRenderer({
           저장된 스냅샷 리포트입니다. 각 블록 하단의 원천 데이터 링크를 통해 실시간 상세 내역을 바로
           확인할 수 있습니다.
         </div>
+      ) : blocks.length > 0 ? (
+        <div className="border-primary/20 bg-primary/5 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3.5 py-2 text-xs">
+          <span className="text-muted-foreground">
+            각 블록 우측의 <strong className="text-foreground font-medium">AI로 수정</strong>{" "}
+            버튼이나 아래 버튼으로 차트·표·요약 추가 및 수정을 요청할 수 있습니다.
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            className="text-primary hover:bg-primary/10 h-6 gap-1 px-2 text-xs"
+            onClick={() =>
+              dispatchFocusNavigator({ prefillText: "분석 블록을 추가해줘: ", replace: true })
+            }
+          >
+            <Sparkles className="size-3" />
+            AI에게 블록 추가 요청
+          </Button>
+        </div>
       ) : null}
 
       {blocks.length === 0 ? (
@@ -198,7 +215,9 @@ export function AnalysisViewRenderer({
               variant="outline"
               size="sm"
               className="mt-4 gap-1.5 text-xs"
-              onClick={() => dispatchFocusNavigator({ prefillText: "분석 블록을 추가해줘: " })}
+              onClick={() =>
+                dispatchFocusNavigator({ prefillText: "분석 블록을 추가해줘: ", replace: true })
+              }
             >
               <Sparkles className="text-primary size-3.5" />
               AI에게 블록 추가 요청
@@ -209,6 +228,25 @@ export function AnalysisViewRenderer({
         <div className="space-y-5">
           {blocks.map((block) => {
             const isHighlighted = !publishedOnly && autoHighlightBlockId === block.id;
+            const blockTitle = "title" in block && block.title ? block.title : block.id;
+            const blockEditAction = !publishedOnly ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                className="text-muted-foreground hover:text-primary hover:bg-primary/10 h-6 shrink-0 gap-1 px-1.5 text-[11px]"
+                onClick={() =>
+                  dispatchFocusNavigator({
+                    prefillText: `'${blockTitle}(${block.id})' 블록을 `,
+                    replace: true,
+                  })
+                }
+              >
+                <Sparkles className="text-primary size-3" />
+                AI로 수정
+              </Button>
+            ) : undefined;
+
             return (
               <div
                 key={block.id}
@@ -223,11 +261,11 @@ export function AnalysisViewRenderer({
                 )}
               >
                 {block.type === "text" ? (
-                  <TextBlockRenderer block={block} />
+                  <TextBlockRenderer block={block} headerAction={blockEditAction} />
                 ) : block.type === "table" ? (
-                  <TableBlockRenderer block={block} />
+                  <TableBlockRenderer block={block} headerAction={blockEditAction} />
                 ) : (
-                  <ChartBlockRenderer block={block} />
+                  <ChartBlockRenderer block={block} headerAction={blockEditAction} />
                 )}
               </div>
             );

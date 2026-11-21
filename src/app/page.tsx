@@ -51,6 +51,27 @@ const GATEWAY_ROLES: readonly GatewayRoleItem[] = [
 ];
 
 /**
+ * 랜딩 하단에 배치되는 사전 시드 데모 도메인 및 권장 체험 순서 가이드 메타데이터
+ */
+const DEMO_WALKTHROUGH_STEPS = [
+  {
+    step: "1단계",
+    role: "Builder",
+    summary: "관계 그래프·폼 캔버스에서 도메인 구조를 탐색하고 자연어로 필드를 편집·발행",
+  },
+  {
+    step: "2단계",
+    role: "Consumer",
+    summary: "발행된 폼에 신규 데이터를 제출하거나 다중 필터·정렬·관계형 피커로 실데이터 탐색",
+  },
+  {
+    step: "3단계",
+    role: "Analyst",
+    summary: "자연어 질문으로 차트·표 리포트를 작성하고 [원본 데이터 보기]로 컨슈머 목록 드릴다운",
+  },
+] as const;
+
+/**
  * 서비스 메인 게이트웨이 페이지 (/)
  *
  * 사용자의 역할에 따라 [빌더], [컨슈머], [분석가] 환경으로 진입할 수 있는 3자 역할 관문입니다.
@@ -115,6 +136,40 @@ export default function HomePage() {
               );
             })}
           </div>
+
+          {/* 사전 구축 데모 환경 & 권장 체험 순서 안내 */}
+          <Card className="border-border/70 bg-card/80 w-full text-left shadow-xs backdrop-blur-xs">
+            <CardHeader className="space-y-1.5 pb-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle className="text-foreground text-sm font-semibold">
+                  사전 구축 데모 환경 안내
+                </CardTitle>
+                <span className="text-muted-foreground font-mono text-[11px]">
+                  IT 서비스 에이전시 ERP 도메인 · 폼 7종 · 누적 응답 3만 건 이상 · 발행 리포트 3종
+                </span>
+              </div>
+              <CardDescription className="text-muted-foreground text-xs leading-relaxed">
+                고객사, 프로젝트, 임직원, 작업일지, 비용 전표, 매출 정산 등 상호 연결된 도메인
+                데이터가 사전 구성되어 있어 별도 데이터 입력 없이도 모든 역할을 바로 체험할 수
+                있습니다.
+              </CardDescription>
+            </CardHeader>
+            <div className="grid grid-cols-1 gap-3 px-6 pb-5 sm:grid-cols-3">
+              {DEMO_WALKTHROUGH_STEPS.map((item) => (
+                <div
+                  key={item.step}
+                  className="border-border/60 bg-muted/30 flex flex-col gap-1 rounded-lg border px-3.5 py-2.5"
+                >
+                  <div className="flex items-center gap-1.5 text-xs font-semibold">
+                    <span className="text-primary">{item.step}</span>
+                    <span className="text-muted-foreground">·</span>
+                    <span className="text-foreground">{item.role}</span>
+                  </div>
+                  <p className="text-muted-foreground text-xs leading-relaxed">{item.summary}</p>
+                </div>
+              ))}
+            </div>
+          </Card>
         </main>
       </div>
     </div>

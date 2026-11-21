@@ -1,7 +1,12 @@
 import * as React from "react";
+import { Sparkles } from "lucide-react";
 import { PrimaryFieldBadge } from "@/entities/form";
+import { Badge } from "@/shared/ui/badge";
 import { Label } from "@/shared/ui/label";
 import { cn } from "@/shared/lib/cn";
+
+const INTERACTIVE_CONTROL_SELECTOR =
+  'input, textarea, select, button, a, [role="combobox"], [role="checkbox"], [role="radio"], [role="switch"], label';
 
 /**
  * 폼 필드 래퍼 프로퍼티 인터페이스
@@ -20,6 +25,9 @@ export interface FormFieldWrapperProps {
 
   /** 도메인의 대표 식별 필드 여부 */
   isPrimary?: boolean | undefined;
+
+  /** 빌더 프리뷰 모드 등에서 라벨 옆에 노출할 필드 타입 한글 라벨 */
+  typeLabel?: string | undefined;
 
   /** 필드 하단 설명/도움말 문구 */
   description?: string | undefined;
@@ -52,6 +60,7 @@ export function FormFieldWrapper({
   label,
   required = false,
   isPrimary = false,
+  typeLabel,
   description,
   error,
   isSelected = false,
@@ -59,19 +68,28 @@ export function FormFieldWrapper({
   children,
   className,
 }: FormFieldWrapperProps) {
-  const handleClick = React.useCallback(() => {
-    onFieldClick?.(id);
-  }, [id, onFieldClick]);
+  // 실제 입력 컨트롤 조작 중에는 AI 채팅 포커스를 가로채지 않고, 카드 빈 영역/헤더/수정 버튼 클릭만 연결합니다.
+  const handleContainerClick = React.useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!onFieldClick) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest(INTERACTIVE_CONTROL_SELECTOR)) {
+        return;
+      }
+      onFieldClick(id);
+    },
+    [id, onFieldClick]
+  );
 
   return (
     <div
       data-field-id={id}
-      onClick={handleClick}
+      onClick={handleContainerClick}
       className={cn(
         "group relative flex flex-col gap-1.5 rounded-lg border border-transparent p-3 transition-colors",
         isPrimary && "border-primary/30 bg-primary/[0.02]",
         isSelected && "border-primary/50 bg-primary/5 ring-primary/20 ring-2",
-        onFieldClick && "hover:border-border hover:bg-muted/40 cursor-pointer",
+        onFieldClick && "hover:border-border hover:bg-muted/40",
         className
       )}
     >
@@ -89,7 +107,24 @@ export function FormFieldWrapper({
             )}
           </Label>
           {isPrimary && <PrimaryFieldBadge />}
+          {typeLabel && (
+            <Badge variant="outline" className="text-muted-foreground px-1.5 py-0 text-[10px]">
+              {typeLabel}
+            </Badge>
+          )}
         </div>
+
+        {onFieldClick && (
+          <button
+            type="button"
+            onClick={() => onFieldClick(id)}
+            className="text-muted-foreground hover:text-primary hover:bg-primary/10 inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium opacity-75 transition-all group-hover:opacity-100"
+            title="클릭하여 AI Navigator에게 이 필드 수정을 요청합니다"
+          >
+            <Sparkles className="text-primary size-3" />
+            AI로 수정
+          </button>
+        )}
       </div>
 
       <div className="mt-1">{children}</div>

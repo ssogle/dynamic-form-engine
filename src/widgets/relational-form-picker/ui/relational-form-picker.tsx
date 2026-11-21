@@ -7,6 +7,8 @@ import {
   type ConsumerFormSubmitterProps,
   ConsumerSubmissionEditor,
   type ConsumerSubmissionEditorProps,
+  DynamicFormRenderer,
+  type DynamicFormRendererProps,
   type RelationPickerSlotProps,
   type RelationSelectedTableSlotProps,
 } from "@/features/render-dynamic-form";
@@ -92,6 +94,30 @@ export function RelationalSubmissionEditor({
     <ConsumerSubmissionEditor
       formId={formId}
       submissionId={submissionId}
+      renderRelationPicker={renderRelationalPickerTable}
+      renderRelationSelectedTable={renderRelationalSelectedTable}
+    />
+  );
+}
+
+/**
+ * 관계형 테이블 피커가 결합된 동적 폼 렌더러 위젯 Props
+ *
+ * 빌더 라이브 캔버스(`mode="preview"`)에서도 컨슈머 제출 화면과 동일한
+ * 관계형 피커 다이얼로그 및 선택 결과 테이블을 체험할 수 있도록 제공합니다.
+ */
+export type RelationalDynamicFormRendererProps = Omit<
+  DynamicFormRendererProps,
+  "renderRelationPicker" | "renderRelationSelectedTable"
+>;
+
+/**
+ * 관계형 레코드 선택 피커 및 선택 결과 테이블(`ManageFormSubmissions`)이 통합된 동적 폼 렌더러 위젯
+ */
+export function RelationalDynamicFormRenderer(props: RelationalDynamicFormRendererProps) {
+  return (
+    <DynamicFormRenderer
+      {...props}
       renderRelationPicker={renderRelationalPickerTable}
       renderRelationSelectedTable={renderRelationalSelectedTable}
     />

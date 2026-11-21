@@ -22,7 +22,10 @@ import { YmdMaskedInput } from "@/shared/ui/date-input";
 import { Input } from "@/shared/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
-import { formatFilterConditionSummary } from "../lib/filter-summary";
+import {
+  formatFilterConditionSummary,
+  normalizeConditionOptionTokens,
+} from "../lib/filter-summary";
 import { RelationColumnFilterPicker } from "./relation-column-filter-picker";
 
 export interface ColumnHeaderFilterProps {
@@ -77,7 +80,11 @@ function createInitialDraft(
     };
   }
 
-  const normalized = normalizeFieldFilterCondition(current);
+  const normalized = normalizeFieldFilterCondition(
+    capability?.filterWidget === "options"
+      ? normalizeConditionOptionTokens(current, options)
+      : current
+  );
   const boolStr = normalized.value === false || normalized.value === "false" ? "false" : "true";
 
   // AI가 relation 필드에 레거시 eq(단일 UUID)를 적용한 경우 UI 피커의 in 규격으로 안전 정규화

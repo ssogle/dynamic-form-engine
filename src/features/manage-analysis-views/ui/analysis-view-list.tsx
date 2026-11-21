@@ -2,12 +2,12 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { FileBarChart2, Sparkles, Trash2 } from "lucide-react";
+import { FileBarChart2, Globe, RotateCcw, Sparkles, Trash2 } from "lucide-react";
 import { extractAnalysisBlocks } from "@/entities/analysis-view";
 import { formatDate } from "@/shared/lib/date";
 import { dispatchFocusNavigator } from "@/shared/lib/navigator-focus";
-import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
+import { PublishStatusBadge } from "@/shared/ui/publish-status-badge";
 import {
   Card,
   CardContent,
@@ -138,9 +138,7 @@ export function AnalysisViewList() {
                   >
                     {view.title}
                   </Link>
-                  <Badge variant={isPublished ? "default" : "secondary"}>
-                    {isPublished ? "발행됨" : "초안"}
-                  </Badge>
+                  <PublishStatusBadge isPublished={isPublished} />
                 </div>
                 <CardDescription className="line-clamp-2 min-h-10">
                   {view.description || "설명이 등록되지 않은 분석 뷰 문서입니다."}
@@ -148,9 +146,15 @@ export function AnalysisViewList() {
               </CardHeader>
 
               <CardContent className="text-muted-foreground pb-3 text-xs">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <span>구성 블록 {blockCount}개</span>
-                  <span>수정: {formatDate(view.updatedAt) || "-"}</span>
+                  {view.publishedAt ? (
+                    <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                      {formatDate(view.publishedAt)} 발행
+                    </span>
+                  ) : (
+                    <span>수정: {formatDate(view.updatedAt) || "-"}</span>
+                  )}
                 </div>
               </CardContent>
 
@@ -162,12 +166,23 @@ export function AnalysisViewList() {
                 <div className="flex items-center gap-2">
                   <Button
                     type="button"
-                    variant={isPublished ? "secondary" : "default"}
+                    variant={isPublished ? "outline" : "default"}
                     size="sm"
+                    className="gap-1.5"
                     disabled={isPublishPending || cannotPublish}
                     onClick={() => handleTogglePublish(view.id, !isPublished)}
                   >
-                    {isPublished ? "초안 회수" : "공식 발행"}
+                    {isPublished ? (
+                      <>
+                        <RotateCcw className="size-3.5" />
+                        발행 취소
+                      </>
+                    ) : (
+                      <>
+                        <Globe className="size-3.5" />
+                        공식 발행
+                      </>
+                    )}
                   </Button>
 
                   <Popover

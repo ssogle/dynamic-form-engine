@@ -133,6 +133,9 @@ export interface DynamicFieldProps {
   /** 비활성화 여부 */
   disabled?: boolean | undefined;
 
+  /** 빌더 프리뷰 모드 등에서 필드 타입 배지를 라벨 옆에 표시할지 여부 */
+  showTypeBadge?: boolean | undefined;
+
   /** 관계형 필드 선택 다이얼로그 본문 주입용 선택적 렌더 슬롯 */
   renderRelationPicker?: ((slot: RelationPickerSlotProps) => React.ReactNode) | undefined;
 

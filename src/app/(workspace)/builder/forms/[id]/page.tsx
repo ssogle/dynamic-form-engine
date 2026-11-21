@@ -1,6 +1,7 @@
 import * as React from "react";
-import { DynamicFormRenderer } from "@/features/render-dynamic-form";
+import { BuilderFormPublishButton } from "@/features/manage-builder-forms";
 import { BuilderDataPreviewDialog } from "@/widgets/builder-form-preview";
+import { RelationalDynamicFormRenderer } from "@/widgets/relational-form-picker";
 import { BackLink } from "@/shared/ui/back-link";
 
 /**
@@ -27,7 +28,10 @@ export default async function BuilderFormIdPage({ params }: BuilderFormIdPagePro
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <BackLink href="/builder/forms" label="폼 목록으로" />
-        <BuilderDataPreviewDialog formId={id} />
+        <div className="flex flex-wrap items-center gap-2">
+          <BuilderDataPreviewDialog formId={id} />
+          <BuilderFormPublishButton formId={id} />
+        </div>
       </div>
 
       <div className="flex flex-col gap-1">
@@ -35,11 +39,13 @@ export default async function BuilderFormIdPage({ params }: BuilderFormIdPagePro
           실시간 폼 라이브 캔버스
         </h1>
         <p className="text-muted-foreground text-xs">
-          폼 ID: <span className="text-primary font-mono font-medium">{id}</span>
+          필드 카드를 클릭하거나 좌측 AI Navigator에서 자연어로 필드 추가·수정을 요청할 수 있습니다.{" "}
+          <span className="text-border mx-1">|</span> 폼 ID:{" "}
+          <span className="text-primary font-mono font-medium">{id}</span>
         </p>
       </div>
 
-      <DynamicFormRenderer formId={id} mode="preview" />
+      <RelationalDynamicFormRenderer formId={id} mode="preview" />
     </div>
   );
 }

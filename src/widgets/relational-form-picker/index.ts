@@ -6,6 +6,8 @@
  */
 
 export {
+  RelationalDynamicFormRenderer,
+  type RelationalDynamicFormRendererProps,
   RelationalFormSubmitter,
   type RelationalFormSubmitterProps,
   RelationalSubmissionEditor,

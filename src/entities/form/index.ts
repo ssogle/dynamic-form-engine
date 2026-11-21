@@ -48,6 +48,7 @@ export {
 } from "./lib/validate-form-schema-transition";
 export { normalizeSelectOption, normalizeSelectOptions } from "./lib/select-options";
 export { formatFieldDisplayValue } from "./lib/format-field-value";
+export { FIELD_TYPE_LABELS, getFieldTypeLabel } from "./lib/field-type-labels";
 export {
   buildFormRelationGraph,
   type FormRelationGraphData,
