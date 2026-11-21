@@ -4,19 +4,37 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 > **자연어 기반 관계형 도메인 폼 빌더, 비정형 데이터 정제 런타임 및 결정론적 데이터 분석 엔진**  
-> Next.js 16 (App Router) · FSD(Feature-Sliced Design) · SDD(Spec-Driven Development) · TDD Harness
+> Next.js 16 (App Router) · FSD(Feature-Sliced Design) · SDD(Spec-Driven Development) · TDD Harness  
+> **Live Demo**: [https://dynamic-form-engine-bay.vercel.app/](https://dynamic-form-engine-bay.vercel.app/) _(분할 캔버스·가상화 테이블·3D 그래프를 위해 **데스크톱 `1024px` 이상** 환경 권장)_
 
 ---
 
-## 1. Executive Summary
+## 1. Why & Executive Summary
 
-본 프로젝트는 단순 설문 생성기를 넘어, **자연어로 관계형 도메인 스키마를 설계(Builder)하고, 정형/멀티모달 비정형 데이터를 안전하게 수집·관리(Consumer)하며, PostgreSQL 서버 집계 결과를 바탕으로 리포트와 차트(Analyst)까지 완결하는 통합 3-Workspace 데이터 엔진**입니다.
+### 왜 만들었는가 (Problem Statement -> Solution)
 
-LLM 도입 시 빈번히 발생하는 **환각(Hallucination), 수치 오계산, 스키마·데이터 무결성 파괴, 비정형 출력 오류, 불필요한 토큰·지연 비용**을 애플리케이션 레벨과 엔지니어링 하네스(Harness)로 통제합니다:
+기존의 업무 데이터 도구와 단순 AI 연동 앱은 **워크플로 단절**과 **LLM 신뢰성 부족**이라는 두 가지 구조적 한계를 가집니다:
+
+| 해결하려는 문제 (Problem)                                                                                                                                                        | 본 프로젝트의 해결 방식 (Solution)                                                                                                                                            |
+| :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1) 설계·수집·분석 워크플로의 파편화**<br/>폼/테이블 설계, 비정형 문서·이미지 수기 입력, 조건부 필터링과 집계 리포트가 별도 도구로 분리되어 있고 변경마다 개발·수작업 병목 발생 | **통합 3-Workspace 파이프라인**<br/>자연어 관계형 스키마 설계(`Builder`), 비정형 Vision 정제·입력(`Consumer`), PostgreSQL 집계 기반 리포트(`Analyst`)를 단일 엔진으로 통합    |
+| **2) LLM 도입 시 신뢰성·안전성·비용의 딜레마**<br/>AI가 없는 필드를 지어내거나 응답이 쌓인 스키마를 파괴하고, 수치 암산 오류(환각)·무단 변경·전체 DB 덤프로 인한 지연/토큰 폭증  | **결정론적 검증·집계 분리 + 제어된 에이전트 루프**<br/>Zod/낙관적 락 가드, PostgreSQL 서버 집계, 온디맨드 도구 호출, 파괴적 작업 HITL 승인 게이트로 AI 자유도와 안전성을 양립 |
+
+### 핵심 해결 아키텍처 요약
+
+본 프로젝트는 단순 설문 생성기가 아닌 **관계형 도메인 스키마 설계(Builder) -> 정형/멀티모달 데이터 수집(Consumer) -> 서버 집계 기반 분석(Analyst)을 완결하는 통합 데이터 엔진**으로, 애플리케이션 레벨과 엔지니어링 하네스로 다음 3가지 원칙을 강제합니다:
 
 1. **On-Demand Tool Calling & HITL Gate**: 사전 전량 컨텍스트 덤프 대신 온디맨드 조회 도구(`searchForms`, `getFormDetails`, `searchSubmissions`, `getRelatedSubmissions`)와 종단 스텝 조기 종료(`shouldStopAfterTerminalStep`)로 지연과 토큰을 절감하며, 발행·삭제·제출/수정 저장 전 인라인 `[승인]`/`[취소]` 사전 확인 루프를 강제합니다.
 2. **Data Integrity & Schema Governance**: 소프트 삭제(`deletedAt`), `version` 컬럼 기반 낙관적 락(`409 Conflict`), 발행 중 폼 수정 보호, 응답 보유 폼의 파괴적 스키마 변경 차단, 단일 진실 원천 `FIELD_CAPABILITY_BY_TYPE` 필터·집계 규격을 적용했습니다.
 3. **Deterministic Server Analytics**: LLM 암산을 금지하고 Drizzle + PostgreSQL 집계(`aggregateFormSubmissions`) 및 결정론적 교차 연산기(`computeSeriesMetric`) 결과만을 근거로 `text`, `table`, `chart` 블록 분석 뷰를 생성합니다.
+
+### Live Demo & Quick Walkthrough (1분 체험 시나리오)
+
+사전 구성된 샘플 폼과 연결 데이터를 기준으로 배포된 [Live Demo](https://dynamic-form-engine-bay.vercel.app/)에서 전체 흐름을 바로 확인할 수 있습니다:
+
+1. **Builder (`/builder/forms`)**: 3D 관계 그래프와 폼 목록을 탐색한 뒤, 개별 폼 캔버스에서 필드 카드의 `AI로 수정`을 눌러 예) `"우선순위 선택 필드를 추가해줘"`를 실행해 실시간 스키마 갱신 및 데이터 미리보기를 확인합니다.
+2. **Consumer (`/consumer`)**: 발행된 폼에 신규 데이터를 제출하거나(이미지 첨부 시 Gemini Vision 자동 입력 + `[승인]`/`[취소]` HITL 카드), 다중 컬럼 필터·정렬·관계형 레코드 피커로 실데이터를 탐색합니다.
+3. **Analyst (`/analyst/views`)**: 예) `"최근 매출과 비용을 프로젝트별로 비교하는 차트와 요약 표를 만들어줘"`로 서버 집계 기반 분석 뷰를 작성하고, 블록 하단 `[원본 데이터 보기]` 링크로 컨슈머 필터링 목록까지 드릴다운합니다.
 
 ---
 
@@ -31,13 +49,45 @@ LLM 도입 시 빈번히 발생하는 **환각(Hallucination), 수치 오계산,
 
 | 워크스페이스 | 주요 경로                                                                                                   | 핵심 기능 및 책임                                                                                                                                                                                                                                         |
 | :----------- | :---------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Landing**  | `/`                                                                                                         | DB 무조회 자동 회전 3D 온톨로지 배경(`LandingOntologyBackground`) 및 3개 역할 포털 게이트웨이                                                                                                                                                             |
-| **Builder**  | `/builder/forms`, `/builder/forms/[id]`                                                                     | 9종 도메인 필드(`text`, `textarea`, `number`, `select`, `radio`, `checkbox`, `date`, `switch`, `relation`) 설계, `primaryFieldId` 지정, 다중 뷰 프리뷰, `/builder/forms` 3D 관계 그래프 + 목록 스플릿 뷰(`SpriteText` 상시 라벨, 방향성 파티클)           |
-| **Consumer** | `/consumer`, `/consumer/forms/[id]`, `/new`, `/submissions/[submissionId]`, `/edit`, `/consumer/views/[id]` | 발행된 폼 입력/수정, 영수증/명세서 이미지 첨부 Gemini Vision 자동 입력(`fillFields`), 제출/수정 저장 HITL 승인, TanStack Virtual 테이블 + URL 동기화 통합 필터/기간/정렬, `relations` 역참조 목록, 공유 분석 뷰 열람                                      |
-| **Analyst**  | `/analyst/views`, `/analyst/views/[id]`                                                                     | PostgreSQL 서버 레벨 `count`/`sum`/`avg`/`min`/`max` · 시계열 · `relation`/옵션 기준 그룹 집계, Zero-fill 교차 연산, Recharts(`bar`, `line`, `pie`) 차트 + 테이블 + 마크다운 요약 블록 편집·원자적 일괄 갱신(`SET_ALL_BLOCKS`) 및 원천 `sourceLinks` 연동 |
+| **Landing**  | `/`                                                                                                         | DB 무조회 자동 회전 3D 온톨로지 배경(`LandingOntologyBackground`), 빠른 체험 가이드 카드, 전역 `error.tsx` / `not-found.tsx` 복구 화면 및 3개 역할 포털 게이트웨이                                                                                        |
+| **Builder**  | `/builder/forms`, `/builder/forms/[id]`                                                                     | 9종 도메인 필드 설계, `primaryFieldId` 지정, 필드 타입 배지 및 Click-to-Mention(`AI로 수정`), 관계형 피커 위젯 연동, 실데이터 우선 목록 프리뷰, 상단 발행 토글(`공식 발행`/`발행 취소`), `/builder/forms` 3D 관계 그래프 + 목록 스플릿 뷰                 |
+| **Consumer** | `/consumer`, `/consumer/forms/[id]`, `/new`, `/submissions/[submissionId]`, `/edit`, `/consumer/views/[id]` | 발행된 폼 입력/수정, 영수증/명세서 이미지 첨부 Gemini Vision 자동 입력(`fillFields`), 제출/수정 저장 HITL 승인, TanStack Virtual 테이블 + URL 동기화 통합 필터(기간·옵션 코드 정규화 포함)/정렬, `relations` 역참조 목록, 발행 스냅샷 분석 뷰 열람        |
+| **Analyst**  | `/analyst/views`, `/analyst/views/[id]`                                                                     | PostgreSQL 서버 레벨 `count`/`sum`/`avg`/`min`/`max` · 시계열 · `relation`/옵션 기준 그룹 집계, Zero-fill 교차 연산, 파생 지표·기존 블록 정렬(`SORT_BLOCK_DATA`), Recharts(`bar`, `line`, `pie`) 차트·테이블·마크다운 블록별 `AI로 수정` 및 `sourceLinks` |
 
 > [!NOTE]
-> `/builder`, `/consumer`, `/analyst` 작업 공간은 좌측 상주형 AI Navigator 패널(`w-80 lg:w-96`), 라이브 캔버스, 가상화 데이터 테이블, 3D 그래프의 사용성을 보장하기 위해 **데스크톱(`1024px` 이상) 전용**으로 설계되었으며, `1024px` 미만 뷰포트 진입 시 `WorkspaceSplitShell`이 데스크톱 안내 가드 카드를 표시합니다.
+> `/builder`, `/consumer`, `/analyst` 작업 공간은 좌/우 도킹형 AI Navigator 패널(`w-80 lg:w-96`), 라이브 캔버스, 가상화 데이터 테이블, 3D 그래프의 사용성을 보장하기 위해 **데스크톱(`1024px` 이상) 전용**으로 설계되었으며, `1024px` 미만 뷰포트 진입 시 `WorkspaceSplitShell`이 데스크톱 안내 가드 카드를 표시합니다.
+
+### Product Screenshots
+
+#### 1) Builder — 3D 도메인 관계 그래프 & 폼 목록 분할 보기
+
+등록된 도메인 폼과 `relation` 연결 구조를 WebGL 3D 그래프(`react-force-graph-3d`)로 시각화하고, 발행/초안 상태별 폼 목록과 함께 탐색합니다.
+
+![Builder 3D 도메인 관계 그래프 및 목록 분할 보기](assets/builder-relation-graph.jpg)
+
+#### 2) Builder — 자연어 폼 스키마 생성 & 실시간 라이브 캔버스
+
+자연어 요청만으로 대표 필드(`PRIMARY`), 다른 폼과의 관계 참조(`relation`), 선택 옵션이 포함된 폼 스키마를 즉시 생성하고 실시간으로 편집합니다.
+
+![Builder 자연어 폼 생성 및 실시간 캔버스](assets/builder-live-canvas.jpg)
+
+#### 3) Builder — 고위험 작업 실행 전 HITL 사전 승인 게이트
+
+삭제·발행·제출 등 데이터 변이를 수반하는 도구는 LLM이 즉시 실행하지 않고 인라인 `[취소]`/`[승인]` 카드로 사용자 확인을 거친 뒤 결정론적으로 실행합니다.
+
+![AI Navigator HITL 사전 승인 카드](assets/builder-hitl-confirmation.jpg)
+
+#### 4) Consumer — AI 상대 날짜/수치 필터링 & 가상화 데이터 목록
+
+`"이번달 10만원 이상 비용 목록"` 같은 자연어 질의를 날짜 범위(`2026-11-01 ~ 2026-11-30`)와 수치 필터로 변환해 URL·필터 칩·TanStack Virtual 테이블에 즉시 동기화합니다.
+
+![Consumer AI 필터링 및 가상화 데이터 목록](assets/consumer-filtered-list.png)
+
+#### 5) Analyst — 관계형 서버 집계·교차 연산 & 블록 단위 AI 차트 수정
+
+PostgreSQL 서버 집계(`매출 청구` + `비용 지출`)와 `computeSeriesMetric` 교차 연산 결과를 바탕으로 차트·표 리포트를 생성하고, 특정 블록만 지정해 수정하며 `[원본 데이터 보기]`로 드릴다운합니다.
+
+![Analyst 서버 집계 차트 및 블록 AI 수정](assets/analyst-comparison-chart.png)
 
 ---
 
@@ -50,7 +100,7 @@ sequenceDiagram
     autonumber
     actor User as 사용자
     participant Shell as NavigatorShell (Client)
-    participant API as Hono/Next API (/api/v1/navigator)
+    participant API as Next Route (/api/v1/navigator)
     participant Engine as runNavigatorEngine (Server)
     participant Gemini as Gemini (Vercel AI SDK)
     participant DB as PostgreSQL (Drizzle ORM)
@@ -77,17 +127,17 @@ sequenceDiagram
 ### 2) 데이터베이스 물리 스키마 (`src/shared/tables/`)
 
 - `forms.table.ts`: 폼 메타데이터, JSONB `schemaDefinition` (`primaryFieldId` + `fields`), `publishedAt`, `version`(낙관적 락), `deletedAt`
-- `form-submissions.table.ts`: 제출 응답 JSONB `data`, `formId` FK(CASCADE), `version`, `deletedAt`
-- `relations.table.ts`: `relation` 필드 저장 시 동기화되는 경량 엣지 인덱스 (`sourceFormId`, `sourceSubmissionId`, `targetSubmissionId`, `fieldId`) — JSONB 풀 스캔 없이 단건 상세 역참조 및 AI `getRelatedSubmissions` 추적 지원
-- `analysis-views.table.ts`: 블록(`text`, `table`, `chart`) 기반 분석 뷰 JSONB `blocks`, `publishedAt`, `version`, `deletedAt`
+- `form-submissions.table.ts`: 제출 응답 JSONB `data`, `formId` FK(`forms.id`, CASCADE), `version`, `deletedAt`, 활성 부분 인덱스(`idx_form_submissions_active`)
+- `relations.table.ts`: `relation` 필드 저장 시 동기화되는 경량 엣지 인덱스 — 복합 PK `(sourceId, targetId, fieldId)`, `sourceId`/`targetId` FK(`form_submissions.id`, CASCADE), 정방향/역방향 인덱스(`idx_relations_source`, `idx_relations_target`)로 단건 상세 역참조 및 AI `getRelatedSubmissions` 추적 지원
+- `analysis-views.table.ts`: 블록(`text`, `table`, `chart`) 기반 분석 뷰 JSONB `blocks`, `publishedAt`, `version`, `deletedAt`, 활성/발행 부분 인덱스
 
 ### 3) API 엔드포인트 (`src/app/api/v1/`)
 
-- `GET/POST/PATCH/DELETE /api/v1/forms/[[...route]]` (Hono Router)
-- `GET/POST/PATCH/DELETE /api/v1/forms/:formId/submissions` 및 필터·집계 라우트 (Hono Router)
-- `GET/POST/PATCH/DELETE /api/v1/analysis-views/[[...route]]` (Hono Router)
-- `GET /api/v1/relations` (역참조 연결 내역 조회)
-- `POST /api/v1/navigator` (NDJSON 스트리밍 & JSON 응답 AI 실행)
+- `GET/POST /api/v1/forms`, `GET/PATCH/DELETE /api/v1/forms/:id`, `POST /api/v1/forms/:id/publish` (Hono Router)
+- `GET/POST /api/v1/forms/:id/submissions`, `GET/PATCH/DELETE /api/v1/forms/:id/submissions/:submissionId` (Hono Router — 다중 필터·정렬·기간·배치 ID 조회 포함)
+- `GET /api/v1/analysis-views`, `GET/DELETE /api/v1/analysis-views/:id`, `POST /api/v1/analysis-views/:id/publish` (Hono Router — 뷰 생성·블록 편집은 Navigator Analyst 도구로 수행)
+- `GET /api/v1/relations` (Hono Router — 역참조 연결 내역 조회)
+- `POST /api/v1/navigator` (Next.js Route Handler, `maxDuration = 60` — NDJSON 스트리밍 `?stream=1` 및 JSON 응답 AI 실행)
 
 ---
 
@@ -99,36 +149,60 @@ sequenceDiagram
 | **State / Query / Table** | TanStack Query `v5`, TanStack Table `v8`, TanStack Virtual `v3`, React Hook Form `v7`, Zod `v4`, Zustand `v5`                         |
 | **Visualization**         | Recharts `v3` (Bar/Line/Pie), `react-force-graph-3d` + `three-spritetext` (WebGL 3D 관계 그래프), `react-markdown` + `remark-gfm`     |
 | **Backend / DB**          | Hono `v4`, Drizzle ORM + `drizzle-zod`, PostgreSQL (`postgres`)                                                                       |
-| **AI Runtime**            | Vercel AI SDK (`ai` `v7`) + `@ai-sdk/google` (`gemini-flash-lite-latest`)                                                             |
+| **AI Runtime**            | Vercel AI SDK (`ai` `v7`) + `@ai-sdk/google` (`gemini-flash-latest` / `gemini-flash-lite-latest`)                                     |
 | **Test / Quality**        | Vitest `v3`, ESLint (`eslint-plugin-boundaries`, `eslint-plugin-check-file`), Prettier, Husky, Commitlint                             |
 
 ---
 
 ## 5. Architecture & Engineering Harness
 
-단방향 결합도와 관심사 분리를 보장하기 위해 **FSD(Feature-Sliced Design)** 레이어 구조를 따릅니다:
+### Feature-Sliced Design (FSD) & Evolutionary Architecture
+
+단방향 결합도와 관심사 분리를 보장하기 위해 **FSD(Feature-Sliced Design)** 레이어 구조를 따르며, 코드의 크기나 UI 외형이 아닌 **유스케이스와 공유 관계**를 기준으로 레이어를 결정합니다:
 
 ```text
-src/
-├── app/          # Next.js App Router 진입점, 워크스페이스 쉘, Hono/Route Handlers
-├── widgets/      # 복합 UI 패널 (navigator-shell, builder-form-preview)
-├── features/     # 유스케이스 기능 슬라이스 (execute-navigator-action, manage-builder-forms,
-│                 #   manage-form-submissions, manage-analysis-views, browse-published-forms,
-│                 #   render-dynamic-form, render-analysis-view)
-├── entities/     # 핵심 도메인 엔티티, Zod 스키마, React Query 훅, 서버 리포지토리 (form, form-submission, analysis-view)
-└── shared/       # 공용 UI(shadcn/ui, 배럴 금지), DB 테이블 DDL, HTTP/Date/AI/Zod 유틸리티
+▲ (상위: 비즈니스 결합도 높음 — 상위 레이어는 하위 레이어만 참조 가능)
+│
+├── src/app/       # [최상위 진입점] Thin App Router, 워크스페이스 쉘, Hono/Next API Route Handlers
+├── src/widgets/   # [피처 조립 레이어] 2개 이상의 Feature/Entity가 결합하는 복합 독립 구획
+│                  #   (navigator-shell, builder-form-preview, relational-form-picker)
+├── src/features/  # [유스케이스 출발점] 모든 사용자 비즈니스 행위와 상호작용의 기본 단위
+│                  #   (execute-navigator-action, manage-builder-forms, manage-form-submissions,
+│                  #    manage-analysis-views, browse-published-forms, render-dynamic-form, render-analysis-view)
+├── src/entities/  # [하향된 도메인 모델] 복수 피처가 공유하는 도메인 스키마·쿼리·스토어·서버 영속성
+│                  #   (form, form-submission, analysis-view)
+└── src/shared/    # [하향된 기술 도구] 도메인 무관 공용 UI(shadcn/ui, 배럴 금지), DB DDL, HTTP/Date/AI/Zod 유틸리티
+│
+▼ (하위: 재사용성 높음 — 동일 레이어 간 수평 참조 및 역방향 참조 금지)
 ```
 
-| 분류              | 가드레일 / 규칙                                              | 핵심 목적                                                                               | 문서                                                                                                                |
-| :---------------- | :----------------------------------------------------------- | :-------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------ |
-| **FSD & 네이밍**  | `eslint-plugin-boundaries`, `check-file`                     | 레이어 단방향 의존성, Public API(`index.ts`/`server.ts`) 강제, `kebab-case` 통일        | [.agents/rules/fsd-architecture-rule.md](.agents/rules/fsd-architecture-rule.md)                                    |
-| **코딩 패러다임** | `no-restricted-syntax`, Result 패턴                          | 함수형 지향(`class`/`this` 금지), `{ data, error }` 반환, YAGNI                         | [.agents/rules/coding-paradigm-rule.md](.agents/rules/coding-paradigm-rule.md)                                      |
-| **Zod SSOT**      | Schema-First 거버넌스                                        | `tables/*.table.ts` vs `schema/*.schema.ts` vs `types/*.types.ts` 역할 분리             | [.agents/rules/zod-schema-governance-rule.md](.agents/rules/zod-schema-governance-rule.md)                          |
-| **날짜/시간**     | `no-restricted-imports` + `@/shared/lib/date` + `sql`now()`` | Store in UTC, Display in Local, 중앙 DB 시계 권한, 서드파티 직접 import 차단            | [.agents/rules/date-and-time-rule.md](.agents/rules/date-and-time-rule.md)                                          |
-| **UI & 스타일링** | `@/shared/ui` 직접 임포트, Tailwind v4 시맨틱 토큰           | 배럴 파일 금지, 시스템 팝업(`alert`/`confirm`) 금지, `Thin View` + `use-*.hook.ts` 분리 | [.agents/rules/ui-and-styling-rule.md](.agents/rules/ui-and-styling-rule.md)                                        |
-| **테스트 전략**   | Vitest (`*.test.ts`)                                         | 순수 비즈니스 로직·스키마·스토어·서버 단위 테스트 집중 (`*.test.tsx` UI 테스트 배제)    | [.agents/rules/testing-strategy-rule.md](.agents/rules/testing-strategy-rule.md)                                    |
-| **SDD & Git**     | `docs/specs/{active,archived}`, Husky + Commitlint           | 스펙 선설계 후 구현·완료 시 아카이빙 동결, GitHub Flow 및 PR 템플릿 준수                | [SDD 규칙](.agents/rules/spec-driven-development-rule.md) / [Git 규칙](.agents/rules/git-commit-automation-rule.md) |
-| **CI 자동 검증**  | GitHub Actions (`.github/workflows/ci.yml`)                  | `master` Push 및 PR 단위 `npm run verify`(타입·린트·포맷·전체 단위 테스트) 자동 게이트  | [ci.yml](.github/workflows/ci.yml)                                                                                  |
+- **Feature-First 진화적 3단계 라이프사이클 (위젯 모놀리스 방지)**:
+  1. **기능 우선 (`features/`)**: 모든 신규 유스케이스는 `features/*`에서 시작하여 비즈니스 로직이 없는 Thin App Router(`app/*`)에 직접 배치합니다. (단일 피처만 감싸는 껍데기 위젯 금지)
+  2. **공유 시 하향 추출 (`entities/` vs `shared/`)**: 동일 레이어 간 수평 참조(`cross-feature import`)를 금지하고, 여러 피처가 함께 쓰는 코드는 도메인 의미가 있으면 `entities/*`(예: 초안 스토어, 엔티티 쿼리/스키마)로, 도메인 무관 순수 도구면 `shared/*`로 하향 추출합니다.
+  3. **복합 구획 조립 시 상향 승격 (`widgets/`)**: 2개 이상의 독립된 Feature/Entity가 한 화면 구획에서 유기적으로 맞물려야 할 때만 `widgets/*`로 승격 조립합니다.
+- **표준 세그먼트 & Public API (`index.ts` / `server.ts`) 경계 분리**:
+  - 모호한 `model/`·`api/` 대신 역할이 명확한 세그먼트(`ui`, `hooks/use-*.hook.ts`, `queries`, `server/*.server.ts`, `store`, `schema`, `types`, `lib`, `tables`) 중 필요한 것만 선택 구성하며, `eslint-plugin-check-file`로 전 경로 `kebab-case`를 강제합니다.
+  - 외부 레이어는 반드시 슬라이스 루트 진입점만 참조하며, 클라이언트·공용 진입점(`index.ts`)과 `import "server-only"` 기반 서버 전용 진입점(`server.ts`)을 분리해 브라우저 번들로의 DB/비밀키/서버 로직 유출을 빌드 타임에 차단합니다.
+
+### Engineering Harness Guardrails
+
+| 분류              | 가드레일 / 규칙                                              | 핵심 목적                                                                                   | 문서                                                                                                                |
+| :---------------- | :----------------------------------------------------------- | :------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------ |
+| **FSD & 네이밍**  | `eslint-plugin-boundaries`, `check-file`                     | 레이어 단방향 의존성, Public API(`index.ts`/`server.ts`) 강제, `kebab-case` 통일            | [.agents/rules/fsd-architecture-rule.md](.agents/rules/fsd-architecture-rule.md)                                    |
+| **코딩 패러다임** | `no-restricted-syntax`, Result 패턴                          | 함수형 지향(`class`/`this` 금지), `{ data, error }` 반환, YAGNI                             | [.agents/rules/coding-paradigm-rule.md](.agents/rules/coding-paradigm-rule.md)                                      |
+| **Zod SSOT**      | Schema-First 거버넌스                                        | `tables/*.table.ts` vs `schema/*.schema.ts` vs `types/*.types.ts` 역할 분리                 | [.agents/rules/zod-schema-governance-rule.md](.agents/rules/zod-schema-governance-rule.md)                          |
+| **날짜/시간**     | `no-restricted-imports` + `@/shared/lib/date` + `sql`now()`` | Store in UTC, Display in Local, 중앙 DB 시계 권한, 서드파티 직접 import 차단                | [.agents/rules/date-and-time-rule.md](.agents/rules/date-and-time-rule.md)                                          |
+| **UI & 스타일링** | `@/shared/ui` 직접 임포트, Tailwind v4 시맨틱 토큰           | 배럴 파일 금지, 시스템 팝업(`alert`/`confirm`) 금지, `Thin View` + `use-*.hook.ts` 분리     | [.agents/rules/ui-and-styling-rule.md](.agents/rules/ui-and-styling-rule.md)                                        |
+| **테스트 전략**   | Vitest (`*.test.ts`, `dom`/`node` 분리)                      | 85개 테스트 파일 / 598개 단위 테스트 (`jsdom` 훅·쿼리 vs `node` 서버·스키마·로직 분리 실행) | [.agents/rules/testing-strategy-rule.md](.agents/rules/testing-strategy-rule.md)                                    |
+| **SDD & Git**     | `docs/specs/{active,archived}`, Husky + Commitlint           | 스펙 선설계 후 구현·완료 시 아카이빙 동결, GitHub Flow 및 PR 템플릿 준수                    | [SDD 규칙](.agents/rules/spec-driven-development-rule.md) / [Git 규칙](.agents/rules/git-commit-automation-rule.md) |
+| **CI 자동 검증**  | GitHub Actions (`.github/workflows/ci.yml`)                  | Node 24 기반 `check`(정적 검사) + `test`(Vitest) 병렬 게이트                                | [ci.yml](.github/workflows/ci.yml)                                                                                  |
+
+### Schema-First Development (Zod Single Source of Truth)
+
+정적 데이터 계약과 동적 폼 런타임 검증 모두 단일 스키마에서 파생해 계층 간 불일치를 원천 차단합니다:
+
+- **단일 진실 원천(`schema/*.schema.ts`)**: `z.infer`/`z.input`으로 TypeScript 타입을 파생하여 수동 인터페이스 중복 선언을 금지하고, Hono API 경계 검증(`parseRequestData`)과 AI Tool 입출력 스키마까지 동일한 Zod 계약을 공유합니다.
+- **동적 런타임 스키마 파생**: 저장된 폼 스키마(`schemaDefinition`)로부터 `buildDynamicFormSchema` / `validateSubmissionData`가 클라이언트 React Hook Form 검증기와 서버 제출 검증기를 결정론적으로 생성하며, 조회·정렬·집계 가능 여부는 `FIELD_CAPABILITY_BY_TYPE`에서 일관되게 파생됩니다.
 
 ### Agentic Engineering Workflow (Harness-Driven Development)
 
@@ -141,7 +215,7 @@ src/
 
 ---
 
-## 6. Spec-Driven Evolution (Archived Specs 001 ~ 017)
+## 6. Spec-Driven Evolution (Archived Specs 001 ~ 018)
 
 완료된 모든 기능 명세와 기술 의사결정 이력은 [`docs/specs/archived/`](docs/specs/archived/)에 읽기 전용으로 보존되어 있습니다.
 
@@ -164,6 +238,7 @@ src/
 | 015  | [015-workspace-ux-shell-and-focus-polish.md](docs/specs/archived/015-workspace-ux-shell-and-focus-polish.md)             | 랜딩 헤더·다크 테마 통합, `BackLink` 통일, AI 패널 좌/우 도킹·`Cmd+K`, 3D 그래프 드래그/시점·블록 포커스 개선                |
 | 016  | [016-unified-table-and-ai-sort-engine.md](docs/specs/archived/016-unified-table-and-ai-sort-engine.md)                   | 관계형 피커·선택결과·상세 테이블 `ManageFormSubmissions` 통합, 정렬 칩·UUID 스키마 통일, AI 파생 지표·`SORT_BLOCK_DATA` 정렬 |
 | 017  | [017-studio-ux-preview-and-filter-unification.md](docs/specs/archived/017-studio-ux-preview-and-filter-unification.md)   | 랜딩 데모 안내, 발행 상태 UI 통일, 빌더·분석가 AI 편집 동선, 프리뷰·드릴다운 필터 통합                                       |
+| 018  | [018-production-hardening-and-ci.md](docs/specs/archived/018-production-hardening-and-ci.md)                             | `maxDuration=60`, 프로덕션 500 마스킹, `error`/`not-found`, 전용 파비콘, ESLint 0 warnings 및 CI 구축                        |
 
 ---
 
@@ -171,7 +246,8 @@ src/
 
 핵심 도메인 엔진 검증에 집중하기 위해 아래 항목은 의도적으로 스코프에서 분리했으며, 현행 구조 위에서 자연스럽게 확장 가능하도록 경계를 유지했습니다:
 
-- **인증 및 멀티테넌트(Auth/RBAC)**: 단일 워크스페이스 프로토타입으로 인증 계층 제외 (Hono 미들웨어 및 테이블 테넌트 키 추가로 확장 가능)
+- **인증 및 멀티테넌트(Auth/RBAC)**: 공개 데모 체험 장벽을 없애고 핵심 엔진에 집중하기 위해 로그인·권한 계층 제외 (Hono 미들웨어 및 테이블 테넌트 키 추가로 확장 가능)
+- **추가 필드 타입 확장 (`file`, `email`, `phone`, `rich-text` 등)**: 현재는 관계·정제·집계 검증에 집중해 9종 코어 필드(`text`, `textarea`, `number`, `select`, `radio`, `checkbox`, `date`, `switch`, `relation`)에 한정했으나, 필터·정렬·집계 능력이 `FIELD_CAPABILITY_BY_TYPE` 단일 규격에 선언되어 있어 신규 필드 타입과 입력 컴포넌트를 일관된 계약으로 확장 가능
 - **버전 변경 이력 & 시점 롤백 UI**: `version` 기반 낙관적 락(`409 Conflict`)은 구현되었으며, append-only 이력 테이블 및 diff 롤백 UI는 운영 단계 확장에 위임
 - **조건부 상태 전이·자동화 워크플로우 엔진**: 도메인 데이터 수집·관계·분석 레이어와 분리해 향후 제출 이벤트 기반 룰 엔진으로 확장
 - **모바일 반응형 워크스페이스 / 다국어(i18n) / 추가 차트 유형**: 한국어 단일화 및 데스크톱(`1024px+`) 전용 하드 가드 적용, 차트는 핵심 3종(`bar`, `line`, `pie`)에 집중
@@ -182,7 +258,7 @@ src/
 
 ### 1) Requirements
 
-- Node.js 20.x 이상
+- Node.js 22.x 이상 (CI 기준 24.x)
 - npm 10.x 이상
 - PostgreSQL 데이터베이스 (로컬 Docker, Supabase, Neon 등)
 
