@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { WorkspaceAppBar } from "./_components/workspace-app-bar";
+import { WorkspaceAppBar } from "../_components/workspace-app-bar";
 
 /**
  * 작업 공간 공통 최상위 레이아웃 ((workspace))

@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { ArrowLeft, Globe, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { Globe, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { BackLink } from "@/shared/ui/back-link";
 import { Button } from "@/shared/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 import { useAnalysisViewActions } from "../hooks/use-analysis-view-actions.hook";
@@ -35,12 +35,7 @@ export function AnalysisViewActionBar({ viewId }: AnalysisViewActionBarProps) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button asChild variant="ghost" size="sm" className="text-muted-foreground gap-1.5">
-          <Link href="/analyst/views">
-            <ArrowLeft className="size-4" />
-            분석 뷰 목록
-          </Link>
-        </Button>
+        <BackLink href="/analyst/views" label="분석 뷰 목록으로" />
 
         {view ? (
           <div className="flex flex-wrap items-center gap-2">

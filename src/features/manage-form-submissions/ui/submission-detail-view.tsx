@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft, Edit, Trash2, Calendar, Clock, FileText, Link2 } from "lucide-react";
+import { Edit, Trash2, Calendar, Clock, FileText, Link2 } from "lucide-react";
 import { formatFieldDisplayValue, PrimaryFieldBadge, type CoreFormField } from "@/entities/form";
 import type { FormSubmission } from "@/entities/form-submission";
+import { BackLink } from "@/shared/ui/back-link";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 import { Badge } from "@/shared/ui/badge";
@@ -114,12 +115,7 @@ export function SubmissionDetailView({
     return (
       <div className="w-full space-y-6">
         {mode !== "preview" && (
-          <Button asChild variant="ghost" size="sm" className="gap-1.5 text-xs">
-            <Link href={`/consumer/forms/${formId}`}>
-              <ArrowLeft className="size-3.5" />
-              데이터 목록으로 돌아가기
-            </Link>
-          </Button>
+          <BackLink href={`/consumer/forms/${formId}`} label="데이터 목록으로" />
         )}
 
         <Card className="border-destructive/30 bg-destructive/5 shadow-xs">
@@ -141,12 +137,7 @@ export function SubmissionDetailView({
       {/* 1. 상단 네비게이션 및 액션 툴바 (컨슈머 모드에서만 표시) */}
       {mode !== "preview" && (
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <Button asChild variant="ghost" size="sm" className="gap-1.5 text-xs">
-            <Link href={`/consumer/forms/${formId}`}>
-              <ArrowLeft className="size-3.5" />
-              데이터 목록으로 돌아가기
-            </Link>
-          </Button>
+          <BackLink href={`/consumer/forms/${formId}`} label="데이터 목록으로" />
 
           <div className="flex items-center gap-2">
             <Button asChild variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
@@ -431,18 +422,6 @@ export function SubmissionDetailView({
             )}
           </CardContent>
         </Card>
-      )}
-
-      {/* 6. 하단 복귀 버튼 (컨슈머 모드에서만 표시) */}
-      {mode !== "preview" && (
-        <div className="flex justify-end pt-2">
-          <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs">
-            <Link href={`/consumer/forms/${formId}`}>
-              <ArrowLeft className="size-3.5" />
-              데이터 목록으로
-            </Link>
-          </Button>
-        </div>
       )}
     </div>
   );

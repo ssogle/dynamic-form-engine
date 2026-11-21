@@ -76,6 +76,8 @@ export function BuilderRelationGraph({
 }: BuilderRelationGraphProps) {
   const router = useRouter();
   const graphRef = React.useRef<ForceGraphMethods<Graph3DNode, Graph3DLink> | undefined>(undefined);
+  const hasInitialFitRef = React.useRef(false);
+  const hoveredNodeIdRef = React.useRef<string | null>(null);
   const [hoveredNode, setHoveredNode] = React.useState<FormRelationGraphNode | null>(null);
 
   const graphData = React.useMemo(() => {
@@ -86,15 +88,71 @@ export function BuilderRelationGraph({
     };
   }, [forms]);
 
+  const configureGraphForces = React.useCallback(
+    (instance: ForceGraphMethods<Graph3DNode, Graph3DLink> | undefined, shouldRefresh: boolean) => {
+      if (!instance) {
+        return;
+      }
+
+      if (shouldRefresh) {
+        // next/dynamic 비동기 청크 로드 직후 마운트 시점에서 onFinishUpdate -> DragControls가
+        // init() 이후 시점에 확실히 연결되도록 1회 refresh()로 객체·드래그 핸들러를 재바인딩합니다.
+        instance.refresh?.();
+      }
+
+      const chargeForce = instance.d3Force?.("charge") as
+        { strength?: (value: number) => unknown } | undefined;
+      chargeForce?.strength?.(-240);
+
+      const linkForce = instance.d3Force?.("link") as
+        { distance?: (value: number) => unknown } | undefined;
+      linkForce?.distance?.(95);
+
+      instance.d3ReheatSimulation?.();
+    },
+    []
+  );
+
+  // 폼 목록 구조가 변경된 경우에만 초기 전체 맞춤을 다시 허용하고 d3 force 간격을 적용합니다.
+  React.useEffect(() => {
+    hasInitialFitRef.current = false;
+
+    const rafId = requestAnimationFrame(() => {
+      configureGraphForces(graphRef.current, false);
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [graphData, configureGraphForces]);
+
+  const handleGraphRef = React.useCallback(
+    (instance: ForceGraphMethods<Graph3DNode, Graph3DLink> | null | undefined) => {
+      const normalized = instance ?? undefined;
+      graphRef.current = normalized;
+      if (!normalized) {
+        return;
+      }
+      requestAnimationFrame(() => {
+        configureGraphForces(normalized, true);
+      });
+    },
+    [configureGraphForces]
+  );
+
   const handleResetView = React.useCallback(() => {
+    hasInitialFitRef.current = true;
     graphRef.current?.zoomToFit(450, 48);
   }, []);
 
   const handleEngineStop = React.useCallback(() => {
+    if (hasInitialFitRef.current) {
+      return;
+    }
+    hasInitialFitRef.current = true;
     graphRef.current?.zoomToFit(350, 48);
   }, []);
 
   const handleNodeHover = React.useCallback((node: NodeObject<Graph3DNode> | null) => {
+    hoveredNodeIdRef.current = node?.id ? String(node.id) : null;
     setHoveredNode(node ?? null);
   }, []);
 
@@ -107,16 +165,13 @@ export function BuilderRelationGraph({
     [router]
   );
 
-  const hoveredNodeId = hoveredNode?.id ?? null;
-  const getNodeColor = React.useCallback(
-    (node: NodeObject<Graph3DNode>) => {
-      if (hoveredNodeId && hoveredNodeId === node.id) {
-        return "#facc15";
-      }
-      return node.isPublished ? "#34d399" : "#38bdf8";
-    },
-    [hoveredNodeId]
-  );
+  // hoveredNodeIdRef를 참조하고 콜백 참조를 고정해 Hover 시 물리 엔진이 재시작되며 카메라 줌이 풀리는 현상을 차단합니다.
+  const getNodeColor = React.useCallback((node: NodeObject<Graph3DNode>) => {
+    if (hoveredNodeIdRef.current && hoveredNodeIdRef.current === node.id) {
+      return "#facc15";
+    }
+    return node.isPublished ? "#34d399" : "#38bdf8";
+  }, []);
 
   if (isLoading) {
     return (
@@ -183,8 +238,9 @@ export function BuilderRelationGraph({
         ) : (
           <div className={cn("relative w-full bg-slate-950", heightClassName)}>
             <ForceGraph3DCanvas<Graph3DNode, Graph3DLink>
-              graphRef={graphRef}
+              graphRef={handleGraphRef}
               graphData={graphData}
+              enableNodeDrag={true}
               backgroundColor="#070b14"
               showNavInfo={false}
               nodeResolution={16}

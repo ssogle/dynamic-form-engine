@@ -1,7 +1,5 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { AnalysisViewRenderer } from "@/features/render-analysis-view";
-import { Button } from "@/shared/ui/button";
+import { BackLink } from "@/shared/ui/back-link";
 
 interface ConsumerViewDetailPageProps {
   params: Promise<{
@@ -19,12 +17,9 @@ export default async function ConsumerViewDetailPage({ params }: ConsumerViewDet
 
   return (
     <div className="w-full space-y-6">
-      <Button asChild variant="ghost" size="sm" className="text-muted-foreground gap-1.5">
-        <Link href="/consumer">
-          <ArrowLeft className="size-4" />
-          목록으로 돌아가기
-        </Link>
-      </Button>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <BackLink href="/consumer" label="포털 목록으로" />
+      </div>
 
       <AnalysisViewRenderer viewId={id} publishedOnly />
     </div>

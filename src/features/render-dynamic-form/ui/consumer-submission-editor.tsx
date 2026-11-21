@@ -10,6 +10,7 @@ import {
   CardContent,
   CardFooter,
 } from "@/shared/ui/card";
+import { BackLink } from "@/shared/ui/back-link";
 import { Button } from "@/shared/ui/button";
 import { Badge } from "@/shared/ui/badge";
 import { Skeleton } from "@/shared/ui/skeleton";
@@ -90,10 +91,10 @@ export function ConsumerSubmissionEditor({ formId, submissionId }: ConsumerSubmi
           </CardHeader>
           <CardFooter className="gap-2">
             <Button asChild variant="outline" size="sm">
-              <Link href={`/consumer/forms/${formId}/submissions`}>제출 목록으로 돌아가기</Link>
+              <Link href={`/consumer/forms/${formId}`}>데이터 목록으로</Link>
             </Button>
             <Button asChild variant="ghost" size="sm">
-              <Link href="/consumer">전체 목록</Link>
+              <Link href="/consumer">포털 목록</Link>
             </Button>
           </CardFooter>
         </Card>
@@ -119,9 +120,7 @@ export function ConsumerSubmissionEditor({ formId, submissionId }: ConsumerSubmi
           </CardHeader>
           <CardFooter className="flex justify-center gap-3 pt-4">
             <Button asChild size="sm">
-              <Link href={`/consumer/forms/${formId}/submissions`}>
-                제출 내역 목록으로 돌아가기
-              </Link>
+              <Link href={`/consumer/forms/${formId}`}>데이터 목록으로</Link>
             </Button>
             <Button variant="outline" size="sm" onClick={handleResetSuccess}>
               계속 수정하기
@@ -137,16 +136,7 @@ export function ConsumerSubmissionEditor({ formId, submissionId }: ConsumerSubmi
     <div className="w-full space-y-6">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:text-foreground h-7 px-2 text-xs"
-          >
-            <Link href={`/consumer/forms/${formId}/submissions`}>
-              &larr; 제출 목록으로 돌아가기
-            </Link>
-          </Button>
+          <BackLink href={`/consumer/forms/${formId}`} label="데이터 목록으로" />
           <span className="text-muted-foreground text-xs">/</span>
           <span className="text-muted-foreground max-w-48 truncate font-mono text-xs">
             {submission.id}

@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Columns2, LayoutGrid, Orbit } from "lucide-react";
+import { Columns2, LayoutGrid, Orbit, Sparkles } from "lucide-react";
+import { dispatchFocusNavigator } from "@/shared/lib/navigator-focus";
 import { Button } from "@/shared/ui/button";
 import { useBuilderFormList } from "../hooks/use-builder-form-list.hook";
 import { BuilderFormList } from "./builder-form-list";
@@ -21,37 +22,50 @@ export function BuilderFormsWorkspace() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-end gap-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Button
           type="button"
           size="xs"
-          variant={viewMode === "split" ? "default" : "outline"}
+          variant="outline"
           className="gap-1.5 text-xs"
-          onClick={() => setViewMode("split")}
+          onClick={() => dispatchFocusNavigator({ prefillText: "새로운 폼을 만들어줘: " })}
         >
-          <Columns2 className="size-3.5" />
-          분할 보기
+          <Sparkles className="text-primary size-3.5" />
+          AI에게 새 폼 요청
         </Button>
-        <Button
-          type="button"
-          size="xs"
-          variant={viewMode === "list" ? "default" : "outline"}
-          className="gap-1.5 text-xs"
-          onClick={() => setViewMode("list")}
-        >
-          <LayoutGrid className="size-3.5" />
-          목록만
-        </Button>
-        <Button
-          type="button"
-          size="xs"
-          variant={viewMode === "graph" ? "default" : "outline"}
-          className="gap-1.5 text-xs"
-          onClick={() => setViewMode("graph")}
-        >
-          <Orbit className="size-3.5" />
-          3D 그래프만
-        </Button>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Button
+            type="button"
+            size="xs"
+            variant={viewMode === "split" ? "default" : "outline"}
+            className="gap-1.5 text-xs"
+            onClick={() => setViewMode("split")}
+          >
+            <Columns2 className="size-3.5" />
+            분할 보기
+          </Button>
+          <Button
+            type="button"
+            size="xs"
+            variant={viewMode === "list" ? "default" : "outline"}
+            className="gap-1.5 text-xs"
+            onClick={() => setViewMode("list")}
+          >
+            <LayoutGrid className="size-3.5" />
+            목록만
+          </Button>
+          <Button
+            type="button"
+            size="xs"
+            variant={viewMode === "graph" ? "default" : "outline"}
+            className="gap-1.5 text-xs"
+            onClick={() => setViewMode("graph")}
+          >
+            <Orbit className="size-3.5" />
+            3D 그래프만
+          </Button>
+        </div>
       </div>
 
       {viewMode !== "list" && (

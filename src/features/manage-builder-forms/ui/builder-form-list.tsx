@@ -2,7 +2,8 @@
 
 import React from "react";
 import Link from "next/link";
-import { FileText, Trash2 } from "lucide-react";
+import { FileText, Sparkles, Trash2 } from "lucide-react";
+import { dispatchFocusNavigator } from "@/shared/lib/navigator-focus";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import {
@@ -86,6 +87,16 @@ export function BuilderFormList() {
           <p className="text-muted-foreground mt-1 text-xs">
             AI Navigator 대화창에 자연어로 새로운 폼 생성을 요청해 보세요.
           </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-4 gap-1.5 text-xs"
+            onClick={() => dispatchFocusNavigator({ prefillText: "새로운 폼을 만들어줘: " })}
+          >
+            <Sparkles className="text-primary size-3.5" />
+            AI에게 폼 생성 요청하기
+          </Button>
         </CardContent>
       </Card>
     );

@@ -15,7 +15,7 @@ export default function ConsumerPortalPage() {
         <h1 className="text-foreground text-2xl font-bold tracking-tight">컨슈머 포털</h1>
         <p className="text-muted-foreground text-sm/relaxed">
           공식 발행된 폼과 분석가가 공유한 리포트 뷰를 한곳에서 확인할 수 있습니다. 원하는 항목을
-          선택하거나 좌측 AI Navigator에게 필요한 작업을 말씀해 보세요.
+          선택하거나 AI Navigator에게 필요한 작업을 말씀해 보세요.
         </p>
       </div>
 

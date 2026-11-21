@@ -97,7 +97,7 @@ export function useAnalysisViewActions({
       requestedAt: Date.now(),
     });
     setRefreshStatusMessage(
-      "좌측 Analyst AI에게 최신 데이터 기준 전체 블록(요약 글·표·차트) 재집계를 요청했습니다."
+      "Analyst AI에게 최신 데이터 기준 전체 블록(요약 글·표·차트) 재집계를 요청했습니다."
     );
   }, [view, isRefreshPending, requestAiRefresh]);
 
