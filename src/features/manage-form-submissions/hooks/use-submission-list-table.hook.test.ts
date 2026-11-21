@@ -121,7 +121,7 @@ describe("useSubmissionListTable (features/manage-form-submissions/hooks)", () =
       "form-uuid-1",
       expect.objectContaining({
         sort: "createdAt:desc",
-        limit: 20,
+        limit: 50,
       })
     );
 
