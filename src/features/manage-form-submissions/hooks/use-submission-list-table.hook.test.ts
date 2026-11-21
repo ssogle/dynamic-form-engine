@@ -637,4 +637,81 @@ describe("useSubmissionListTable (features/manage-form-submissions/hooks)", () =
       })
     );
   });
+
+  it("정렬 배지 제거(handleRemoveSort) 및 초기화(handleResetSorting) 시 기본 정렬(createdAt:desc)과 URL 동기화를 올바르게 복원해야 한다", () => {
+    const { result } = renderHook(
+      () =>
+        useSubmissionListTable({
+          form: dummyForm,
+          initialSort: [
+            { id: "field-name", desc: false },
+            { id: "createdAt", desc: true },
+          ],
+        }),
+      { wrapper: createWrapper() }
+    );
+
+    expect(result.current.isDefaultSorting).toBe(false);
+    expect(result.current.sorting).toEqual([
+      { id: "field-name", desc: false },
+      { id: "createdAt", desc: true },
+    ]);
+
+    act(() => {
+      result.current.handleRemoveSort("field-name");
+    });
+
+    expect(result.current.sorting).toEqual([{ id: "createdAt", desc: true }]);
+    expect(result.current.isDefaultSorting).toBe(true);
+    expect(mockReplace).toHaveBeenLastCalledWith("/consumer/forms/form-uuid-1", { scroll: false });
+
+    act(() => {
+      result.current.handleRemoveSort("createdAt");
+    });
+    expect(result.current.sorting).toEqual([{ id: "createdAt", desc: true }]);
+    expect(result.current.isDefaultSorting).toBe(true);
+
+    act(() => {
+      result.current.handleResetSorting();
+    });
+    expect(result.current.sorting).toEqual([{ id: "createdAt", desc: true }]);
+  });
+
+  it("compact 또는 selectionMode 설정 시 __select 체크박스 열 추가 및 actions 열 숨김이 적용되어야 한다", () => {
+    const { result } = renderHook(
+      () =>
+        useSubmissionListTable({
+          form: dummyForm,
+          compact: true,
+          selectionMode: {
+            multiple: true,
+            selectedIds: ["sub-1"],
+            onToggleSelect: vi.fn(),
+          },
+        }),
+      { wrapper: createWrapper() }
+    );
+
+    const columnIds = result.current.table.getAllColumns().map((col) => col.id);
+    expect(columnIds[0]).toBe("__select");
+    expect(columnIds).not.toContain("actions");
+  });
+
+  it("onRemoveSelectedRow 전달 시 우측 __unlink 열이 추가되고 기본 actions 열은 숨겨져야 한다", () => {
+    const onRemoveSelectedRow = vi.fn();
+    const { result } = renderHook(
+      () =>
+        useSubmissionListTable({
+          form: dummyForm,
+          embedded: true,
+          compact: true,
+          onRemoveSelectedRow,
+        }),
+      { wrapper: createWrapper() }
+    );
+
+    const columnIds = result.current.table.getAllColumns().map((col) => col.id);
+    expect(columnIds[columnIds.length - 1]).toBe("__unlink");
+    expect(columnIds).not.toContain("actions");
+  });
 });

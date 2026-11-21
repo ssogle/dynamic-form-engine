@@ -33,6 +33,8 @@ export function DynamicFormRenderer({
   isSubmitting = false,
   disabled = false,
   className,
+  renderRelationPicker,
+  renderRelationSelectedTable,
 }: DynamicFormRendererProps) {
   const {
     activeForm,
@@ -239,6 +241,8 @@ export function DynamicFormRenderer({
                           isSelected={isHighlighted}
                           onFieldClick={mode === "preview" ? onFieldClick : undefined}
                           disabled={disabled || isSubmitting}
+                          renderRelationPicker={renderRelationPicker}
+                          renderRelationSelectedTable={renderRelationSelectedTable}
                         />
                       </div>
                     );

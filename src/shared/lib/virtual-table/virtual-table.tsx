@@ -209,20 +209,20 @@ export function VirtualTable<TData>({
                         ? header.column.columnDef.header(header.getContext())
                         : header.column.columnDef.header}
 
-                    {/* 컬럼 리사이저 드래그 핸들 (우측 끝 정확 안착 및 편안한 히트박스) */}
+                    {/* 컬럼 리사이저 드래그 핸들 (외부 조상 group 클래스와의 호버 간섭 차단을 위해 네임드 group/resizer 사용) */}
                     {canResize && (
                       <div
                         data-testid={`resizer-${header.id}`}
                         onMouseDown={header.getResizeHandler()}
                         onTouchStart={header.getResizeHandler()}
                         className={cn(
-                          "group absolute top-0 -right-2 z-20 flex h-full w-4 cursor-col-resize touch-none items-center justify-center select-none",
+                          "group/resizer absolute top-0 -right-2 z-20 flex h-full w-4 cursor-col-resize touch-none items-center justify-center select-none",
                           isResizing && "bg-primary/20"
                         )}
                       >
                         <div
                           className={cn(
-                            "group-hover:bg-primary h-full w-0.5 transition-colors group-hover:w-1",
+                            "group-hover/resizer:bg-primary h-full w-0.5 transition-colors group-hover/resizer:w-1",
                             isResizing ? "bg-primary w-1" : "bg-transparent"
                           )}
                         />

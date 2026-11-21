@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { normalizeStringIds } from "@/shared/lib/normalize";
-import { parseFieldFiltersParam, type NormalizedFieldFilterCondition } from "@/shared/schema";
+import {
+  isUuid,
+  parseFieldFiltersParam,
+  type NormalizedFieldFilterCondition,
+} from "@/shared/schema";
 import { calendarDateStringSchema, refineDateRangeOrder } from "./date-range.schema";
 import type { FormSubmission } from "./form-submission.schema";
 
@@ -12,11 +16,6 @@ const optionalNonEmptyString = (schema: z.ZodType<string>) =>
     (val) => (typeof val === "string" && val.trim() === "" ? undefined : val),
     schema.optional()
   );
-
-/**
- * RFC 4122/9562 표준 UUID 검증용 내부 Zod 스키마
- */
-const uuidSchema = z.uuid();
 
 /**
  * 폼 응답 목록 페이징, 멀티 정렬, 컬럼 필터, 배치 ID 및 기간 범위 조회 요청 쿼리 Zod 스키마
@@ -110,7 +109,7 @@ export function parseFiltersParam(filtersStr?: unknown): NormalizedFieldFilterCo
  * @returns 검증 및 중복 제거된 UUID 문자열 배열
  */
 export function normalizeUuidIds(rawVal: unknown): string[] {
-  return normalizeStringIds(rawVal).filter((id) => uuidSchema.safeParse(id).success);
+  return normalizeStringIds(rawVal).filter(isUuid);
 }
 
 /**

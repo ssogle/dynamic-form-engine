@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Edit, Trash2, Calendar, Clock, FileText, Link2 } from "lucide-react";
 import { formatFieldDisplayValue, PrimaryFieldBadge, type CoreFormField } from "@/entities/form";
 import type { FormSubmission } from "@/entities/form-submission";
+import { normalizeStringIds } from "@/shared/lib/normalize";
 import { BackLink } from "@/shared/ui/back-link";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
@@ -14,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 import { formatDateTime } from "@/shared/lib/date";
 import type { FormSubmissionViewMode } from "../types/submission-view.types";
 import { useSubmissionDetailView } from "../hooks/use-submission-detail-view.hook";
+import { ManageFormSubmissions } from "./manage-form-submissions";
 import { RelatedSubmissionSubtable } from "./related-submission-subtable";
 
 export interface SubmissionDetailViewProps {
@@ -306,33 +308,70 @@ export function SubmissionDetailView({
                 {/* 필드 입력값 상세 출력 */}
                 {field.type === "relation" ? (
                   <div className="mt-1 space-y-2">
-                    {relDetail?.targetForm && relDetail.rows.length > 0 ? (
-                      <RelatedSubmissionSubtable
-                        mode={mode}
-                        group={{
-                          sourceForm: {
-                            id: relDetail.targetForm.id,
-                            title: relDetail.targetForm.title,
-                            schemaDefinition: relDetail.targetForm.schemaDefinition,
-                          },
-                          submissions: relDetail.rows,
-                        }}
-                      />
-                    ) : relDetail && relDetail.missingIds.length > 0 ? (
-                      <div className="bg-muted/30 border-border/40 flex flex-wrap gap-1.5 rounded-md border p-3">
-                        {relDetail.missingIds.map((missingId) => (
-                          <Badge key={missingId} variant="outline" className="font-mono text-xs">
-                            {missingId}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="bg-muted/30 border-border/40 rounded-md border p-3">
-                        <span className="text-muted-foreground text-xs">
-                          연결된 타깃 레코드가 없습니다.
-                        </span>
-                      </div>
-                    )}
+                    {(() => {
+                      const selectedIds = normalizeStringIds(rawValue);
+                      if (
+                        relDetail?.targetForm &&
+                        (selectedIds.length > 0 || relDetail.rows.length > 0)
+                      ) {
+                        return (
+                          <div className="space-y-2">
+                            {(relDetail.rows.length > 0 || mode !== "preview") && (
+                              <ManageFormSubmissions
+                                formId={relDetail.targetForm.id}
+                                mode={mode}
+                                embedded
+                                compact
+                                lockedFilters={
+                                  selectedIds.length > 0
+                                    ? [{ fieldId: "id", op: "in", values: selectedIds }]
+                                    : undefined
+                                }
+                                sampleSubmissions={mode === "preview" ? relDetail.rows : undefined}
+                              />
+                            )}
+                            {relDetail.missingIds.length > 0 && (
+                              <div className="bg-muted/30 border-border/40 flex flex-wrap items-center gap-1.5 rounded-md border p-2.5">
+                                <span className="text-muted-foreground text-[11px]">
+                                  조회할 수 없는 레코드:
+                                </span>
+                                {relDetail.missingIds.map((missingId) => (
+                                  <Badge
+                                    key={missingId}
+                                    variant="outline"
+                                    className="font-mono text-[11px]"
+                                  >
+                                    {missingId}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+                      if (relDetail && relDetail.missingIds.length > 0) {
+                        return (
+                          <div className="bg-muted/30 border-border/40 flex flex-wrap gap-1.5 rounded-md border p-3">
+                            {relDetail.missingIds.map((missingId) => (
+                              <Badge
+                                key={missingId}
+                                variant="outline"
+                                className="font-mono text-xs"
+                              >
+                                {missingId}
+                              </Badge>
+                            ))}
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="bg-muted/30 border-border/40 rounded-md border p-3">
+                          <span className="text-muted-foreground text-xs">
+                            연결된 타깃 레코드가 없습니다.
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 ) : (
                   <div className="bg-muted/30 border-border/40 mt-1 rounded-md border p-3">

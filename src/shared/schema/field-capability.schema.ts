@@ -238,7 +238,7 @@ export const CHECKBOX_BOOLEAN_CAPABILITY: FieldQueryCapability = {
  */
 export const SYSTEM_FIELD_CAPABILITIES: Record<SystemFieldId, FieldQueryCapability> = {
   id: {
-    filterOperators: ["eq", "contains"],
+    filterOperators: ["eq", "contains", "in"],
     defaultOperator: "contains",
     filterWidget: "text",
     sortable: true,

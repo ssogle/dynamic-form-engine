@@ -141,6 +141,24 @@ describe("relation-summary (features/manage-form-submissions/lib)", () => {
         )
       ).toEqual([{ targetFormId, submissionIds: [] }]);
     });
+
+    it("서브미션 행이 0건이어도 활성 필터 조건의 유효한 relation UUID는 룩업 대상에 포함해야 한다", () => {
+      const targets = extractRelationTargets(
+        [singleRelField],
+        [],
+        [
+          { fieldId: "f_project", op: "in", values: [subMissingId] },
+          { fieldId: "f_project", op: "eq", value: subAId },
+          { fieldId: "f_project", op: "contains", value: "키워드" },
+        ]
+      );
+      expect(targets).toEqual([
+        {
+          targetFormId,
+          submissionIds: [subAId, subMissingId],
+        },
+      ]);
+    });
   });
 
   describe("buildRelationLookupMap & formatRelationSummaryCell", () => {

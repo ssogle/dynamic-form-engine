@@ -13,6 +13,7 @@ import {
   extractRelationTargets,
   type RelationLookupMap,
 } from "../lib/relation-summary";
+import type { FieldFilterCondition } from "@/shared/schema";
 
 export interface UseRelationLookupReturn {
   lookupMap: RelationLookupMap;
@@ -20,7 +21,7 @@ export interface UseRelationLookupReturn {
 }
 
 /**
- * 부모 폼의 활성 관계형 필드들과 현재 로드된 서브미션 목록을 분석하여,
+ * 부모 폼의 활성 관계형 필드들과 현재 로드된 서브미션 목록·활성 필터를 분석하여,
  * 참조된 모든 타깃 폼 메타데이터와 타깃 레코드들을 React Query `useQueries`로
  * 일괄(Batch) 병렬 페칭한 뒤 O(1) 조회 딕셔너리로 반환하는 공용 훅입니다.
  *
@@ -28,11 +29,12 @@ export interface UseRelationLookupReturn {
  */
 export function useRelationLookup(
   fields: CoreFormField[],
-  submissions: FormSubmission[]
+  submissions: FormSubmission[],
+  filterConditions?: ReadonlyArray<FieldFilterCondition>
 ): UseRelationLookupReturn {
   const relationTargets = React.useMemo(
-    () => extractRelationTargets(fields, submissions),
-    [fields, submissions]
+    () => extractRelationTargets(fields, submissions, filterConditions),
+    [fields, submissions, filterConditions]
   );
 
   // 1. 참조된 고유 타깃 폼 스키마 메타데이터 배치 조회 (primaryFieldId 및 컬럼 정의 확보용)

@@ -52,7 +52,11 @@ describe("filter-summary (manage-form-submissions/lib)", () => {
         { fieldId: "f_amount", op: "between", min: 1000, max: 5000 },
         fields[1]
       )
-    ).toBe("1000 ~ 5000");
+    ).toBe("1,000 ~ 5,000");
+
+    expect(
+      formatFilterConditionSummary({ fieldId: "f_amount", op: "gte", value: 1000000 }, fields[1])
+    ).toBe("이상 (>=) 1,000,000");
 
     expect(
       formatFilterConditionSummary({ fieldId: "f_switch", op: "eq", value: true }, fields[2])
@@ -66,6 +70,15 @@ describe("filter-summary (manage-form-submissions/lib)", () => {
     expect(
       formatFilterConditionSummary(
         { fieldId: "f_project", op: "in", values: ["aaaa1111-1111-4111-a111-111111111111"] },
+        fields[3],
+        relMap
+      )
+    ).toBe("차세대 ERP");
+
+    // AI가 relation 필드에 eq 단일 UUID를 전달한 경우에도 대표 라벨로 치환되어야 한다
+    expect(
+      formatFilterConditionSummary(
+        { fieldId: "f_project", op: "eq", value: "aaaa1111-1111-4111-a111-111111111111" },
         fields[3],
         relMap
       )

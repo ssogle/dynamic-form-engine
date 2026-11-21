@@ -1,8 +1,9 @@
 import "server-only";
-import { and, eq, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/shared/db/server";
 import {
   isSystemFieldId,
+  isUuid,
   normalizeFieldFilterCondition,
   resolveFieldQueryCapability,
   validateFiltersAgainstFields,
@@ -15,8 +16,6 @@ import { resolveFieldOptionLabelMap, type AnalyticsFieldMeta } from "../lib/anal
 import { isValidTimezone } from "../schema/date-range.schema";
 import { formSubmissions } from "../schema/form-submission.schema";
 import { buildValidFieldDateSql } from "./date-filter-sql.server";
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * 공용 필터 SQL 조건 생성 옵션
@@ -196,6 +195,14 @@ function buildSystemFieldConditionSql(
   timezone: string
 ): SQL | null {
   if (condition.fieldId === "id") {
+    if (condition.op === "in") {
+      const uuids = (condition.values ?? []).map((v) => String(v).trim()).filter((v) => isUuid(v));
+      if (uuids.length === 0) {
+        return sql`FALSE`;
+      }
+      return inArray(formSubmissions.id, uuids);
+    }
+
     const keyword = String(condition.value ?? "").trim();
     if (!keyword) return null;
     if (condition.op === "eq") {
@@ -426,7 +433,7 @@ async function buildDomainFieldConditionSql(
     for (const item of rawList) {
       const trimmed = item.trim();
       if (!trimmed) continue;
-      if (UUID_REGEX.test(trimmed)) {
+      if (isUuid(trimmed)) {
         candidateIds.add(trimmed);
       } else {
         const resolved = await resolveRelationFilterCandidateIds(

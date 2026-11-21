@@ -181,4 +181,27 @@ describe("Field Filter SQL Builder (field-filter-sql.server)", () => {
     expect(res.conditions).toHaveLength(1);
     expect(dialect.sqlToQuery(res.conditions![0]!).params).toContain(targetSubId);
   });
+
+  it("시스템 id 필드의 in 연산자에 UUID 배열이 전달되면 IN 조건 SQL을 생성하고 유효한 UUID가 없으면 FALSE를 반환해야 한다", async () => {
+    const id1 = "11111111-1111-4111-8111-111111111111";
+    const id2 = "22222222-2222-4222-8222-222222222222";
+
+    const validRes = await buildFieldFilterSqlConditions({
+      filters: [{ fieldId: "id", op: "in", values: [id1, id2] }],
+      schemaDefinition,
+    });
+    expect(validRes.error).toBeNull();
+    expect(validRes.conditions).toHaveLength(1);
+    const compiledValid = dialect.sqlToQuery(validRes.conditions![0]!);
+    expect(compiledValid.params).toContain(id1);
+    expect(compiledValid.params).toContain(id2);
+
+    const invalidOnlyRes = await buildFieldFilterSqlConditions({
+      filters: [{ fieldId: "id", op: "in", values: ["not-a-uuid"] }],
+      schemaDefinition,
+    });
+    expect(invalidOnlyRes.error).toBeNull();
+    expect(invalidOnlyRes.conditions).toHaveLength(1);
+    expect(dialect.sqlToQuery(invalidOnlyRes.conditions![0]!).sql).toBe("FALSE");
+  });
 });

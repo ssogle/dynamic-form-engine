@@ -12,7 +12,10 @@ import type { FieldFilterCondition } from "@/shared/schema";
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 import { Skeleton } from "@/shared/ui/skeleton";
-import type { FormSubmissionViewMode } from "../types/submission-view.types";
+import type {
+  FormSubmissionViewMode,
+  SubmissionSelectionMode,
+} from "../types/submission-view.types";
 import { SubmissionListTable } from "./submission-list-table";
 
 export interface ManageFormSubmissionsProps {
@@ -41,9 +44,21 @@ export interface ManageFormSubmissionsProps {
    */
   embedded?: boolean | undefined;
   /**
+   * 컴팩트 렌더링 여부 (액션 열 생략 및 스크롤 높이 축소)
+   */
+  compact?: boolean | undefined;
+  /**
+   * 관계형 레코드 선택 피커 다이얼로그 등 선택 모드 제어 옵션
+   */
+  selectionMode?: SubmissionSelectionMode | undefined;
+  /**
    * 초기화 시에도 유지되는 고정 필터 조건 목록
    */
   lockedFilters?: FieldFilterCondition[] | undefined;
+  /**
+   * 선택된 관계 레코드 인라인 테이블에서 개별 행 연결 해제 콜백
+   */
+  onRemoveSelectedRow?: ((submissionId: string) => void) | undefined;
   /**
    * 프리뷰 모드에서 실데이터 0건 시 폴백으로 표시할 가상 샘플 레코드 목록
    */
@@ -67,7 +82,10 @@ export function ManageFormSubmissions({
   initialSort,
   mode = "consumer",
   embedded = false,
+  compact = false,
+  selectionMode,
   lockedFilters,
+  onRemoveSelectedRow,
   sampleSubmissions,
   onSelectSubmission,
 }: ManageFormSubmissionsProps) {
@@ -127,7 +145,10 @@ export function ManageFormSubmissions({
         initialSort={initialSort}
         mode={mode}
         embedded={embedded}
+        compact={compact}
+        selectionMode={selectionMode}
         lockedFilters={lockedFilters}
+        onRemoveSelectedRow={onRemoveSelectedRow}
         sampleSubmissions={sampleSubmissions}
         onSelectSubmission={onSelectSubmission}
       />

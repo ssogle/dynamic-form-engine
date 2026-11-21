@@ -1,6 +1,7 @@
 import "server-only";
 import { and, asc, desc, eq, inArray, isNull, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import { db } from "@/shared/db/server";
+import { isUuid } from "@/shared/schema";
 import { forms } from "@/shared/tables";
 import { formSubmissions } from "../schema/form-submission.schema";
 import type {
@@ -133,23 +134,15 @@ function buildMetricAggregateSql(metric: AnalyticsMetric, targetFieldId?: string
   return buildOuterMetricAggregateSql(metric, numericExpr);
 }
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 function collectUuidStrings(rawValue: unknown, targetSet: Set<string>): void {
-  if (typeof rawValue === "string") {
-    const trimmed = rawValue.trim();
-    if (UUID_REGEX.test(trimmed)) {
-      targetSet.add(trimmed);
-    }
+  if (isUuid(rawValue)) {
+    targetSet.add(rawValue.trim());
     return;
   }
   if (Array.isArray(rawValue)) {
     for (const item of rawValue) {
-      if (typeof item === "string") {
-        const trimmed = item.trim();
-        if (UUID_REGEX.test(trimmed)) {
-          targetSet.add(trimmed);
-        }
+      if (isUuid(item)) {
+        targetSet.add(item.trim());
       }
     }
   }

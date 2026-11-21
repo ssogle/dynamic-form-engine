@@ -1,4 +1,36 @@
+import type * as React from "react";
 import type { ActiveForm, Form, CoreFormField } from "@/entities/form";
+
+/**
+ * 관계형 레코드 선택 다이얼로그 내부에 공통 테이블 위젯을 주입하기 위한 슬롯 프롭 계약
+ *
+ * FSD 계층 규칙(피처 간 수평 참조 금지)을 유지하면서 `widgets/` 계층에서
+ * `ManageFormSubmissions` 선택 모드를 조립해 주입할 수 있도록 인터페이스를 분리합니다.
+ */
+export interface RelationPickerSlotProps {
+  /** 참조 대상 타깃 도메인 폼 UUID */
+  readonly targetFormId: string;
+  /** 다중 선택 허용 여부 */
+  readonly multiple: boolean;
+  /** 현재 선택된 타깃 응답 UUID 목록 */
+  readonly selectedIds: readonly string[];
+  /** 행 클릭·체크박스 토글 시 선택 상태를 변경하는 콜백 */
+  readonly onToggleSelect: (submissionId: string) => void;
+}
+
+/**
+ * 폼 입력/수정 화면에서 이미 선택된 관계형 레코드 목록을 공통 테이블 위젯으로 표시하기 위한 슬롯 프롭 계약
+ */
+export interface RelationSelectedTableSlotProps {
+  /** 참조 대상 타깃 도메인 폼 UUID */
+  readonly targetFormId: string;
+  /** 현재 선택된 타깃 응답 UUID 목록 */
+  readonly selectedIds: readonly string[];
+  /** 읽기 전용(비활성화) 여부 */
+  readonly disabled: boolean;
+  /** 개별 행 연결 해제(삭제) 시 호출되는 콜백 */
+  readonly onRemove: (submissionId: string) => void;
+}
 
 /**
  * 동적 폼 렌더러의 동작 모드
@@ -58,9 +90,20 @@ export interface DynamicFormRendererProps {
   isSubmitting?: boolean | undefined;
 
   /**
-   * 폼 전체 비활성화 여부
+   * 비활성화 여부
    */
   disabled?: boolean | undefined;
+
+  /**
+   * 관계형 필드 선택 다이얼로그 본문을 외부 위젯(공통 데이터 테이블 등)으로 주입하는 선택적 렌더 슬롯
+   */
+  renderRelationPicker?: ((slot: RelationPickerSlotProps) => React.ReactNode) | undefined;
+
+  /**
+   * 이미 선택된 관계형 레코드 요약 테이블을 외부 위젯(공통 데이터 테이블)으로 주입하는 선택적 렌더 슬롯
+   */
+  renderRelationSelectedTable?:
+    ((slot: RelationSelectedTableSlotProps) => React.ReactNode) | undefined;
 
   /**
    * 외부 커스텀 스타일 클래스
@@ -89,4 +132,11 @@ export interface DynamicFieldProps {
 
   /** 비활성화 여부 */
   disabled?: boolean | undefined;
+
+  /** 관계형 필드 선택 다이얼로그 본문 주입용 선택적 렌더 슬롯 */
+  renderRelationPicker?: ((slot: RelationPickerSlotProps) => React.ReactNode) | undefined;
+
+  /** 선택된 관계형 레코드 목록 테이블 주입용 선택적 렌더 슬롯 */
+  renderRelationSelectedTable?:
+    ((slot: RelationSelectedTableSlotProps) => React.ReactNode) | undefined;
 }

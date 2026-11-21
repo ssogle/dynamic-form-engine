@@ -16,6 +16,10 @@ import { Badge } from "@/shared/ui/badge";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { formatDateTime } from "@/shared/lib/date";
 import { useConsumerSubmissionEditor } from "../hooks/use-consumer-submission-editor.hook";
+import type {
+  RelationPickerSlotProps,
+  RelationSelectedTableSlotProps,
+} from "../types/render-dynamic-form.types";
 import { DynamicFormRenderer } from "./dynamic-form-renderer";
 
 export interface ConsumerSubmissionEditorProps {
@@ -27,6 +31,14 @@ export interface ConsumerSubmissionEditorProps {
    * 수정 대상 제출 응답 ID (UUID)
    */
   submissionId: string;
+  /**
+   * 관계형 필드 선택 다이얼로그 본문을 외부 위젯/레이어에서 주입하기 위한 렌더 슬롯
+   */
+  renderRelationPicker?: (slot: RelationPickerSlotProps) => React.ReactNode;
+  /**
+   * 이미 선택된 관계형 레코드 테이블을 외부 위젯/레이어에서 주입하기 위한 렌더 슬롯
+   */
+  renderRelationSelectedTable?: (slot: RelationSelectedTableSlotProps) => React.ReactNode;
 }
 
 /**
@@ -35,7 +47,12 @@ export interface ConsumerSubmissionEditorProps {
  * 모달 팝업 대신 전체 화면 워크스페이스에서 기존 제출 데이터를 시각적으로 확인하고,
  * AI Navigator 실시간 필드 동기화 및 동적 유효성 검사를 거쳐 데이터를 수정/저장하는 순수 얇은 뷰(Thin View) 컴포넌트입니다.
  */
-export function ConsumerSubmissionEditor({ formId, submissionId }: ConsumerSubmissionEditorProps) {
+export function ConsumerSubmissionEditor({
+  formId,
+  submissionId,
+  renderRelationPicker,
+  renderRelationSelectedTable,
+}: ConsumerSubmissionEditorProps) {
   const {
     form,
     submission,
@@ -178,6 +195,8 @@ export function ConsumerSubmissionEditor({ formId, submissionId }: ConsumerSubmi
         submitTriggerCount={activeSubmitTriggerCount}
         onSubmit={handleUpdate}
         isSubmitting={isUpdating}
+        renderRelationPicker={renderRelationPicker}
+        renderRelationSelectedTable={renderRelationSelectedTable}
       />
     </div>
   );
