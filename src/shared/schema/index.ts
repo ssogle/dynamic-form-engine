@@ -48,3 +48,5 @@ export {
   type FilterableFieldDescriptor,
   type NormalizedFieldFilterCondition,
 } from "./field-filter.schema";
+
+export { isUuid, uuidSchema } from "./uuid.schema";

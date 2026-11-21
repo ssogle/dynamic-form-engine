@@ -8,6 +8,7 @@ import { cn } from "@/shared/lib/cn";
 import {
   FIELD_FILTER_OPERATOR_LABELS,
   fieldFilterConditionSchema,
+  isUuid,
   normalizeFieldFilterCondition,
   resolveTargetFieldCapability,
   validateFiltersAgainstFields,
@@ -79,6 +80,21 @@ function createInitialDraft(
   const normalized = normalizeFieldFilterCondition(current);
   const boolStr = normalized.value === false || normalized.value === "false" ? "false" : "true";
 
+  // AI가 relation 필드에 레거시 eq(단일 UUID)를 적용한 경우 UI 피커의 in 규격으로 안전 정규화
+  if (fieldType === "relation" && normalized.op === "eq") {
+    const rawVal = normalized.value !== undefined ? String(normalized.value).trim() : "";
+    if (isUuid(rawVal)) {
+      return {
+        op: "in",
+        scalarValue: "",
+        boolValue: boolStr,
+        selectedValues: [rawVal],
+        minValue: "",
+        maxValue: "",
+      };
+    }
+  }
+
   return {
     op: normalized.op,
     scalarValue: normalized.value !== undefined ? String(normalized.value) : "",
@@ -129,17 +145,23 @@ export function ColumnHeaderFilter({
   const widget = capability?.filterWidget ?? "text";
   const isUnary = draft.op === "isEmpty" || draft.op === "isNotEmpty";
 
-  // relation 컨슈머 UI에서는 피커(in) 및 빈값(isEmpty/isNotEmpty) 중심으로 노출
+  // relation 컨슈머 UI에서는 피커(in) 및 빈값(isEmpty/isNotEmpty) 중심으로 노출하되, AI가 contains 키워드를 설정한 경우에만 편집 가능하도록 예외 허용
   const visibleOperators = React.useMemo(() => {
     const operators = capability?.filterOperators ?? ["contains"];
     if (widget === "relation") {
-      return operators.filter((op) => op === "in" || op === "isEmpty" || op === "isNotEmpty");
+      return operators.filter(
+        (op) =>
+          op === "in" ||
+          op === "isEmpty" ||
+          op === "isNotEmpty" ||
+          (draft.op === "contains" && op === "contains")
+      );
     }
     if (widget === "options" && fieldType === "checkbox") {
       return operators.filter((op) => op !== "eq");
     }
     return operators;
-  }, [widget, capability, fieldType]);
+  }, [widget, capability, fieldType, draft.op]);
 
   const handleOperatorChange = (nextOp: FieldFilterOperator) => {
     setErrorMessage(null);
@@ -555,7 +577,18 @@ export function ColumnHeaderFilter({
 
             {!isUnary && widget === "relation" && (
               <>
-                {relationTargetFormId ? (
+                {draft.op === "contains" ? (
+                  <Input
+                    value={draft.scalarValue}
+                    onChange={(e) => {
+                      setErrorMessage(null);
+                      setDraft((prev) => ({ ...prev, scalarValue: e.target.value }));
+                    }}
+                    placeholder="연결된 대상 이름 검색어..."
+                    className="h-7 text-xs"
+                    autoFocus
+                  />
+                ) : relationTargetFormId ? (
                   <RelationColumnFilterPicker
                     targetFormId={relationTargetFormId}
                     selectedIds={draft.selectedValues}

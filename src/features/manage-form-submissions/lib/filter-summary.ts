@@ -1,11 +1,34 @@
 import type { CoreFormField } from "@/entities/form";
 import {
   FIELD_FILTER_OPERATOR_LABELS,
+  isUuid,
   normalizeFieldFilterCondition,
   resolveTargetFieldCapability,
   SYSTEM_FIELD_LABELS,
   type FieldFilterCondition,
 } from "@/shared/schema";
+
+/**
+ * 숫자 필터 피연산자를 천 단위 콤마가 포함된 가독성 문자열로 변환합니다.
+ */
+function formatFilterScalarValue(
+  raw: string | number | boolean | undefined,
+  fieldType?: string
+): string {
+  if (raw === undefined) {
+    return "";
+  }
+  const str = String(raw);
+  if (fieldType !== "number") {
+    return str;
+  }
+  const cleaned = str.trim().replaceAll(",", "");
+  if (!cleaned) {
+    return "";
+  }
+  const num = Number(cleaned);
+  return Number.isFinite(num) ? num.toLocaleString("ko-KR") : str;
+}
 
 /**
  * 활성 필터 조건을 툴팁 및 상단 요약 배지에 표시할 가독성 있는 문자열로 포맷팅합니다.
@@ -28,8 +51,8 @@ export function formatFilterConditionSummary(
   }
 
   if (normalized.op === "between") {
-    const minStr = normalized.min !== undefined ? String(normalized.min) : "";
-    const maxStr = normalized.max !== undefined ? String(normalized.max) : "";
+    const minStr = formatFilterScalarValue(normalized.min, field?.type);
+    const maxStr = formatFilterScalarValue(normalized.max, field?.type);
     return `${minStr} ~ ${maxStr}`.trim();
   }
 
@@ -74,11 +97,21 @@ export function formatFilterConditionSummary(
     return normalized.op === "eq" ? display : `${opLabel}: ${display}`;
   }
 
-  if (normalized.op === "contains" || normalized.op === "eq") {
-    return rawValue;
+  if (field?.type === "relation" && normalized.op === "eq") {
+    const resolved = relationLabelMap?.get(rawValue);
+    if (resolved) {
+      return resolved;
+    }
+    return isUuid(rawValue) ? rawValue.slice(0, 8) : rawValue;
   }
 
-  return `${opLabel} ${rawValue}`.trim();
+  const displayScalar = formatFilterScalarValue(normalized.value, field?.type);
+
+  if (normalized.op === "contains" || normalized.op === "eq") {
+    return displayScalar;
+  }
+
+  return `${opLabel} ${displayScalar}`.trim();
 }
 
 /**

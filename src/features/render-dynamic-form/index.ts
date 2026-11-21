@@ -39,4 +39,6 @@ export type {
   DynamicFormMode,
   DynamicFormRendererProps,
   DynamicFieldProps,
+  RelationPickerSlotProps,
+  RelationSelectedTableSlotProps,
 } from "./types/render-dynamic-form.types";

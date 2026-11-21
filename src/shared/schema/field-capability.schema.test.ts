@@ -78,6 +78,7 @@ describe("Field Capability Schema (shared/schema/field-capability.schema)", () =
     expect(isSystemFieldId("f_name")).toBe(false);
 
     expect(resolveSystemFieldCapability("id")).toEqual(SYSTEM_FIELD_CAPABILITIES.id);
+    expect(resolveSystemFieldCapability("id")?.filterOperators).toContain("in");
     expect(resolveSystemFieldCapability("createdAt")?.filterWidget).toBe("date");
     expect(resolveSystemFieldCapability("updatedAt")?.filterOperators).toContain("between");
     expect(resolveSystemFieldCapability("unknown")).toBeNull();

@@ -13,6 +13,10 @@ import {
 import { Button } from "@/shared/ui/button";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { useConsumerFormSubmitter } from "../hooks/use-consumer-form-submitter.hook";
+import type {
+  RelationPickerSlotProps,
+  RelationSelectedTableSlotProps,
+} from "../types/render-dynamic-form.types";
 import { DynamicFormRenderer } from "./dynamic-form-renderer";
 
 export interface ConsumerFormSubmitterProps {
@@ -20,6 +24,14 @@ export interface ConsumerFormSubmitterProps {
    * 대상 폼 식별자 (UUID)
    */
   formId: string;
+  /**
+   * 관계형 필드 선택 다이얼로그 본문을 외부 위젯/레이어에서 주입하기 위한 렌더 슬롯
+   */
+  renderRelationPicker?: (slot: RelationPickerSlotProps) => React.ReactNode;
+  /**
+   * 이미 선택된 관계형 레코드 테이블을 외부 위젯/레이어에서 주입하기 위한 렌더 슬롯
+   */
+  renderRelationSelectedTable?: (slot: RelationSelectedTableSlotProps) => React.ReactNode;
 }
 
 /**
@@ -28,7 +40,11 @@ export interface ConsumerFormSubmitterProps {
  * 공식 발행된 활성 폼을 불러와 엔드유저가 실시간 유효성 검증과 함께
  * 답변을 작성하고 서버로 일괄 제출(Batch Submission)하는 순수 얇은 뷰(Thin View) 컴포넌트입니다.
  */
-export function ConsumerFormSubmitter({ formId }: ConsumerFormSubmitterProps) {
+export function ConsumerFormSubmitter({
+  formId,
+  renderRelationPicker,
+  renderRelationSelectedTable,
+}: ConsumerFormSubmitterProps) {
   const {
     form,
     isLoading,
@@ -142,6 +158,8 @@ export function ConsumerFormSubmitter({ formId }: ConsumerFormSubmitterProps) {
       submitTriggerCount={activeSubmitTriggerCount}
       onSubmit={handleSubmit}
       isSubmitting={isSubmitting}
+      renderRelationPicker={renderRelationPicker}
+      renderRelationSelectedTable={renderRelationSelectedTable}
     />
   );
 }

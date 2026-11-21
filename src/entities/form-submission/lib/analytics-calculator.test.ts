@@ -213,6 +213,51 @@ describe("Analytics Calculator (entities/form-submission/lib)", () => {
         { key: "프로젝트 B", baseValue: 0, targetValue: 0, margin_rate: null },
       ]);
     });
+
+    it("sortBy/sortOrder 지정 시 계산 결과(result)·baseValue·targetValue 기준으로 정렬하고 null은 하단에 유지해야 한다", () => {
+      const sortedProfitDesc = computeSeriesMetric({
+        operation: "subtract",
+        baseSeries: [
+          { key: "프로젝트 가", value: 500 },
+          { key: "프로젝트 나", value: 1200 },
+          { key: "프로젝트 다", value: 900 },
+        ],
+        targetSeries: [
+          { key: "프로젝트 가", value: 100 },
+          { key: "프로젝트 나", value: 1000 },
+          { key: "프로젝트 다", value: 100 },
+        ],
+        resultKey: "net_profit",
+        sortBy: "result",
+        sortOrder: "desc",
+      });
+
+      expect(sortedProfitDesc.rows.map((r) => r.key)).toEqual([
+        "프로젝트 다",
+        "프로젝트 가",
+        "프로젝트 나",
+      ]);
+
+      const sortedRatioAsc = computeSeriesMetric({
+        operation: "ratio",
+        baseSeries: [
+          { key: "A", value: 300 },
+          { key: "B", value: 100 },
+          { key: "C", value: 50 },
+        ],
+        targetSeries: [
+          { key: "A", value: 100 },
+          { key: "B", value: 0 },
+          { key: "C", value: 100 },
+        ],
+        resultKey: "margin_rate",
+        sortBy: "result",
+        sortOrder: "asc",
+      });
+
+      // C(50) -> A(300) -> B(null은 항상 하단)
+      expect(sortedRatioAsc.rows.map((r) => r.key)).toEqual(["C", "A", "B"]);
+    });
   });
 
   describe("buildContinuousTimeBucketKeys (0건 구간 포함 연속 버킷 생성)", () => {

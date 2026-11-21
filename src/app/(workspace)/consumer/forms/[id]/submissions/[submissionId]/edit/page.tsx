@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ConsumerSubmissionEditor } from "@/features/render-dynamic-form";
+import { RelationalSubmissionEditor } from "@/widgets/relational-form-picker";
 
 interface ConsumerSubmissionEditPageProps {
   params: Promise<{
@@ -24,5 +24,5 @@ export default async function ConsumerSubmissionEditPage({
 }: ConsumerSubmissionEditPageProps) {
   const { id, submissionId } = await params;
 
-  return <ConsumerSubmissionEditor formId={id} submissionId={submissionId} />;
+  return <RelationalSubmissionEditor formId={id} submissionId={submissionId} />;
 }

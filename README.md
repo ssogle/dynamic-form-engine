@@ -128,27 +128,28 @@ src/
 
 ---
 
-## 6. Spec-Driven Evolution (Archived Specs 001 ~ 015)
+## 6. Spec-Driven Evolution (Archived Specs 001 ~ 016)
 
 완료된 모든 기능 명세와 기술 의사결정 이력은 [`docs/specs/archived/`](docs/specs/archived/)에 읽기 전용으로 보존되어 있습니다.
 
-| 번호 | 스펙 문서                                                                                                                | 핵심 구현 내용                                                                                                |
-| :--- | :----------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------ |
-| 001  | [001-autonomous-navigator-core.md](docs/specs/archived/001-autonomous-navigator-core.md)                                 | 동적 폼 엔진 기반 및 AI Builder 프로토타입 구축                                                               |
-| 002  | [002-consumer-form-submission-core.md](docs/specs/archived/002-consumer-form-submission-core.md)                         | 컨슈머 동적 폼 렌더링, Zod 동적 검증 및 제출 파이프라인                                                       |
-| 003  | [003-on-demand-navigator-engine.md](docs/specs/archived/003-on-demand-navigator-engine.md)                               | 전략 레지스트리 및 온디맨드 도구 호출 기반 AI 오케스트레이션 통합                                             |
-| 004  | [004-consumer-data-domain-workspace.md](docs/specs/archived/004-consumer-data-domain-workspace.md)                       | TanStack Virtual 기반 컨슈머 데이터 워크스페이스 및 상세/수정 CRUD                                            |
-| 005  | [005-relational-domain-link-and-select-options.md](docs/specs/archived/005-relational-domain-link-and-select-options.md) | `relation` 외래키 연결, `relations` 인덱스 테이블, `select` 옵션 메타데이터                                   |
-| 006  | [006-hono-api-router.md](docs/specs/archived/006-hono-api-router.md)                                                     | `/api/v1/*` Hono API 라우터 도입 및 검증 미들웨어 표준화                                                      |
-| 007  | [007-analyst-knowledge-studio.md](docs/specs/archived/007-analyst-knowledge-studio.md)                                   | 서버 집계 기반 Analyst Studio 및 `text`/`table`/`chart` 분석 뷰                                               |
-| 008  | [008-unified-field-filter-engine.md](docs/specs/archived/008-unified-field-filter-engine.md)                             | `FIELD_CAPABILITY_BY_TYPE` 통합 필드/기간/정렬 필터 엔진                                                      |
-| 009  | [009-workspace-app-switcher-layout.md](docs/specs/archived/009-workspace-app-switcher-layout.md)                         | 글로벌 앱 바 및 3-Workspace 좌우 분할 레이아웃 통일                                                           |
-| 010  | [010-builder-form-multi-view-preview.md](docs/specs/archived/010-builder-form-multi-view-preview.md)                     | 빌더 다중 뷰 미리보기(폼/목록/상세/분석) 지원                                                                 |
-| 011  | [011-data-integrity-and-schema-governance.md](docs/specs/archived/011-data-integrity-and-schema-governance.md)           | `version` 낙관적 락, 발행 폼 수정 보호, `select`/`relation` 배열 포맷 통일                                    |
-| 012  | [012-consumer-ai-accuracy-and-filtering.md](docs/specs/archived/012-consumer-ai-accuracy-and-filtering.md)               | 상대 날짜 컨텍스트, 옵션 코드 정규화, `submitForm` 선검증, 목록 필터·검색 도구                                |
-| 013  | [013-ai-chat-multimodal-hitl-and-ux-polish.md](docs/specs/archived/013-ai-chat-multimodal-hitl-and-ux-polish.md)         | 마크다운 통합 렌더러, Gemini Vision 이미지 입력, HITL 사전 승인 카드, 역참조 테이블 통합                      |
-| 014  | [014-relation-graph-visualization.md](docs/specs/archived/014-relation-graph-visualization.md)                           | `react-force-graph-3d` + `three-spritetext` 3D 관계 그래프, 랜딩 3D 배경, 제출 HITL·지연 최적화, 모바일 가드  |
-| 015  | [015-workspace-ux-shell-and-focus-polish.md](docs/specs/archived/015-workspace-ux-shell-and-focus-polish.md)             | 랜딩 헤더·다크 테마 통합, `BackLink` 통일, AI 패널 좌/우 도킹·`Cmd+K`, 3D 그래프 드래그/시점·블록 포커스 개선 |
+| 번호 | 스펙 문서                                                                                                                | 핵심 구현 내용                                                                                                               |
+| :--- | :----------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------- |
+| 001  | [001-autonomous-navigator-core.md](docs/specs/archived/001-autonomous-navigator-core.md)                                 | 동적 폼 엔진 기반 및 AI Builder 프로토타입 구축                                                                              |
+| 002  | [002-consumer-form-submission-core.md](docs/specs/archived/002-consumer-form-submission-core.md)                         | 컨슈머 동적 폼 렌더링, Zod 동적 검증 및 제출 파이프라인                                                                      |
+| 003  | [003-on-demand-navigator-engine.md](docs/specs/archived/003-on-demand-navigator-engine.md)                               | 전략 레지스트리 및 온디맨드 도구 호출 기반 AI 오케스트레이션 통합                                                            |
+| 004  | [004-consumer-data-domain-workspace.md](docs/specs/archived/004-consumer-data-domain-workspace.md)                       | TanStack Virtual 기반 컨슈머 데이터 워크스페이스 및 상세/수정 CRUD                                                           |
+| 005  | [005-relational-domain-link-and-select-options.md](docs/specs/archived/005-relational-domain-link-and-select-options.md) | `relation` 외래키 연결, `relations` 인덱스 테이블, `select` 옵션 메타데이터                                                  |
+| 006  | [006-hono-api-router.md](docs/specs/archived/006-hono-api-router.md)                                                     | `/api/v1/*` Hono API 라우터 도입 및 검증 미들웨어 표준화                                                                     |
+| 007  | [007-analyst-knowledge-studio.md](docs/specs/archived/007-analyst-knowledge-studio.md)                                   | 서버 집계 기반 Analyst Studio 및 `text`/`table`/`chart` 분석 뷰                                                              |
+| 008  | [008-unified-field-filter-engine.md](docs/specs/archived/008-unified-field-filter-engine.md)                             | `FIELD_CAPABILITY_BY_TYPE` 통합 필드/기간/정렬 필터 엔진                                                                     |
+| 009  | [009-workspace-app-switcher-layout.md](docs/specs/archived/009-workspace-app-switcher-layout.md)                         | 글로벌 앱 바 및 3-Workspace 좌우 분할 레이아웃 통일                                                                          |
+| 010  | [010-builder-form-multi-view-preview.md](docs/specs/archived/010-builder-form-multi-view-preview.md)                     | 빌더 다중 뷰 미리보기(폼/목록/상세/분석) 지원                                                                                |
+| 011  | [011-data-integrity-and-schema-governance.md](docs/specs/archived/011-data-integrity-and-schema-governance.md)           | `version` 낙관적 락, 발행 폼 수정 보호, `select`/`relation` 배열 포맷 통일                                                   |
+| 012  | [012-consumer-ai-accuracy-and-filtering.md](docs/specs/archived/012-consumer-ai-accuracy-and-filtering.md)               | 상대 날짜 컨텍스트, 옵션 코드 정규화, `submitForm` 선검증, 목록 필터·검색 도구                                               |
+| 013  | [013-ai-chat-multimodal-hitl-and-ux-polish.md](docs/specs/archived/013-ai-chat-multimodal-hitl-and-ux-polish.md)         | 마크다운 통합 렌더러, Gemini Vision 이미지 입력, HITL 사전 승인 카드, 역참조 테이블 통합                                     |
+| 014  | [014-relation-graph-visualization.md](docs/specs/archived/014-relation-graph-visualization.md)                           | `react-force-graph-3d` + `three-spritetext` 3D 관계 그래프, 랜딩 3D 배경, 제출 HITL·지연 최적화, 모바일 가드                 |
+| 015  | [015-workspace-ux-shell-and-focus-polish.md](docs/specs/archived/015-workspace-ux-shell-and-focus-polish.md)             | 랜딩 헤더·다크 테마 통합, `BackLink` 통일, AI 패널 좌/우 도킹·`Cmd+K`, 3D 그래프 드래그/시점·블록 포커스 개선                |
+| 016  | [016-unified-table-and-ai-sort-engine.md](docs/specs/archived/016-unified-table-and-ai-sort-engine.md)                   | 관계형 피커·선택결과·상세 테이블 `ManageFormSubmissions` 통합, 정렬 칩·UUID 스키마 통일, AI 파생 지표·`SORT_BLOCK_DATA` 정렬 |
 
 ---
 

@@ -1,6 +1,7 @@
 import { extractPrimaryFieldValue, type CoreFormField, type Form } from "@/entities/form";
 import type { FormSubmission } from "@/entities/form-submission";
 import { normalizeStringIds } from "@/shared/lib/normalize";
+import { isUuid, type FieldFilterCondition } from "@/shared/schema";
 
 /**
  * 특정 부모 폼과 서브미션 목록에서 참조된 타깃 폼 및 타깃 레코드 ID 집합 규격
@@ -31,24 +32,31 @@ export interface RelationFieldDetailRows {
 }
 
 /**
- * 활성 필드와 서브미션 행들을 순회하며, 배치 조회가 필요한 타깃 폼 ID 및
+ * 활성 필드·서브미션 행·활성 필터 조건을 순회하며, 배치 조회가 필요한 타깃 폼 ID 및
  * 해당 폼에서 참조된 중복 제거 서브미션 ID 목록을 추출합니다.
+ *
+ * 결과 건수가 0건이거나 로딩 중이어도 상단 필터 칩이 UUID 대신 대표명을 즉시 표시할 수 있도록
+ * 활성 필터 조건에 포함된 relation UUID도 함께 수집합니다.
  *
  * @param fields 부모 폼의 활성 필드 목록
  * @param submissions 현재 화면에 로드된 부모 서브미션 목록
+ * @param filterConditions 현재 적용 중인 필터 조건 목록 (선택)
  * @returns 타깃 폼 단위로 그룹핑된 조회 대상 배열 (결정론적 정렬 보장)
  */
 export function extractRelationTargets(
   fields: CoreFormField[],
-  submissions: FormSubmission[]
+  submissions: FormSubmission[],
+  filterConditions?: ReadonlyArray<FieldFilterCondition>
 ): RelationTargetGroup[] {
   const byTargetForm = new Map<string, Set<string>>();
+  const relationFieldTargetMap = new Map<string, string>();
 
   for (const field of fields) {
     if (field.type !== "relation" || !field.relationConfig?.targetFormId) {
       continue;
     }
     const targetFormId = field.relationConfig.targetFormId;
+    relationFieldTargetMap.set(field.id, targetFormId);
     let idSet = byTargetForm.get(targetFormId);
     if (!idSet) {
       idSet = new Set<string>();
@@ -60,6 +68,23 @@ export function extractRelationTargets(
       const ids = normalizeStringIds(dataObj[field.id]);
       for (const id of ids) {
         idSet.add(id);
+      }
+    }
+  }
+
+  for (const cond of filterConditions ?? []) {
+    const targetFormId = relationFieldTargetMap.get(cond.fieldId);
+    if (!targetFormId) continue;
+    const idSet = byTargetForm.get(targetFormId);
+    if (!idSet) continue;
+
+    if (isUuid(cond.value)) {
+      idSet.add(cond.value.trim());
+    }
+    for (const val of cond.values ?? []) {
+      const trimmed = val.trim();
+      if (isUuid(trimmed)) {
+        idSet.add(trimmed);
       }
     }
   }

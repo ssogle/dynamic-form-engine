@@ -18,7 +18,10 @@ export {
 } from "./ui/related-submission-subtable";
 
 export { buildPreviewSampleSubmissions } from "./lib/build-preview-samples";
-export type { FormSubmissionViewMode } from "./types/submission-view.types";
+export type {
+  FormSubmissionViewMode,
+  SubmissionSelectionMode,
+} from "./types/submission-view.types";
 
 // 커스텀 훅 및 시스템 상수 Public API
 export {

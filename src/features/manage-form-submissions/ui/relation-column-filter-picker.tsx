@@ -13,6 +13,7 @@ import {
   useInfiniteFormSubmissionsQuery,
 } from "@/entities/form-submission";
 import { resolveFieldQueryCapability, serializeFieldFiltersParam } from "@/shared/schema";
+import { useDebouncedValue } from "@/shared/lib/debounce";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Checkbox } from "@/shared/ui/checkbox";
@@ -38,6 +39,7 @@ export function RelationColumnFilterPicker({
   onChangeSelectedIds,
 }: RelationColumnFilterPickerProps) {
   const [searchQuery, setSearchQuery] = React.useState("");
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
   const { data: targetForm, isLoading: isFormLoading } = useFormDetailQuery(targetFormId);
 
   const primaryFieldId = React.useMemo(() => extractPrimaryFieldId(targetForm), [targetForm]);
@@ -47,7 +49,7 @@ export function RelationColumnFilterPicker({
   }, [targetForm, primaryFieldId]);
 
   const filtersParam = React.useMemo(() => {
-    const trimmed = searchQuery.trim();
+    const trimmed = debouncedSearchQuery.trim();
     if (!trimmed || !primaryFieldId) {
       return undefined;
     }
@@ -61,7 +63,7 @@ export function RelationColumnFilterPicker({
       return undefined;
     }
     return serializeFieldFiltersParam([{ fieldId: primaryFieldId, op, value: trimmed }]);
-  }, [primaryFieldId, primaryField, searchQuery]);
+  }, [primaryFieldId, primaryField, debouncedSearchQuery]);
 
   const {
     data: submissionsData,

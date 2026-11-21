@@ -1,6 +1,6 @@
 import * as React from "react";
 import { BackLink } from "@/shared/ui/back-link";
-import { ConsumerFormSubmitter } from "@/features/render-dynamic-form";
+import { RelationalFormSubmitter } from "@/widgets/relational-form-picker";
 
 interface ConsumerFormNewSubmissionPageProps {
   params: Promise<{
@@ -25,7 +25,7 @@ export default async function ConsumerFormNewSubmissionPage({
         <BackLink href={`/consumer/forms/${id}`} label="데이터 목록으로" />
       </div>
 
-      <ConsumerFormSubmitter formId={id} />
+      <RelationalFormSubmitter formId={id} />
     </div>
   );
 }

@@ -17,7 +17,10 @@ import { Badge } from "@/shared/ui/badge";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 import { formatFilterConditionSummary, resolveFilterFieldLabel } from "../lib/filter-summary";
-import type { FormSubmissionViewMode } from "../types/submission-view.types";
+import type {
+  FormSubmissionViewMode,
+  SubmissionSelectionMode,
+} from "../types/submission-view.types";
 import { useSubmissionListTable, getColumnLabel } from "../hooks/use-submission-list-table.hook";
 
 export interface SubmissionListTableProps {
@@ -29,8 +32,14 @@ export interface SubmissionListTableProps {
   mode?: FormSubmissionViewMode | undefined;
   /** 상세 화면 내 임베디드 렌더링 여부 */
   embedded?: boolean | undefined;
+  /** 컴팩트 렌더링 여부 (액션 열 생략 및 스크롤 높이 축소) */
+  compact?: boolean | undefined;
+  /** 관계형 레코드 선택 피커 다이얼로그 등 선택 모드 제어 옵션 */
+  selectionMode?: SubmissionSelectionMode | undefined;
   /** 초기화 시에도 유지되는 고정 필터 조건 목록 */
   lockedFilters?: FieldFilterCondition[] | undefined;
+  /** 선택된 관계 레코드 인라인 테이블에서 개별 행 연결 해제 시 호출되는 콜백 */
+  onRemoveSelectedRow?: ((submissionId: string) => void) | undefined;
   /** 프리뷰 모드에서 실데이터 0건 시 폴백으로 표시할 가상 샘플 레코드 목록 */
   sampleSubmissions?: FormSubmission[] | undefined;
   /** 프리뷰 모드에서 행/상세 클릭 시 호출할 인라인 콜백 */
@@ -51,7 +60,10 @@ export function SubmissionListTable({
   initialSort,
   mode = "consumer",
   embedded = false,
+  compact = false,
+  selectionMode,
   lockedFilters,
+  onRemoveSelectedRow,
   sampleSubmissions,
   onSelectSubmission,
 }: SubmissionListTableProps) {
@@ -65,6 +77,8 @@ export function SubmissionListTable({
     dateRangeFilter,
     dateRangeFieldLabel,
     activeFilterCount,
+    sorting,
+    isDefaultSorting,
     isLoading,
     isError,
     error,
@@ -75,6 +89,8 @@ export function SubmissionListTable({
     handleSetFieldFilter,
     handleClearAllFilters,
     handleClearDateRange,
+    handleRemoveSort,
+    handleResetSorting,
     handleRowClick,
     isSamplePreview,
   } = useSubmissionListTable({
@@ -84,7 +100,10 @@ export function SubmissionListTable({
     initialSort,
     mode,
     embedded,
+    compact,
+    selectionMode,
     lockedFilters,
+    onRemoveSelectedRow,
     sampleSubmissions,
     onSelectSubmission,
   });
@@ -131,8 +150,8 @@ export function SubmissionListTable({
   return (
     <div className="space-y-3">
       {/* 테이블 상단 툴바: 레코드 수, 활성 필터 배지, 컬럼 가시성 설정 */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-start justify-between gap-3 px-1 text-xs">
+        <div className="flex min-h-7 min-w-0 flex-1 flex-wrap items-center gap-2">
           <span className="text-muted-foreground">
             총 <strong className="text-foreground font-semibold">{totalCount}</strong>개 레코드
           </span>
@@ -193,12 +212,51 @@ export function SubmissionListTable({
               </button>
             </Badge>
           )}
+          {!isDefaultSorting &&
+            sorting.map((sortItem, idx) => {
+              const colLabel = getColumnLabel(sortItem.id, activeFields);
+              const dirLabel = sortItem.desc ? "내림차순" : "오름차순";
+              const priorityPrefix = sorting.length > 1 ? `${idx + 1}. ` : "";
+              return (
+                <Badge
+                  key={`sort-${sortItem.id}`}
+                  variant="outline"
+                  className="border-primary/30 bg-primary/5 gap-1 px-2 py-0.5 text-[11px]"
+                >
+                  <span>
+                    정렬: {priorityPrefix}
+                    {colLabel} {dirLabel}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveSort(sortItem.id)}
+                    className="hover:text-foreground ml-1 text-xs"
+                    title={`${colLabel} 정렬 해제`}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </Badge>
+              );
+            })}
+          {!isDefaultSorting && sorting.length > 1 && (
+            <Badge variant="secondary" className="gap-1 px-2 py-0.5 text-[11px]">
+              정렬 초기화
+              <button
+                type="button"
+                onClick={handleResetSorting}
+                className="hover:text-foreground ml-1 text-xs"
+                title="기본 정렬로 복귀"
+              >
+                <X className="size-3" />
+              </button>
+            </Badge>
+          )}
         </div>
 
         {/* 컬럼 가시성 드롭다운/팝오버 */}
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="h-7 gap-1 px-2.5 text-xs">
+            <Button variant="outline" size="sm" className="h-7 shrink-0 gap-1 px-2.5 text-xs">
               <SlidersHorizontal className="size-3" />
               컬럼 표시
             </Button>
@@ -209,7 +267,9 @@ export function SubmissionListTable({
               <div className="max-h-60 space-y-1 overflow-y-auto">
                 {table
                   .getAllLeafColumns()
-                  .filter((col) => col.id !== "actions")
+                  .filter(
+                    (col) => col.id !== "actions" && col.id !== "__select" && col.id !== "__unlink"
+                  )
                   .map((column) => {
                     const isVisible = column.getIsVisible();
                     const colTitle = getColumnLabel(column.id, activeFields);
@@ -267,10 +327,17 @@ export function SubmissionListTable({
         <VirtualTable
           table={table}
           containerRef={tableContainerRef}
+          maxHeightClassName={compact ? "max-h-72" : undefined}
           isFetchingNextPage={isFetchingNextPage}
           hasNextPage={hasNextPage}
           fetchNextPage={fetchNextPage}
-          onRowClick={mode === "preview" ? undefined : (row) => handleRowClick(row.original.id)}
+          onRowClick={
+            selectionMode
+              ? (row) => selectionMode.onToggleSelect(row.original.id)
+              : mode === "preview" || onRemoveSelectedRow
+                ? undefined
+                : (row) => handleRowClick(row.original.id)
+          }
         />
       )}
     </div>

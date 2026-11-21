@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { X } from "lucide-react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -34,8 +35,13 @@ import {
   type SubmissionDateRangeFilter,
 } from "@/entities/form-submission";
 import { formatDateTime } from "@/shared/lib/date";
+import { Button } from "@/shared/ui/button";
+import { Checkbox } from "@/shared/ui/checkbox";
 import { formatRelationSummaryCell, type RelationLookupMap } from "../lib/relation-summary";
-import type { FormSubmissionViewMode } from "../types/submission-view.types";
+import type {
+  FormSubmissionViewMode,
+  SubmissionSelectionMode,
+} from "../types/submission-view.types";
 import { useRelationLookup } from "./use-relation-lookup.hook";
 import { ColumnHeaderFilter } from "../ui/column-header-filter";
 import { SubmissionActionCell } from "../ui/submission-action-cell";
@@ -87,9 +93,21 @@ export interface UseSubmissionListTableParams {
    */
   embedded?: boolean | undefined;
   /**
+   * 컴팩트 렌더링 여부 (액션 열 생략 및 스크롤 최대 높이 축소)
+   */
+  compact?: boolean | undefined;
+  /**
+   * 관계형 레코드 선택 피커 다이얼로그 등 선택 모드 제어 옵션
+   */
+  selectionMode?: SubmissionSelectionMode | undefined;
+  /**
    * 초기화(handleClearAllFilters) 시에도 항상 유지·합산되는 고정 필터 조건 목록 (역참조 필터링용)
    */
   lockedFilters?: FieldFilterCondition[] | undefined;
+  /**
+   * 폼 입력/수정 내 선택된 관계 레코드 테이블에서 개별 행 연결 해제 콜백 (지정 시 우측 X 해제 열 표시 및 행 이동 비활성화)
+   */
+  onRemoveSelectedRow?: ((submissionId: string) => void) | undefined;
   /**
    * 프리뷰 모드에서 실데이터 0건일 때 폴백으로 표시할 가상 샘플 레코드 목록
    */
@@ -169,6 +187,22 @@ export interface UseSubmissionListTableReturn {
    * 가상화 테이블 스크롤 컨테이너 ref
    */
   tableContainerRef: React.RefObject<HTMLDivElement | null>;
+  /**
+   * 현재 적용 중인 정렬 조건 상태 목록
+   */
+  sorting: SortingState;
+  /**
+   * 현재 정렬이 기본값(createdAt 내림차순 단독)인지 여부
+   */
+  isDefaultSorting: boolean;
+  /**
+   * 특정 컬럼의 정렬 조건만 제거하는 핸들러 (모두 제거 시 기본 정렬로 복귀)
+   */
+  handleRemoveSort: (fieldId: string) => void;
+  /**
+   * 정렬 상태를 기본값(createdAt 내림차순)으로 초기화하는 핸들러
+   */
+  handleResetSorting: () => void;
   /**
    * 단일 컬럼 필터 값 설정 핸들러 (구조화 조건 객체 또는 레거시 문자열 지원)
    */
@@ -256,18 +290,32 @@ export function useSubmissionListTable({
   initialSort,
   mode = "consumer",
   embedded = false,
+  compact = false,
+  selectionMode,
   lockedFilters,
+  onRemoveSelectedRow,
   sampleSubmissions,
   onSelectSubmission,
 }: UseSubmissionListTableParams): UseSubmissionListTableReturn {
   const router = useRouter();
   const activeFields = React.useMemo(() => extractActiveFields(form), [form]);
   const primaryFieldId = extractPrimaryFieldId(form);
-  const resolvedInitialSorting = React.useMemo<SortingState>(
-    () => (initialSort && initialSort.length > 0 ? initialSort : [{ id: "createdAt", desc: true }]),
-    [initialSort]
+  const initialSortSignature = serializeSortItems(
+    initialSort && initialSort.length > 0 ? initialSort : [{ id: "createdAt", desc: true }]
   );
-  const [sorting, setSorting] = React.useState<SortingState>(resolvedInitialSorting);
+  const stableInitialSorting = React.useMemo<SortingState>(
+    () =>
+      initialSortSignature.split(",").map((token) => {
+        const lastColon = token.lastIndexOf(":");
+        if (lastColon === -1) return { id: token, desc: true };
+        return {
+          id: token.slice(0, lastColon),
+          desc: token.slice(lastColon + 1) !== "asc",
+        };
+      }),
+    [initialSortSignature]
+  );
+  const [sorting, setSorting] = React.useState<SortingState>(stableInitialSorting);
   const [columnFilters, setColumnFilters] = React.useState<Record<string, FieldFilterCondition>>(
     () => buildInitialFiltersMap(initialFilters, activeFields)
   );
@@ -282,13 +330,12 @@ export function useSubmissionListTable({
   const initialEndDate = initialDateRange?.endDate;
   const initialDateFieldId = initialDateRange?.dateFieldId;
   const initialFiltersSignature = serializeFieldFiltersParam(initialFilters) ?? "";
-  const initialSortSignature = serializeSortItems(resolvedInitialSorting);
 
   React.useEffect(() => {
     setSorting((prev) =>
-      serializeSortItems(prev) === initialSortSignature ? prev : resolvedInitialSorting
+      serializeSortItems(prev) === initialSortSignature ? prev : stableInitialSorting
     );
-  }, [initialSortSignature, resolvedInitialSorting]);
+  }, [initialSortSignature, stableInitialSorting]);
 
   React.useEffect(() => {
     setDateRangeFilter((prev) => {
@@ -371,7 +418,53 @@ export function useSubmissionListTable({
     () => (isSamplePreview ? [] : serverSubmissions),
     [isSamplePreview, serverSubmissions]
   );
-  const { lookupMap: relationLookupMap } = useRelationLookup(activeFields, lookupTargets);
+  const activeFilterList = React.useMemo(
+    () => (isSamplePreview ? [] : Object.values(columnFilters)),
+    [isSamplePreview, columnFilters]
+  );
+  const { lookupMap: relationLookupMap } = useRelationLookup(
+    activeFields,
+    lookupTargets,
+    activeFilterList
+  );
+
+  const isDefaultSorting = React.useMemo(
+    () => sorting.length === 1 && sorting[0]?.id === "createdAt" && sorting[0]?.desc === true,
+    [sorting]
+  );
+
+  const applySortingWithSync = React.useCallback(
+    (nextSorting: SortingState) => {
+      const resolved: SortingState =
+        nextSorting.length > 0 ? nextSorting : [{ id: "createdAt", desc: true }];
+      setSorting(resolved);
+      if (mode !== "preview" && !embedded) {
+        router.replace(buildConsumerFormUrl(form.id, dateRangeFilter, columnFilters, resolved), {
+          scroll: false,
+        });
+      }
+    },
+    [mode, embedded, router, form.id, dateRangeFilter, columnFilters]
+  );
+
+  const handleSortingChange = React.useCallback(
+    (updaterOrValue: SortingState | ((old: SortingState) => SortingState)) => {
+      const next = typeof updaterOrValue === "function" ? updaterOrValue(sorting) : updaterOrValue;
+      applySortingWithSync(next);
+    },
+    [sorting, applySortingWithSync]
+  );
+
+  const handleRemoveSort = React.useCallback(
+    (fieldId: string) => {
+      applySortingWithSync(sorting.filter((s) => s.id !== fieldId));
+    },
+    [sorting, applySortingWithSync]
+  );
+
+  const handleResetSorting = React.useCallback(() => {
+    applySortingWithSync([{ id: "createdAt", desc: true }]);
+  }, [applySortingWithSync]);
 
   // 단일 컬럼 필터 갱신 핸들러 (문자열 전달 시 해당 필드의 기본 연산자로 자동 변환)
   // React 19 Strict Mode/동시성 렌더링에서 setState 업데이터 내부 부수효과(router.replace)를 금지하므로,
@@ -461,6 +554,11 @@ export function useSubmissionListTable({
   );
 
   // 4. 동적 TanStack 컬럼 정의 (순수 createElement 기반)
+  const selectedIdSet = React.useMemo(
+    () => new Set(selectionMode?.selectedIds ?? []),
+    [selectionMode?.selectedIds]
+  );
+
   const columns = React.useMemo<ColumnDef<FormSubmission>[]>(() => {
     const cols: ColumnDef<FormSubmission>[] = [];
     const renderStaticHeader = (label: string, isPrimary = false) =>
@@ -470,6 +568,39 @@ export function useSubmissionListTable({
         label,
         isPrimary ? React.createElement(PrimaryFieldBadge) : null
       );
+
+    // 선택 피커 모드 시 좌측 고정 선택 체크박스/라디오 열 추가
+    if (selectionMode) {
+      cols.push({
+        id: "__select",
+        header: () =>
+          React.createElement(
+            "div",
+            { className: "text-muted-foreground text-center text-[11px] font-medium" },
+            "선택"
+          ),
+        cell: ({ row }) => {
+          const isSelected = selectedIdSet.has(row.original.id);
+          return React.createElement(
+            "div",
+            {
+              className: "flex items-center justify-center",
+              onClick: (e: React.MouseEvent) => e.stopPropagation(),
+            },
+            React.createElement(Checkbox, {
+              checked: isSelected,
+              className: selectionMode.multiple ? undefined : "rounded-full",
+              "aria-label": isSelected ? "선택 해제" : "레코드 선택",
+              onCheckedChange: () => selectionMode.onToggleSelect(row.original.id),
+            })
+          );
+        },
+        size: 48,
+        minSize: 48,
+        maxSize: 48,
+        enableResizing: false,
+      });
+    }
 
     // 폼 활성 필드별 동적 컬럼 생성
     activeFields.forEach((field: CoreFormField) => {
@@ -591,28 +722,63 @@ export function useSubmissionListTable({
       maxSize: TABLE_COLUMN_WIDTH.MAX,
     });
 
-    // 관리 액션 컬럼
-    cols.push({
-      id: "actions",
-      header: () =>
-        React.createElement(
-          "div",
-          { className: "text-left font-semibold" },
-          SYSTEM_COLUMN_LABELS.actions
-        ),
-      cell: ({ row }) =>
-        React.createElement(SubmissionActionCell, {
-          submission: row.original,
-          formId: form.id,
-          deletingId,
-          onDelete: handleDelete,
-          mode,
-          onSelectSubmission,
-        }),
-      size: mode === "preview" ? 96 : 180,
-      minSize: mode === "preview" ? 80 : 180,
-      enableResizing: false,
-    });
+    // 선택된 레코드 인라인 테이블의 개별 연결 해제 열
+    if (onRemoveSelectedRow) {
+      cols.push({
+        id: "__unlink",
+        header: () => React.createElement("div", { className: "sr-only" }, "연결 해제"),
+        cell: ({ row }) =>
+          React.createElement(
+            "div",
+            {
+              className: "flex items-center justify-center",
+              onClick: (e: React.MouseEvent) => e.stopPropagation(),
+            },
+            React.createElement(
+              Button,
+              {
+                type: "button",
+                variant: "ghost",
+                size: "icon-xs",
+                className: "text-muted-foreground hover:text-destructive size-6",
+                title: "연결 해제",
+                "aria-label": "연결 해제",
+                onClick: () => onRemoveSelectedRow(row.original.id),
+              },
+              React.createElement(X, { className: "size-3.5" })
+            )
+          ),
+        size: 48,
+        minSize: 48,
+        maxSize: 48,
+        enableResizing: false,
+      });
+    }
+
+    // 관리 액션 컬럼 (컴팩트 모드·선택 피커 모드·인라인 연결 해제 모드에서는 생략)
+    if (!compact && !selectionMode && !onRemoveSelectedRow) {
+      cols.push({
+        id: "actions",
+        header: () =>
+          React.createElement(
+            "div",
+            { className: "text-left font-semibold" },
+            SYSTEM_COLUMN_LABELS.actions
+          ),
+        cell: ({ row }) =>
+          React.createElement(SubmissionActionCell, {
+            submission: row.original,
+            formId: form.id,
+            deletingId,
+            onDelete: handleDelete,
+            mode,
+            onSelectSubmission,
+          }),
+        size: mode === "preview" ? 96 : 180,
+        minSize: mode === "preview" ? 80 : 180,
+        enableResizing: false,
+      });
+    }
 
     return cols;
   }, [
@@ -625,6 +791,10 @@ export function useSubmissionListTable({
     deletingId,
     handleDelete,
     mode,
+    compact,
+    selectionMode,
+    selectedIdSet,
+    onRemoveSelectedRow,
     onSelectSubmission,
     isSamplePreview,
   ]);
@@ -640,7 +810,7 @@ export function useSubmissionListTable({
       columnVisibility,
       columnSizing,
     },
-    onSortingChange: setSorting,
+    onSortingChange: handleSortingChange,
     onColumnVisibilityChange: setColumnVisibility,
     onColumnSizingChange: setColumnSizing,
     manualSorting: true,
@@ -676,6 +846,8 @@ export function useSubmissionListTable({
       : undefined,
     dateRangeFieldLabel,
     activeFilterCount,
+    sorting,
+    isDefaultSorting,
     isLoading,
     isError,
     error,
@@ -686,6 +858,8 @@ export function useSubmissionListTable({
     handleSetFieldFilter,
     handleClearAllFilters,
     handleClearDateRange,
+    handleRemoveSort,
+    handleResetSorting,
     handleDelete,
     handleRowClick,
     isSamplePreview,

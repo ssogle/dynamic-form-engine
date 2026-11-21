@@ -30,6 +30,11 @@ import { Input } from "@/shared/ui/input";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { cn } from "@/shared/lib/cn";
+import { useDebouncedValue } from "@/shared/lib/debounce";
+import type {
+  RelationPickerSlotProps,
+  RelationSelectedTableSlotProps,
+} from "../types/render-dynamic-form.types";
 import {
   buildPickerFilterString,
   formatRelationCellValue,
@@ -52,6 +57,11 @@ export interface RelationFieldInputProps {
   disabled?: boolean | undefined;
   /** 미선택 상태 안내 문구 */
   placeholder?: string | undefined;
+  /** 외부 위젯 계층에서 공통 데이터 테이블 피커를 주입할 때 사용하는 렌더 슬롯 */
+  renderRelationPicker?: ((slot: RelationPickerSlotProps) => React.ReactNode) | undefined;
+  /** 외부 위젯 계층에서 선택된 레코드 요약 테이블을 공통 테이블로 주입할 때 사용하는 렌더 슬롯 */
+  renderRelationSelectedTable?:
+    ((slot: RelationSelectedTableSlotProps) => React.ReactNode) | undefined;
 }
 
 interface RelationPickerDialogBodyProps {
@@ -79,6 +89,7 @@ function RelationPickerDialogBody({
   onClose,
 }: RelationPickerDialogBodyProps) {
   const [searchQuery, setSearchQuery] = React.useState("");
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
   const [sortState, setSortState] = React.useState<{ id: string; desc: boolean }>({
     id: "createdAt",
     desc: true,
@@ -94,10 +105,10 @@ function RelationPickerDialogBody({
       buildPickerFilterString({
         primaryFieldId,
         primaryFieldType,
-        searchQuery,
+        searchQuery: debouncedSearchQuery,
         columnFilters: {},
       }),
-    [primaryFieldId, primaryFieldType, searchQuery]
+    [primaryFieldId, primaryFieldType, debouncedSearchQuery]
   );
 
   const sortParam = `${sortState.id}:${sortState.desc ? "desc" : "asc"}`;
@@ -337,6 +348,8 @@ export function RelationFieldInput({
   onChange,
   disabled = false,
   placeholder,
+  renderRelationPicker,
+  renderRelationSelectedTable,
 }: RelationFieldInputProps) {
   const [open, setOpen] = React.useState(false);
 
@@ -352,9 +365,9 @@ export function RelationFieldInput({
   // 인라인 미니 테이블에서는 레이아웃 과밀 방지를 위해 최대 4개 핵심 열만 우선 표시
   const miniTableColumns = React.useMemo(() => orderedColumns.slice(0, 4), [orderedColumns]);
 
-  // 2. 이미 선택되어 저장된 타깃 레코드 UUID 목록을 배치 조회 (1페이지 외부 데이터 포함)
+  // 2. 이미 선택되어 저장된 타깃 레코드 UUID 목록을 배치 조회 (외부 공통 테이블 슬롯 미사용 시 폴백 전용)
   const { data: selectedRows = [], isLoading: isSelectedRowsLoading } =
-    useFormSubmissionsByIdsQuery(targetFormId, selectedIds);
+    useFormSubmissionsByIdsQuery(targetFormId, renderRelationSelectedTable ? [] : selectedIds);
 
   const rowsById = React.useMemo(() => {
     const map = new Map<string, FormSubmission>();
@@ -413,6 +426,15 @@ export function RelationFieldInput({
         >
           {placeholder ?? "선택된 레코드가 없습니다. 클릭하여 타깃 테이블에서 선택하세요."}
         </button>
+      ) : renderRelationSelectedTable ? (
+        <div className="border-border/70 bg-background rounded-lg border p-3">
+          {renderRelationSelectedTable({
+            targetFormId,
+            selectedIds,
+            disabled,
+            onRemove: handleRemoveRow,
+          })}
+        </div>
       ) : isTargetFormLoading || isSelectedRowsLoading ? (
         <div className="space-y-1.5 rounded-lg border p-3">
           <Skeleton className="h-6 w-full rounded" />
@@ -491,8 +513,73 @@ export function RelationFieldInput({
 
       {/* 타깃 폼 목록 테이블 선택 다이얼로그 */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-4xl">
-          {open && (
+        <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-5xl">
+          {open && renderRelationPicker ? (
+            <>
+              <DialogHeader>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Table2 className="text-primary size-4" />
+                  <DialogTitle className="text-base font-bold">
+                    {targetForm?.title ?? "타깃 도메인"} 레코드 선택
+                  </DialogTitle>
+                  <Badge variant="outline" className="text-[11px]">
+                    {multiple ? "다중 선택" : "단일 선택"}
+                  </Badge>
+                  {selectedIds.length > 0 && (
+                    <Badge variant="secondary" className="text-[11px]">
+                      {selectedIds.length}건 선택됨
+                    </Badge>
+                  )}
+                </div>
+                <DialogDescription className="text-xs">
+                  컬럼 필터와 정렬을 활용해 연결할 레코드를 선택하세요.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="min-h-0 flex-1 overflow-y-auto py-1">
+                {renderRelationPicker({
+                  targetFormId,
+                  multiple,
+                  selectedIds,
+                  onToggleSelect: (submissionId) => {
+                    const nextValue = toggleRelationSelection({
+                      currentIds: selectedIds,
+                      targetId: submissionId,
+                      multiple,
+                    });
+                    onChange(nextValue);
+                    if (!multiple) {
+                      setOpen(false);
+                    }
+                  },
+                })}
+              </div>
+
+              <DialogFooter className="items-center justify-between gap-2 sm:justify-between">
+                <div>
+                  {selectedIds.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground h-8 text-xs"
+                      onClick={() => onChange(multiple ? [] : "")}
+                    >
+                      선택 전체 해제
+                    </Button>
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 px-4 text-xs"
+                  onClick={() => setOpen(false)}
+                >
+                  {multiple ? "선택 완료" : "닫기"}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : open ? (
             <RelationPickerDialogBody
               targetFormId={targetFormId}
               targetForm={targetForm}
@@ -508,7 +595,7 @@ export function RelationFieldInput({
               }}
               onClose={() => setOpen(false)}
             />
-          )}
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>

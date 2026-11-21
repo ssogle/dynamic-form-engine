@@ -40,6 +40,7 @@ export const ANALYSIS_VIEW_OPERATIONS = [
   "UPDATE_BLOCK",
   "REMOVE_BLOCK",
   "REORDER_BLOCKS",
+  "SORT_BLOCK_DATA",
   "UPDATE_INFO",
   "SET_ALL_BLOCKS",
 ] as const;
@@ -429,12 +430,12 @@ export type CreateAnalysisViewInput = z.infer<typeof createAnalysisViewInputSche
 export const updateAnalysisViewInputSchema = z.object({
   viewId: z.uuid("수정할 분석 뷰의 고유 ID(UUID)는 필수입니다."),
   operation: analysisViewOperationSchema.describe(
-    "수행할 오퍼레이션: ADD_BLOCK, UPDATE_BLOCK, REMOVE_BLOCK, REORDER_BLOCKS, UPDATE_INFO, SET_ALL_BLOCKS"
+    "수행할 오퍼레이션: ADD_BLOCK, UPDATE_BLOCK, REMOVE_BLOCK, REORDER_BLOCKS, SORT_BLOCK_DATA, UPDATE_INFO, SET_ALL_BLOCKS"
   ),
   targetBlockId: z
     .string()
     .optional()
-    .describe("UPDATE_BLOCK, REMOVE_BLOCK 시 조작 대상 블록의 id"),
+    .describe("UPDATE_BLOCK, REMOVE_BLOCK, SORT_BLOCK_DATA 시 조작 대상 블록의 id"),
   block: analysisBlockSchema
     .optional()
     .describe("ADD_BLOCK 또는 UPDATE_BLOCK 시 추가/교체할 단일 블록 객체"),
@@ -448,6 +449,17 @@ export const updateAnalysisViewInputSchema = z.object({
     .array(z.string().min(1))
     .optional()
     .describe("REORDER_BLOCKS 시 기존 블록 ID들의 새로운 전체 순서 배열"),
+  sortKey: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      "SORT_BLOCK_DATA 시 정렬 기준 컬럼 키 (table은 column.key/행 키, chart는 xAxisKey 또는 series[].key)"
+    ),
+  sortOrder: z
+    .enum(["asc", "desc"])
+    .optional()
+    .describe("SORT_BLOCK_DATA 시 정렬 방향 ('asc': 오름차순, 'desc': 내림차순)"),
   blocks: z
     .array(analysisBlockSchema)
     .optional()

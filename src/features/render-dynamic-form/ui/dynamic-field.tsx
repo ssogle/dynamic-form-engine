@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Controller, useFormContext } from "react-hook-form";
-import type { CoreFormField, SelectOption } from "@/entities/form";
+import type { SelectOption } from "@/entities/form";
 import { Input } from "@/shared/ui/input";
 import { Textarea } from "@/shared/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
@@ -27,31 +27,11 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
 import { filterSingleSelectOptions, filterMultiSelectOptions } from "../lib/filter-select-options";
+import type { DynamicFieldProps } from "../types/render-dynamic-form.types";
 import { FormFieldWrapper } from "./form-field-wrapper";
 import { RelationFieldInput } from "./relation-field-input";
 
-/**
- * 동적 필드 컴포넌트 Props 인터페이스
- */
-export interface DynamicFieldProps {
-  /** 렌더링 대상 코어 폼 필드 정의 */
-  field: CoreFormField;
-
-  /** 도메인의 대표 식별 필드 여부 */
-  isPrimary?: boolean | undefined;
-
-  /** 현재 네비게이터 또는 사용자가 선택한 필드 여부 */
-  isSelected?: boolean | undefined;
-
-  /** 필드 클릭 핸들러 (네비게이터 대화 패널에 타깃 필드 컨텍스트 전달용) */
-  onFieldClick?: ((fieldId: string) => void) | undefined;
-
-  /** 외부에서 직접 주입하는 에러 메시지 (React Hook Form 외부 사용 시) */
-  error?: string | undefined;
-
-  /** 비활성화 여부 */
-  disabled?: boolean | undefined;
-}
+export type { DynamicFieldProps };
 
 /**
  * 선택형 옵션(radio/checkbox)의 라벨과 필수 상세 설명을 함께 렌더링하는 보조 컴포넌트입니다.
@@ -235,6 +215,8 @@ export function DynamicField({
   onFieldClick,
   error: propError,
   disabled = false,
+  renderRelationPicker,
+  renderRelationSelectedTable,
 }: DynamicFieldProps) {
   const { id, label, type, placeholder, required, multiple, options, relationConfig, description } =
     field;
@@ -518,6 +500,8 @@ export function DynamicField({
                   onChange={controllerField.onChange}
                   disabled={disabled}
                   placeholder={placeholder}
+                  renderRelationPicker={renderRelationPicker}
+                  renderRelationSelectedTable={renderRelationSelectedTable}
                 />
               )}
             />
