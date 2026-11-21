@@ -366,7 +366,7 @@ export function useSubmissionListTable({
     useInfiniteFormSubmissionsQuery(form.id, {
       sort: sortQueryString,
       filters: filtersQueryString,
-      limit: 20,
+      limit: 50,
     });
 
   const { mutateAsync: deleteSubmission } = useDeleteSubmissionMutation(form.id);
