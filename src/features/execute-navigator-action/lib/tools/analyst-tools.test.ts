@@ -495,4 +495,130 @@ describe("Analyst Navigator Tools (analyst-tools.ts)", () => {
     });
     expect(deps.softDeleteAnalysisViewsByIds).not.toHaveBeenCalled();
   });
+
+  it("computeSeriesMetric 도구는 sortBy와 sortOrder를 전달받아 결과를 결정론적으로 정렬해야 한다", async () => {
+    const res = (await tools.computeSeriesMetric.execute(
+      {
+        operation: "subtract",
+        baseSeries: [
+          { key: "A", value: 100 },
+          { key: "B", value: 500 },
+          { key: "C", value: 250 },
+        ],
+        targetSeries: [
+          { key: "A", value: 50 },
+          { key: "B", value: 200 },
+          { key: "C", value: 100 },
+        ],
+        resultKey: "net_profit",
+        sortBy: "result",
+        sortOrder: "desc",
+      },
+      TOOL_CTX
+    )) as unknown as {
+      success: boolean;
+      data: { rows: Array<{ key: string; net_profit: number | null }> };
+    };
+
+    expect(res.success).toBe(true);
+    expect(res.data.rows.map((r) => r.key)).toEqual(["B", "C", "A"]);
+  });
+
+  describe("SORT_BLOCK_DATA 오퍼레이션", () => {
+    it("table과 chart 블록의 rows/data를 null 하단 고정으로 결정론적 정렬하고, text 블록 및 미존재 키는 거부한다", async () => {
+      const tableBlock: AnalysisBlock = {
+        ...SAMPLE_BLOCK_2,
+        rows: [
+          { key: "A", amount: 100 },
+          { key: "B", amount: null },
+          { key: "C", amount: 500 },
+          { key: "D", amount: 250 },
+        ],
+      };
+      const chartBlock: AnalysisBlock = {
+        ...SAMPLE_BLOCK_3,
+        data: [
+          { key: "A", amount: 100 },
+          { key: "C", amount: 500 },
+          { key: "D", amount: 250 },
+        ],
+      };
+      const existing = createMockAnalysisView({
+        blocks: [SAMPLE_BLOCK_1, tableBlock, chartBlock],
+      });
+
+      vi.mocked(deps.findAnalysisViewById).mockResolvedValue(existing);
+      vi.mocked(deps.updateAnalysisViewById).mockImplementation(async (_id, updates) => ({
+        status: "updated",
+        data: { ...existing, blocks: updates.blocks ?? existing.blocks, version: 2 },
+      }));
+
+      // 1. table 블록 내림차순 정렬 (null은 하단 고정)
+      const tableRes = (await tools.updateAnalysisView.execute(
+        {
+          viewId: VIEW_ID,
+          operation: "SORT_BLOCK_DATA",
+          targetBlockId: "block-2",
+          sortKey: "amount",
+          sortOrder: "desc",
+        },
+        TOOL_CTX
+      )) as { success: boolean; clientAction?: { blocks: AnalysisBlock[] } };
+
+      expect(tableRes.success).toBe(true);
+      const sortedTable = tableRes.clientAction?.blocks.find((b) => b.id === "block-2");
+      expect(sortedTable?.type === "table" && sortedTable.rows.map((r) => r.key)).toEqual([
+        "C",
+        "D",
+        "A",
+        "B",
+      ]);
+
+      // 2. chart 블록 오름차순 정렬
+      const chartRes = (await tools.updateAnalysisView.execute(
+        {
+          viewId: VIEW_ID,
+          operation: "SORT_BLOCK_DATA",
+          targetBlockId: "block-3",
+          sortKey: "amount",
+          sortOrder: "asc",
+        },
+        TOOL_CTX
+      )) as { success: boolean; clientAction?: { blocks: AnalysisBlock[] } };
+
+      expect(chartRes.success).toBe(true);
+      const sortedChart = chartRes.clientAction?.blocks.find((b) => b.id === "block-3");
+      expect(sortedChart?.type === "chart" && sortedChart.data.map((d) => d.key)).toEqual([
+        "A",
+        "D",
+        "C",
+      ]);
+
+      // 3. text 블록 대상 거부
+      const textErr = await tools.updateAnalysisView.execute(
+        {
+          viewId: VIEW_ID,
+          operation: "SORT_BLOCK_DATA",
+          targetBlockId: "block-1",
+          sortKey: "amount",
+          sortOrder: "desc",
+        },
+        TOOL_CTX
+      );
+      expect(textErr).toMatchObject({ success: false });
+
+      // 4. 존재하지 않는 sortKey 거부
+      const keyErr = await tools.updateAnalysisView.execute(
+        {
+          viewId: VIEW_ID,
+          operation: "SORT_BLOCK_DATA",
+          targetBlockId: "block-2",
+          sortKey: "unknownKey",
+          sortOrder: "asc",
+        },
+        TOOL_CTX
+      );
+      expect(keyErr).toMatchObject({ success: false });
+    });
+  });
 });

@@ -345,7 +345,15 @@ export function mergeSeriesWithZeroFill(
  * - ratio 분모가 0인 경우 0으로 나누기를 방어하여 null을 반환하며, 소수점 둘째 자리까지 반올림합니다.
  */
 export function computeSeriesMetric(input: ComputeSeriesMetricInput): ComputeSeriesMetricResult {
-  const { operation, baseSeries, targetSeries, includeKeys, resultKey } = input;
+  const {
+    operation,
+    baseSeries,
+    targetSeries,
+    includeKeys,
+    resultKey,
+    sortBy = "key",
+    sortOrder = "asc",
+  } = input;
 
   const baseMap = new Map<string, number>();
   const targetMap = new Map<string, number>();
@@ -395,6 +403,29 @@ export function computeSeriesMetric(input: ComputeSeriesMetricInput): ComputeSer
       [resultKey]: computed,
     };
   });
+
+  if (sortBy === "key") {
+    if (sortOrder === "desc") {
+      rows.sort((a, b) => b.key.localeCompare(a.key, "ko"));
+    }
+  } else {
+    rows.sort((a, b) => {
+      const rawA = sortBy === "result" ? a[resultKey] : a[sortBy];
+      const rawB = sortBy === "result" ? b[resultKey] : b[sortBy];
+      const numA = typeof rawA === "number" && Number.isFinite(rawA) ? rawA : null;
+      const numB = typeof rawB === "number" && Number.isFinite(rawB) ? rawB : null;
+
+      // 비율 계산 불능(null) 등 결측치는 오름차순·내림차순 모두 하단에 배치합니다.
+      if (numA === null && numB === null) return a.key.localeCompare(b.key, "ko");
+      if (numA === null) return 1;
+      if (numB === null) return -1;
+
+      if (numA !== numB) {
+        return sortOrder === "desc" ? numB - numA : numA - numB;
+      }
+      return a.key.localeCompare(b.key, "ko");
+    });
+  }
 
   return {
     operation,

@@ -58,5 +58,7 @@ describe("formatConsumerContextPrompt (features/execute-navigator-action/lib/pro
     expect(CONSUMER_NAVIGATOR_SYSTEM_PROMPT).toContain("searchSubmissions");
     expect(CONSUMER_NAVIGATOR_SYSTEM_PROMPT).toContain("getRelatedSubmissions");
     expect(CONSUMER_NAVIGATOR_SYSTEM_PROMPT).toContain("success: false");
+    expect(CONSUMER_NAVIGATOR_SYSTEM_PROMPT).toContain('op: "in"');
+    expect(CONSUMER_NAVIGATOR_SYSTEM_PROMPT).toContain("/analyst");
   });
 });

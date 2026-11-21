@@ -278,6 +278,33 @@ describe("createConsumerTools (features/execute-navigator-action/lib/tools)", ()
       expect(res.success).toBe(false);
       expect(res.error).toContain("존재하지 않습니다");
     });
+
+    it("대시보드(/consumer) 등 다른 화면에서도 원격 폼의 relation op:'in' 필터 및 정렬을 적용해 NAVIGATE 액션을 반환해야 한다", async () => {
+      const tools = createConsumerTools({
+        ...baseDeps,
+        currentPath: "/consumer",
+      });
+
+      const res = (await tools.applySubmissionListQuery.execute!(
+        {
+          formId,
+          filters: [{ fieldId: "f_project", op: "in", values: [targetRecordId] }],
+          sort: [{ id: "f_amount", desc: false }],
+          reason: "대시보드에서 특정 프로젝트 지출 내역을 금액 낮은 순으로 엽니다.",
+        },
+        mockExecutionOptions
+      )) as {
+        success: boolean;
+        targetPath?: string;
+        clientAction?: { type: string; targetPath: string };
+      };
+
+      expect(res.success).toBe(true);
+      expect(res.targetPath).toContain(`/consumer/forms/${formId}?`);
+      expect(res.targetPath).toContain("filters=");
+      expect(res.targetPath).toContain("sort=f_amount%3Aasc");
+      expect(res.clientAction?.type).toBe("NAVIGATE");
+    });
   });
 
   describe("searchSubmissions", () => {

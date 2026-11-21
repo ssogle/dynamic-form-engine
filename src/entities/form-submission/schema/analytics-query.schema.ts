@@ -83,6 +83,16 @@ export const computeSeriesMetricInputSchema = z.object({
     .string()
     .min(1, "결과 필드 키 이름은 필수입니다.")
     .describe("결과 필드 키 이름 (예: 'net_profit', 'execution_rate')"),
+  sortBy: z
+    .enum(["key", "baseValue", "targetValue", "result"])
+    .optional()
+    .describe(
+      "결과 행 정렬 기준 ('key': 축 이름순, 'baseValue': 좌항/분자 값순, 'targetValue': 우항/분모 값순, 'result': 계산 결과순). 기본값: 'key'"
+    ),
+  sortOrder: z
+    .enum(["asc", "desc"])
+    .optional()
+    .describe("정렬 방향 ('asc': 오름차순, 'desc': 내림차순). 기본값: 'asc'"),
 });
 
 /**

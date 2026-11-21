@@ -15,6 +15,7 @@ export const ANALYST_NAVIGATOR_SYSTEM_PROMPT = `
      * add (합계): baseSeries + targetSeries
      * ratio (비율 %): (baseSeries / targetSeries) * 100 (예: base=실적, target=목표)
    - ratio 계산 시 분모(targetValue)가 0이면 시스템이 자동으로 null을 반환합니다. 이 null 값을 임의로 0으로 바꾸지 말고 그대로 블록 데이터에 저장하세요 (표는 '-', 차트는 연결 제외/끊김으로 안전 렌더링됩니다).
+   - 결과 시리즈를 특정 기준('key' | 'baseValue' | 'targetValue' | 'result')으로 오름/내림차순 정렬해야 하면 'computeSeriesMetric' 호출 시 'sortBy'와 'sortOrder'('asc' | 'desc')를 직접 지정해 결정론적 정렬 결과를 받아 사용하세요.
 3. 다중 폼 시계열 또는 카테고리·관계 엔티티 병합(Zero-fill Union & 기준 마스터 보존):
    - 두 개 이상의 폼 집계 시리즈를 하나의 표나 차트로 비교할 때는 모든 폼의 X축 키(key) 합집합(Union)을 기준으로 누락된 키의 값은 0으로 채워(Zero-fill) 정렬하세요.
    - 'groupByFieldId'가 'relation' 필드(예: 프로젝트별·부서별)이거나 'select'/'radio' 필드인 경우, 'aggregateFormSubmissions' 결과에는 해당 기간 제출 건수가 0인 항목이 누락됩니다. 기준 마스터 엔티티 전체를 비교하는 분석/갱신에서는 'queryFormSubmissions'로 해당 'relation' 대상 마스터 폼의 전체 활성 레코드(기간 필터 'startDate'/'endDate' 없이 조회) 또는 'select'/'radio' 전체 옵션 라벨을 함께 확인해 'computeSeriesMetric'의 'includeKeys'로 전달하여 값이 0인 항목도 누락 없이 '0'(ratio는 'null')으로 유지하세요.
@@ -68,6 +69,7 @@ export const ANALYST_NAVIGATOR_SYSTEM_PROMPT = `
     - 특정 블록 내용/제목 수정: 'UPDATE_BLOCK' (기존 targetBlockId 유지)
     - 특정 블록 제거: 'REMOVE_BLOCK' (targetBlockId 지정)
     - 블록 순서 변경: 'REORDER_BLOCKS' (기존 블록 ID 전체를 새 순서 배열 blockIds로 전달)
+    - 기존 테이블/차트 블록 데이터 재정렬: 'SORT_BLOCK_DATA' (targetBlockId, sortKey, sortOrder 전달 — 재집계나 전체 블록 재생성 없이 해당 블록의 rows/data만 결정론적으로 정렬)
     - 문서 제목/설명만 수정: 'UPDATE_INFO'
 - 문서 발행/회수: 'publishAnalysisView({ viewId, isPublished })' (최소 1개 이상의 블록이 있어야 발행 가능)
 - 목록에서 삭제/열기: 'visibleAnalysisViews' 목록 캐시를 참고하여 'deleteAnalysisViews({ viewIds })' 또는 'navigate({ targetPath: "/analyst/views/[id]" })' 호출

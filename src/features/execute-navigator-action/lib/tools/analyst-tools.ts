@@ -82,6 +82,51 @@ function hasDuplicateBlockIds(blocks: AnalysisBlock[]): boolean {
 }
 
 /**
+ * 테이블/차트 블록에서 정렬 가능한 컬럼 및 데이터 키 집합을 추출합니다.
+ */
+function getBlockSortableKeys(block: AnalysisBlock): Set<string> {
+  if (block.type === "table") {
+    const keys = new Set(block.columns.map((col) => col.key));
+    for (const row of block.rows) {
+      for (const k of Object.keys(row)) keys.add(k);
+    }
+    return keys;
+  }
+  if (block.type === "chart") {
+    const keys = new Set<string>([block.xAxisKey, ...block.series.map((s) => s.key)]);
+    for (const item of block.data) {
+      for (const k of Object.keys(item)) keys.add(k);
+    }
+    return keys;
+  }
+  return new Set();
+}
+
+/**
+ * 테이블 행 또는 차트 데이터 배열을 특정 키와 방향 기준으로 결정론적 정렬합니다.
+ * null/undefined/NaN은 정렬 방향과 무관하게 항상 하단에 배치합니다.
+ */
+function sortAnalysisRecords<
+  T extends Record<string, string | number | boolean | null | undefined>,
+>(records: T[], sortKey: string, sortOrder: "asc" | "desc"): T[] {
+  const dir = sortOrder === "desc" ? -1 : 1;
+  return [...records].sort((a, b) => {
+    const va = a[sortKey];
+    const vb = b[sortKey];
+    const aEmpty = va === null || va === undefined;
+    const bEmpty = vb === null || vb === undefined;
+    if (aEmpty && bEmpty) return 0;
+    if (aEmpty) return 1;
+    if (bEmpty) return -1;
+
+    if (typeof va === "number" && typeof vb === "number") {
+      return (va - vb) * dir;
+    }
+    return String(va).localeCompare(String(vb), "ko-KR", { numeric: true }) * dir;
+  });
+}
+
+/**
  * AI Analyst Navigator Vercel AI SDK 도구 카탈로그 생성 팩토리 함수
  *
  * 폼 조회(searchForms, getFormDetails)는 공통 queryTools가 담당하며,
@@ -178,7 +223,7 @@ export function createAnalystTools(deps: AnalystToolsDependencies) {
 
   const computeSeriesMetricTool = tool({
     description:
-      "두 집계 시리즈(baseSeries, targetSeries)와 선택적 기준 키 목록(includeKeys)의 합집합 Zero-fill로 정렬한 뒤 차액(subtract: base - target), 합산(add: base + target), 백분율 비율(ratio: (base / target) * 100, 분모 0이면 null)을 부동소수점 오차 없이 계산합니다.",
+      "두 집계 시리즈(baseSeries, targetSeries)와 선택적 기준 키 목록(includeKeys)의 합집합 Zero-fill로 정렬한 뒤 차액(subtract: base - target), 합산(add: base + target), 백분율 비율(ratio: (base / target) * 100, 분모 0이면 null)을 부동소수점 오차 없이 계산합니다. sortBy('key' | 'baseValue' | 'targetValue' | 'result')와 sortOrder('asc' | 'desc')를 지정하면 결과도 결정론적으로 정렬됩니다.",
     inputSchema: computeSeriesMetricInputSchema,
     execute: async (input: ComputeSeriesMetricInput) => {
       const computed = computeSeriesMetric(input);
@@ -229,7 +274,7 @@ export function createAnalystTools(deps: AnalystToolsDependencies) {
 
   const updateAnalysisViewTool = tool({
     description:
-      "기존 분석 뷰 문서의 특정 블록을 추가/수정/삭제/재배치하거나 메타데이터(제목/설명) 및 전체 블록을 수정합니다. 여러 블록의 기간·기준을 한꺼번에 전환할 때는 SET_ALL_BLOCKS로 title/description/blocks를 원자적으로 일괄 갱신하세요.",
+      "기존 분석 뷰 문서의 특정 블록을 추가/수정/삭제/재배치/데이터 정렬(SORT_BLOCK_DATA)하거나 메타데이터(제목/설명) 및 전체 블록을 수정합니다. 여러 블록의 기간·기준을 한꺼번에 전환할 때는 SET_ALL_BLOCKS로 title/description/blocks를 원자적으로 일괄 갱신하고, 기존 차트·표의 행 순서만 바꾸려면 SORT_BLOCK_DATA를 사용하세요.",
     inputSchema: updateAnalysisViewInputSchema,
     execute: async ({
       viewId,
@@ -238,6 +283,8 @@ export function createAnalystTools(deps: AnalystToolsDependencies) {
       block,
       insertIndex,
       blockIds,
+      sortKey,
+      sortOrder,
       blocks: nextAllBlocks,
       title,
       description,
@@ -343,6 +390,49 @@ export function createAnalystTools(deps: AnalystToolsDependencies) {
             }
 
             updatedBlocks = blockIds.map((id) => blockMap.get(id)!);
+            break;
+          }
+
+          case "SORT_BLOCK_DATA": {
+            if (!targetBlockId || !sortKey) {
+              return {
+                success: false,
+                error: "SORT_BLOCK_DATA 오퍼레이션에는 targetBlockId와 sortKey가 필수입니다.",
+              };
+            }
+            const targetIdx = currentBlocks.findIndex((b) => b.id === targetBlockId);
+            if (targetIdx === -1) {
+              return {
+                success: false,
+                error: `정렬 대상 블록 ID('${targetBlockId}')를 찾을 수 없습니다.`,
+              };
+            }
+            const targetBlock = currentBlocks[targetIdx]!;
+            if (targetBlock.type !== "table" && targetBlock.type !== "chart") {
+              return {
+                success: false,
+                error:
+                  "SORT_BLOCK_DATA 오퍼레이션은 'table' 또는 'chart' 블록에만 적용할 수 있습니다.",
+              };
+            }
+            const validKeys = getBlockSortableKeys(targetBlock);
+            if (!validKeys.has(sortKey)) {
+              return {
+                success: false,
+                error: `블록('${targetBlockId}')에 정렬 키('${sortKey}')가 존재하지 않습니다.`,
+              };
+            }
+            const resolvedOrder = sortOrder ?? "desc";
+            updatedBlocks[targetIdx] =
+              targetBlock.type === "table"
+                ? {
+                    ...targetBlock,
+                    rows: sortAnalysisRecords(targetBlock.rows, sortKey, resolvedOrder),
+                  }
+                : {
+                    ...targetBlock,
+                    data: sortAnalysisRecords(targetBlock.data, sortKey, resolvedOrder),
+                  };
             break;
           }
 

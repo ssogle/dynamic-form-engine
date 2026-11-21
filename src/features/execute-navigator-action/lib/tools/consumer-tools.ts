@@ -407,7 +407,7 @@ export function createConsumerTools(deps: ConsumerToolsDependencies) {
 
   const applySubmissionListQueryTool = tool({
     description:
-      "특정 폼의 응답 목록(/consumer/forms/[id])에 컬럼 필터, 기간 범위 필터, 다중 정렬을 적용하거나 전체 초기화(reset: true)합니다.",
+      "어느 화면에 있든 특정 폼의 응답 목록(/consumer/forms/[id])에 컬럼 필터, 기간 범위 필터, 다중 정렬을 적용한 URL로 이동하거나 조건을 초기화(reset: true)합니다. 다른 화면에서도 'searchForms'·'getFormDetails'로 formId/fieldId를 확인한 뒤 원격으로 필터·정렬 적용 목록을 열 수 있습니다. relation 필드 일치 필터 시에는 'op: \"in\", values: [\"uuid\"]' 형식을 우선 사용하세요.",
     inputSchema: consumerApplySubmissionListQueryInputSchema,
     execute: async ({
       formId,
