@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/shared/ui/sonner";
 import { Providers } from "./providers";
@@ -37,6 +38,11 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * 애플리케이션 전역 루트 레이아웃
+ *
+ * 전역 폰트, 테마/쿼리 프로바이더, 토스트 알림 및 Vercel Web Analytics 방문자 추적 스크립트를 마운트합니다.
+ */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
@@ -47,6 +53,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="flex min-h-full flex-col">
         <Providers>{children}</Providers>
         <Toaster position="bottom-right" richColors />
+        {/* Vercel Web Analytics: 프로덕션 환경 방문자 및 페이지뷰 자동 집계 */}
+        <Analytics />
       </body>
     </html>
   );
